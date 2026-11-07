@@ -27,6 +27,9 @@ Trạng thái: **Implementation-ready baseline**, còn các quyết định cầ
 16. [`docs/14-nfr-and-operations.md`](docs/14-nfr-and-operations.md): NFR/SLO, release, vận hành.
 17. [`docs/15-decisions-risks.md`](docs/15-decisions-risks.md): ADR, giả định và rủi ro.
 18. [`docs/16-implementation-plan.md`](docs/16-implementation-plan.md): kế hoạch triển khai chi tiết iOS + backend, môi trường dev không tốn phí.
+19. [`docs/reviews/CON-001-contract-review.md`](docs/reviews/CON-001-contract-review.md): kết quả rà soát contract (C0), các điểm cần ADR.
+20. [`backend/README.md`](backend/README.md): chạy backend local, test, dev token.
+21. [`ios/README.md`](ios/README.md): build iOS qua GitHub Actions và sideload bằng Sideloadly.
 
 ## Tham chiếu UI
 - [`references/ui_concept_reference.png`](references/ui_concept_reference.png): mockup minh họa đã trao đổi; **không phải bản giao diện pixel-perfect hay nguồn thiết kế có thể chỉnh sửa**. Thông số thực thi vẫn theo `docs/02-ux-spec.md`.
