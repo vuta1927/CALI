@@ -37,6 +37,19 @@ Commit `606030e` cung cấp lát cắt UI/UX chạy hoàn toàn local, chưa k�
 Archive unsigned của POC đã build thành công trên GitHub Actions với Xcode 16.4 ở commit
 `606030e` (run `42384088704`). Việc sideload và device matrix trên iPhone thật vẫn chưa được xác minh.
 
+## Quản lý bài tập và giáo án (IOS-009 / MED-002)
+
+Tab **Bài tập** → **+** để thêm; mở chi tiết → **Sửa** để đổi thông tin, ảnh/video.
+Media nhận link HTTPS hoặc chọn từ Thư viện ảnh/Tệp. Tệp được sao chép vào
+Application Support để dùng offline, không gửi lên server. Link trang video có nút mở
+bằng trình duyệt; phát trong app cần URL video tương thích AVPlayer.
+
+Tab **Giáo án** → menu **…** để sửa tên/xóa; chạm ngày nghỉ để thêm buổi.
+Mỗi buổi có menu sửa/xóa, editor có chọn ngày, thêm/bớt/sắp xếp bài và mục tiêu.
+Xóa giáo án giữ lịch sử và buổi đang tập; màn hình trống cho phép tạo lại.
+
+Chi tiết lưu trữ, phạm vi contract và checklist thiết bị: [docs/17](../docs/17-content-editing.md).
+
 ## CI build như thế nào
 
 Workflow `ios-build` (runner `macos-15`) chỉ chạy khi:

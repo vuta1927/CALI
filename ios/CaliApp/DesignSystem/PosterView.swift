@@ -1,10 +1,10 @@
 import SwiftUI
+import UIKit
 
 /// Exercise identity image (AGENTS rule 2: visual-first).
 ///
-/// The POC has no licensed media yet, so every poster is a generated placeholder: a gradient,
-/// an SF Symbol and a visible "PLACEHOLDER" label. Real posters/videos come from the
-/// Exercise Catalog media pipeline (docs/06). TODO(POC-002): replace with cached catalog media.
+/// Personal media overlays the labeled fallback. Bundled production catalog media remains
+/// TODO(POC-002): replace sample placeholders when the licensed media pipeline is ready.
 struct PosterView: View {
     let exercise: Exercise?
     var height: CGFloat = 180
@@ -36,6 +36,21 @@ struct PosterView: View {
                 }
                 .padding(Spacing.s)
             }
+            if let media = exercise?.poster, let url = media.url {
+                GeometryReader { geometry in
+                    if media.source == .local, let image = UIImage(contentsOfFile: url.path) {
+                        Image(uiImage: image).resizable().scaledToFill()
+                            .frame(width: geometry.size.width, height: height).clipped()
+                    } else if media.source == .remote {
+                        AsyncImage(url: url) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFill()
+                                    .frame(width: geometry.size.width, height: height).clipped()
+                            }
+                        }
+                    }
+                }
+            }
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
@@ -45,7 +60,7 @@ struct PosterView: View {
                 .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(exercise?.name ?? "Bài tập"), ảnh minh hoạ tạm")
+        .accessibilityLabel("\(exercise?.name ?? "Bài tập"), ảnh bài tập")
     }
 }
 

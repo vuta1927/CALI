@@ -56,3 +56,12 @@ For MVP, `training_plans.revision` increments on change; `planned_workouts`/`pla
 
 ## 8. Typed sync payloads
 `contracts/entity-payloads.schema.json` is the normative per-entity payload validator for `POST /v1/sync/push`; OpenAPI specifies the envelope. Use JSON Schema validation server-side and generated/handwritten typed models on iOS, ensuring JSON keys stay aligned.
+
+## POC personal-content persistence (IOS-009 / MED-002)
+The app's JSON snapshot adds optional `catalog`; missing means the original bundled
+sample catalog, while an explicit array is authoritative. `Exercise.poster/video`
+are optional `{source: local|remote, value: string}` references. `WorkoutPlan.deletedAt`
+is an optional local tombstone; deleting clears scheduled workouts only. These additive
+fields retain snapshot schemaVersion 1 and decode absent fields as nil. See
+[scope and migration](17-content-editing.md). These app-only shapes are not sync payloads;
+they require no change to the PostgreSQL schema or public API in this POC.

@@ -2,6 +2,14 @@
 
 **Visual reference:** [`../references/ui_concept_reference.png`](../references/ui_concept_reference.png). Đây là minh họa ý tưởng; bố cục và chữ trong hình do AI dựng, có thể sai tiểu tiết. Mọi requirement chính thức nằm ở tài liệu này.
 
+## Quản lý nội dung cá nhân (IOS-009 / MED-002)
+Catalog có nút thêm bài, chi tiết có nút sửa. Form chỉnh tên, kiểu tập, cấp độ,
+nhóm cơ, dụng cụ, cue/lỗi và ảnh/video riêng. Cho nhập HTTPS hoặc chọn Photos/Files,
+gỡ từng media, hủy không lưu. Kiểu tập của bài đã được dùng phải giữ nguyên;
+muốn đổi kiểu thì tạo bài mới để bảo toàn mục tiêu đã ghi.
+Giáo án có sửa tên, xóa xác nhận, tạo lại; buổi tập có thêm/sửa ngày/xóa xác nhận.
+Xem [quy tắc và acceptance](17-content-editing.md).
+
 ## 1. Product UX principles
 1. **See, then read**: ảnh poster biểu đạt đúng posture; tên bài được hiển thị nhưng không chiếm vị trí ưu tiên.
 2. **1-hand use**: nút lớn, ít thao tác, ưu tiên phía dưới màn hình.

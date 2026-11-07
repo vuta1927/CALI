@@ -4,45 +4,97 @@ import SwiftUI
 /// "Giáo án" tab (UX-03): weekly schedule of the active plan, each day editable.
 struct PlanView: View {
     @Environment(AppStore.self) private var store
+    @State private var editingPlan = false
+    @State private var deletingPlan = false
+    @State private var newWorkout: PlannedWorkout?
+    @State private var title = ""
+    @State private var planError: String?
 
     var body: some View {
         let today = Fmt.isoWeekday(Date())
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.l) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text(store.plan.title)
-                            .font(.title3.bold())
-                            .foregroundStyle(Color.caliText)
-                        Text("\(store.plan.workouts.count) buổi / tuần")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.caliSecondary)
-                    }
-                    Spacer()
-                    MockBadge()
-                }
-                ForEach(1...7, id: \.self) { day in
-                    if let workout = store.plan.workouts.first(where: { $0.weekday == day }) {
-                        NavigationLink {
-                            WorkoutDetailView(workoutId: workout.id)
-                        } label: {
-                            PlanDayRow(day: day, isToday: day == today, workout: workout)
+                if store.plan.deletedAt != nil {
+                    ContentUnavailableView("Chưa có giáo án", systemImage: "calendar", description: Text("Tạo giáo án rồi thêm buổi tập vào các ngày trong tuần."))
+                    Button("Tạo giáo án") { title = "Giáo án của tôi"; editingPlan = true }.buttonStyle(.caliPrimary)
+                } else {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
+                            Text(store.plan.title)
+                                .font(.title3.bold())
+                                .foregroundStyle(Color.caliText)
+                            Text("\(store.plan.workouts.count) buổi / tuần")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.caliSecondary)
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        PlanDayRow(day: day, isToday: day == today, workout: nil)
+                        Spacer()
+                        TagChip(text: "Lưu trên máy", systemImage: "internaldrive")
                     }
+                    ForEach(1...7, id: \.self) { day in
+                        if let workout = store.plan.workouts.first(where: { $0.weekday == day }) {
+                            NavigationLink {
+                                WorkoutDetailView(workoutId: workout.id)
+                            } label: {
+                                PlanDayRow(day: day, isToday: day == today, workout: workout)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button {
+                                newWorkout = PlannedWorkout(id: UUID(), weekday: day, title: "Buổi tập mới", focus: "", exercises: [])
+                            } label: {
+                                HStack {
+                                    PlanDayRow(day: day, isToday: day == today, workout: nil)
+                                    Image(systemName: "plus.circle").accessibilityLabel("Thêm buổi tập")
+                                }
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                    Label("Bạn có thể sửa tên giáo án, thêm/sửa/xóa buổi tập. Mọi thay đổi được lưu trên máy và ghi vào nhật ký ở tab Cá nhân.", systemImage: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(Color.caliSecondary)
+                        .padding(.top, Spacing.s)
                 }
-                Label("Giáo án mẫu để thử giao diện. Bạn có thể sửa số set, mục tiêu và thời gian nghỉ; mọi thay đổi được ghi vào nhật ký ở tab Cá nhân.", systemImage: "info.circle")
-                    .font(.footnote)
-                    .foregroundStyle(Color.caliSecondary)
-                    .padding(.top, Spacing.s)
             }
             .padding(Spacing.l)
         }
         .caliScreen()
         .navigationTitle("Giáo án")
         .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbar {
+            if store.plan.deletedAt == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Sửa tên giáo án", systemImage: "pencil") { title = store.plan.title; editingPlan = true }
+                        Button("Xóa giáo án", systemImage: "trash", role: .destructive) { deletingPlan = true }
+                    } label: { Image(systemName: "ellipsis.circle").frame(minWidth: minTapTarget, minHeight: minTapTarget) }
+                    .accessibilityLabel("Quản lý giáo án")
+                }
+            }
+        }
+        .sheet(isPresented: $editingPlan) {
+            NavigationStack {
+                Form {
+                    TextField("Tên giáo án", text: $title)
+                    if let planError { Text(planError).foregroundStyle(Color.caliError) }
+                }
+                    .navigationTitle("Giáo án")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Hủy") { editingPlan = false } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Lưu") {
+                                if store.renamePlan(title) { planError = nil; editingPlan = false }
+                                else { planError = store.alertMessage; store.alertMessage = nil }
+                            }
+                                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+            }
+        }
+        .sheet(item: $newWorkout) { WorkoutEditorView(workout: $0) }
+        .confirmationDialog("Xóa giáo án và các buổi đã lên lịch?", isPresented: $deletingPlan, titleVisibility: .visible) {
+            Button("Xóa giáo án", role: .destructive) { store.deletePlan() }
+            Button("Hủy", role: .cancel) {}
+        } message: { Text("Lịch sử và buổi đang tập được giữ lại. Thao tác này không thể hoàn tác.") }
     }
 }
 
@@ -98,6 +150,8 @@ private struct PlanDayRow: View {
 /// Planned workout detail with start and edit actions.
 struct WorkoutDetailView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var deleting = false
     let workoutId: UUID
     @State private var editing = false
 
@@ -144,10 +198,17 @@ struct WorkoutDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Sửa") { editing = true }
-                        .frame(minWidth: minTapTarget, minHeight: minTapTarget)
+                    Menu {
+                        Button("Sửa buổi tập", systemImage: "pencil") { editing = true }
+                        Button("Xóa buổi tập", systemImage: "trash", role: .destructive) { deleting = true }
+                    } label: { Image(systemName: "ellipsis.circle").frame(minWidth: minTapTarget, minHeight: minTapTarget) }
+                    .accessibilityLabel("Quản lý buổi tập")
                 }
             }
+            .confirmationDialog("Xóa buổi tập này?", isPresented: $deleting, titleVisibility: .visible) {
+                Button("Xóa buổi tập", role: .destructive) { if store.deleteWorkout(workoutId) { dismiss() } }
+                Button("Hủy", role: .cancel) {}
+            } message: { Text("Lịch sử và buổi đang tập được giữ lại.") }
             .sheet(isPresented: $editing) {
                 WorkoutEditorView(workout: workout)
             }

@@ -4,6 +4,7 @@ import SwiftUI
 /// "Bài tập" tab (UX-04): visual-first catalog with search and type/level filters.
 struct CatalogView: View {
     @Environment(AppStore.self) private var store
+    @State private var adding = false
     @State private var query = ""
     @State private var type: ExerciseType?
     @State private var level: ExerciseLevel?
@@ -48,7 +49,7 @@ struct CatalogView: View {
                         }
                     }
                 }
-                Text("Ảnh minh hoạ là ảnh tạm (PLACEHOLDER), sẽ thay bằng ảnh/video thật của thư viện bài tập.")
+                Text("Bạn có thể thêm/sửa bài và gắn ảnh/video của mình. Bài chưa có ảnh sẽ hiển thị PLACEHOLDER.")
                     .font(.footnote)
                     .foregroundStyle(Color.caliSecondary)
             }
@@ -58,6 +59,8 @@ struct CatalogView: View {
         .caliScreen()
         .navigationTitle("Bài tập")
         .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbar { ToolbarItem(placement: .primaryAction) { Button("Thêm bài tập", systemImage: "plus") { adding = true }.frame(minWidth: minTapTarget, minHeight: minTapTarget) } }
+        .sheet(isPresented: $adding) { ExerciseEditorView() }
     }
 
     private var filtered: [Exercise] {
@@ -100,13 +103,24 @@ private struct ExerciseCard: View {
 /// (`showsStartActions: false`).
 struct ExerciseDetailView: View {
     @Environment(AppStore.self) private var store
-    let exercise: Exercise
+    private let original: Exercise
+    private var exercise: Exercise { store.exercise(original.id) ?? original }
+    @State private var editing = false
     var showsStartActions = true
+
+    init(exercise: Exercise, showsStartActions: Bool = true) {
+        original = exercise
+        self.showsStartActions = showsStartActions
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
                 PosterView(exercise: exercise, height: 260)
+                if let media = exercise.video, let url = media.url {
+                    ExerciseVideoView(url: url).id(url)
+                    if media.source == .remote { Link("Mở liên kết video", destination: url) }
+                }
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     Text(exercise.name)
                         .font(.largeTitle.bold())
@@ -139,6 +153,10 @@ struct ExerciseDetailView: View {
         }
         .caliScreen()
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsStartActions { ToolbarItem(placement: .primaryAction) { Button("Sửa") { editing = true } } }
+        }
+        .sheet(isPresented: $editing) { ExerciseEditorView(exercise: exercise) }
     }
 
     /// Ad-hoc 2-set workout with the exercise's default target (not saved to the plan).

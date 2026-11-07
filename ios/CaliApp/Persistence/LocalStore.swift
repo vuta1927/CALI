@@ -11,6 +11,8 @@ struct PersistedSnapshot: Codable, Sendable {
     static let currentSchema = 1
 
     var schemaVersion = PersistedSnapshot.currentSchema
+    /// Absent in older snapshots; load the bundled sample catalog only in that case.
+    var catalog: [Exercise]? = nil
     var plan: WorkoutPlan
     var history: [CompletedSession]
     var recommendations: [Recommendation]
@@ -56,13 +58,9 @@ enum LocalStore {
         }
     }
 
-    static func save(_ snapshot: PersistedSnapshot) {
-        do {
-            let data = try DomainJSON.makeEncoder().encode(snapshot)
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        } catch {
-            log.error("Failed to save local store: \(String(describing: error), privacy: .public)")
-        }
+    static func save(_ snapshot: PersistedSnapshot) throws {
+        let data = try DomainJSON.makeEncoder().encode(snapshot)
+        try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
     static func delete() {

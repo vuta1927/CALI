@@ -17,19 +17,23 @@ enum ExerciseLevel: String, Codable, Sendable, CaseIterable {
 }
 
 struct Exercise: Identifiable, Codable, Hashable, Sendable {
-    let id: UUID
-    let slug: String
-    let name: String
-    let type: ExerciseType
-    let level: ExerciseLevel
-    let equipment: [String]
-    let muscles: [String]
-    let cues: [String]
-    let mistakes: [String]
-    let catalogVersion: Int
+    var id: UUID
+    var slug: String
+    var name: String
+    var type: ExerciseType
+    var level: ExerciseLevel
+    var equipment: [String]
+    var muscles: [String]
+    var cues: [String]
+    var mistakes: [String]
+    var catalogVersion: Int
     /// POC-only: SF Symbol + palette used by the placeholder poster.
-    let symbol: String
-    let paletteIndex: Int
+    var symbol: String
+    var paletteIndex: Int
+
+    /// Local-only user media, never included in the server catalog payload.
+    var poster: ExerciseMediaReference? = nil
+    var video: ExerciseMediaReference? = nil
 
     var equipmentLabel: String {
         equipment.isEmpty ? "Không cần dụng cụ" : equipment.joined(separator: ", ")
@@ -65,6 +69,8 @@ struct PlannedWorkout: Identifiable, Codable, Hashable, Sendable {
 }
 
 struct WorkoutPlan: Codable, Hashable, Sendable {
+    /// Local-only tombstone; historical sessions keep their original IDs.
+    var deletedAt: Date? = nil
     var id: UUID
     var title: String
     var workouts: [PlannedWorkout]

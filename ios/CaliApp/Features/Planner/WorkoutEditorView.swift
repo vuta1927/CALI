@@ -9,6 +9,7 @@ struct WorkoutEditorView: View {
     @State private var draft: PlannedWorkout
     @State private var showPicker = false
     @State private var confirmDiscard = false
+    @State private var saveError: String?
     private let original: PlannedWorkout
 
     init(workout: PlannedWorkout) {
@@ -22,6 +23,9 @@ struct WorkoutEditorView: View {
                 Section {
                     TextField("Tên buổi", text: $draft.title)
                     TextField("Trọng tâm", text: $draft.focus)
+                    Picker("Ngày tập", selection: $draft.weekday) {
+                        ForEach(1...7, id: \.self) { Text(Fmt.weekdayLong($0)).tag($0) }
+                    }
                 } header: {
                     Text("Thông tin")
                 }
@@ -43,7 +47,7 @@ struct WorkoutEditorView: View {
                 .listRowBackground(Color.caliSurface)
             }
             .caliScreen()
-            .navigationTitle("Sửa buổi tập")
+            .navigationTitle(store.plan.workouts.contains { $0.id == draft.id } ? "Sửa buổi tập" : "Thêm buổi tập")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -53,8 +57,8 @@ struct WorkoutEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Lưu") {
-                        store.updateWorkout(draft)
-                        dismiss()
+                        if store.updateWorkout(draft) { dismiss() }
+                        else { saveError = store.alertMessage; store.alertMessage = nil }
                     }
                     .disabled(draft == original || draft.exercises.isEmpty || draft.title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -63,6 +67,9 @@ struct WorkoutEditorView: View {
                 Button("Bỏ thay đổi", role: .destructive) { dismiss() }
                 Button("Tiếp tục sửa", role: .cancel) {}
             }
+            .alert("Không lưu được buổi tập", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) { Button("Đóng", role: .cancel) {} } message: { Text(saveError ?? "") }
             .sheet(isPresented: $showPicker) {
                 ExercisePickerView { exercise in
                     draft.exercises.append(PlannedExercise(
@@ -114,7 +121,7 @@ private struct PlannedExerciseEditor: View {
             Stepper("Thời gian: \(time) giây", value: binding(time) { .timedReps(timeSeconds: $0) }, in: 10...180, step: 5)
         case .interval(let work, let rest):
             Stepper("Tập: \(work) giây", value: binding(work) { .interval(workSeconds: $0, restSeconds: rest) }, in: 5...180, step: 5)
-            Stepper("Nghỉ trong hiệp: \(rest) giây", value: binding(rest) { .interval(workSeconds: work, restSeconds: $0) }, in: 0...120, step: 5)
+            Stepper("Nghỉ trong hiệp: \(rest) giây", value: binding(rest) { .interval(workSeconds: work, restSeconds: $0) }, in: 5...120, step: 5)
         case .skillAttempt(let attempts):
             Stepper("Số lần thử: \(attempts)", value: binding(attempts) { .skillAttempt(attempts: $0) }, in: 1...10)
         }

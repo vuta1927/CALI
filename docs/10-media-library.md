@@ -20,6 +20,17 @@ The starter catalog that ships in the app uses its own manifest format, `contrac
 
 Media cache can be deleted/rebuilt, session logs cannot. Media files validated by SHA-256 and contentVersion; partial downloads not marked READY. Cache budget configurable (initial suggestion 500MB), manual clear cache, never delete active session pinned files.
 
+## 3.1 Personal media in the local POC (MED-002)
+Users can attach their own HTTPS links or import photos/videos through PhotosPicker
+or the Files importer. Files are copied into Application Support/exercise-media with
+UUID filenames; JSON stores relative references. Imports are capped at 20 MB for images
+and 200 MB for videos; video transfer uses a file representation instead of loading
+entire videos into RAM. No user media uploads. Cancel discards newly imported files;
+saved media is retained across launches and is not treated as an evictable cache.
+Remote links require network; webpage videos can open externally. The managed public
+catalog licensing and ingestion rules below still apply to distributed starter content.
+See [local data and QA rules](17-content-editing.md).
+
 ## 4. API and content operations
 - Catalog endpoint includes media references/metadata, not huge encoded binaries; media signed URLs expire, client refreshes as needed.
 - A backend-only content ingestion tool verifies file license, thumbnail quality, orientation, SHA256, version and safety of depicted technique.

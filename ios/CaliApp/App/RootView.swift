@@ -42,7 +42,7 @@ struct RootView: View {
             WelcomeView { store.updateSettings { $0.hasSeenWelcome = true } }
                 .interactiveDismissDisabled()
         }
-        .alert("Không thể bắt đầu", isPresented: alertBinding) {
+        .alert("Không thể thực hiện", isPresented: alertBinding) {
             Button("Đóng", role: .cancel) { store.alertMessage = nil }
             if store.activeSessionInProgress {
                 Button("Mở buổi đang tập") {

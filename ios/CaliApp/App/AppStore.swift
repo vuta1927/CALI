@@ -9,7 +9,7 @@ import Observation
 final class AppStore {
     // MARK: State
 
-    let catalog: [Exercise] = MockData.catalog
+    private(set) var catalog: [Exercise]
     private(set) var plan: WorkoutPlan
     private(set) var history: [CompletedSession]
     private(set) var recommendations: [Recommendation]
@@ -28,12 +28,10 @@ final class AppStore {
     @ObservationIgnored private let persists: Bool
     @ObservationIgnored private let notifications = NotificationService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
-    @ObservationIgnored private let exerciseIndex: [UUID: Exercise] =
-        Dictionary(uniqueKeysWithValues: MockData.catalog.map { ($0.id, $0) })
-
     init(persists: Bool = true, now: Date = Date()) {
         self.persists = persists
         if persists, let snapshot = LocalStore.load() {
+            catalog = snapshot.catalog ?? MockData.catalog
             plan = snapshot.plan
             history = snapshot.history
             recommendations = snapshot.recommendations
@@ -44,6 +42,7 @@ final class AppStore {
                 player = WorkoutPlayerModel(active: active)
             }
         } else {
+            catalog = MockData.catalog
             plan = MockData.plan
             history = MockData.sampleHistory(now: now)
             recommendations = MockData.sampleRecommendations()
@@ -56,7 +55,7 @@ final class AppStore {
 
     // MARK: Lookups
 
-    func exercise(_ id: UUID) -> Exercise? { exerciseIndex[id] }
+    func exercise(_ id: UUID) -> Exercise? { catalog.first { $0.id == id } }
 
     func workout(_ id: UUID) -> PlannedWorkout? {
         if id == MockData.quickTestId { return MockData.quickTest }
@@ -188,12 +187,98 @@ final class AppStore {
 
     // MARK: Plan editing
 
-    func updateWorkout(_ workout: PlannedWorkout) {
-        guard let index = plan.workouts.firstIndex(where: { $0.id == workout.id }) else { return }
-        guard plan.workouts[index] != workout else { return }
-        plan.workouts[index] = workout
-        log("Sửa giáo án", "\(workout.title): \(workout.exercises.count) bài, \(workout.totalSets) set")
-        persist()
+    @discardableResult
+    func saveExercise(_ exercise: Exercise, commandId: UUID = UUID()) -> Bool {
+        if audit.contains(where: { $0.id == commandId }) { return true }
+        guard !exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              [exercise.poster, exercise.video].compactMap({ $0 }).allSatisfy({ $0.url != nil }) else {
+            alertMessage = "Tên bài tập hoặc đường dẫn media không hợp lệ."
+            return false
+        }
+        if let previous = self.exercise(exercise.id), previous.type != exercise.type {
+            let referenced = plan.workouts.contains { $0.exercises.contains { $0.exerciseId == exercise.id } }
+                || MockData.quickTest.exercises.contains { $0.exerciseId == exercise.id }
+                || history.contains { $0.exerciseIds.contains(exercise.id) }
+                || (player?.state.executions.contains { $0.exerciseId == exercise.id } ?? false)
+            guard !referenced else {
+                alertMessage = "Bài đã được sử dụng. Hãy tạo bài mới nếu muốn đổi kiểu tập."
+                return false
+            }
+        }
+        var copy = catalog
+        if let index = copy.firstIndex(where: { $0.id == exercise.id }) { copy[index] = exercise }
+        else { copy.append(exercise) }
+        return commitContent(catalog: copy, plan: plan, action: "Lưu bài tập", detail: exercise.name, commandId: commandId)
+    }
+
+    @discardableResult
+    func updateWorkout(_ workout: PlannedWorkout, commandId: UUID = UUID()) -> Bool {
+        if audit.contains(where: { $0.id == commandId }) { return true }
+        guard !workout.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              (1...7).contains(workout.weekday), !workout.exercises.isEmpty,
+              workout.exercises.allSatisfy({ item in
+                  (1...10).contains(item.setCount) && (0...300).contains(item.restSeconds)
+                      && item.target.validate().isEmpty && exercise(item.exerciseId)?.type == item.target.type
+              }),
+              !plan.workouts.contains(where: { $0.id != workout.id && $0.weekday == workout.weekday }) else {
+            alertMessage = "Kiểm tra tên, ngày tập, bài tập và mục tiêu; mỗi ngày chỉ có một buổi."
+            return false
+        }
+        var copy = plan
+        copy.deletedAt = nil
+        if let index = copy.workouts.firstIndex(where: { $0.id == workout.id }) { copy.workouts[index] = workout }
+        else { copy.workouts.append(workout) }
+        return commitContent(catalog: catalog, plan: copy, action: "Lưu buổi tập", detail: workout.title, commandId: commandId)
+    }
+
+    @discardableResult
+    func renamePlan(_ title: String, commandId: UUID = UUID()) -> Bool {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return false }
+        var copy = plan
+        if copy.deletedAt != nil { copy.id = UUID() }
+        copy.title = title
+        copy.deletedAt = nil
+        return commitContent(catalog: catalog, plan: copy, action: "Sửa giáo án", detail: title, commandId: commandId)
+    }
+
+    @discardableResult
+    func deleteWorkout(_ id: UUID, commandId: UUID = UUID()) -> Bool {
+        if audit.contains(where: { $0.id == commandId }) { return true }
+        guard plan.workouts.contains(where: { $0.id == id }) else {
+            alertMessage = "Buổi tập này không còn trong giáo án."
+            return false
+        }
+        var copy = plan
+        copy.workouts.removeAll { $0.id == id }
+        return commitContent(catalog: catalog, plan: copy, action: "Xóa buổi tập", detail: id.uuidString, commandId: commandId)
+    }
+
+    @discardableResult
+    func deletePlan(commandId: UUID = UUID()) -> Bool {
+        var copy = plan
+        copy.workouts = []
+        copy.deletedAt = Date()
+        return commitContent(catalog: catalog, plan: copy, action: "Xóa giáo án", detail: plan.title, commandId: commandId)
+    }
+
+    /// Write one atomic snapshot before publishing success; a failed write leaves state untouched.
+    private func commitContent(catalog: [Exercise], plan: WorkoutPlan, action: String, detail: String, commandId: UUID) -> Bool {
+        if audit.contains(where: { $0.id == commandId }) { return true }
+        var next = snapshot()
+        next.catalog = catalog
+        next.plan = plan
+        next.audit.insert(AuditEntry(id: commandId, at: Date(), action: action, detail: detail), at: 0)
+        do {
+            if persists { try LocalStore.save(next) }
+            self.catalog = catalog
+            self.plan = plan
+            audit = next.audit
+            return true
+        } catch {
+            alertMessage = "Không lưu được thay đổi trên máy. Hãy kiểm tra dung lượng và thử lại."
+            return false
+        }
     }
 
     // MARK: Recommendations (approval workflow + audit trail, AGENTS rule 5)
@@ -246,6 +331,7 @@ final class AppStore {
         player = nil
         notifications.cancelAll()
         liveActivity.sync(nil, enabled: false)
+        catalog = MockData.catalog
         plan = MockData.plan
         history = MockData.sampleHistory(now: now)
         recommendations = MockData.sampleRecommendations()
@@ -261,17 +347,17 @@ final class AppStore {
         audit.insert(AuditEntry(id: UUID(), at: date, action: action, detail: detail), at: 0)
     }
 
+    private func snapshot() -> PersistedSnapshot {
+        PersistedSnapshot(
+            catalog: catalog, plan: plan, history: history, recommendations: recommendations,
+            audit: audit, settings: settings,
+            active: player.flatMap { $0.state.isActive ? $0.activeSnapshot : nil }, createdAt: createdAt
+        )
+    }
+
     private func persist() {
         guard persists else { return }
-        let active: ActiveSession? = player.flatMap { $0.state.isActive ? $0.activeSnapshot : nil }
-        LocalStore.save(PersistedSnapshot(
-            plan: plan,
-            history: history,
-            recommendations: recommendations,
-            audit: audit,
-            settings: settings,
-            active: active,
-            createdAt: createdAt
-        ))
+        do { try LocalStore.save(snapshot()) }
+        catch { alertMessage = "Không lưu được dữ liệu trên máy. Hãy kiểm tra dung lượng và thử lại." }
     }
 }
