@@ -1,0 +1,72 @@
+{
+  "name": "stale_session_recovery",
+  "description": "Edge #7: app killed mid-set, reopened 7h later. Reconcile reaches awaiting_result without a suggested actual and asks for recovery; nothing is auto-completed.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T15:00:00Z",
+      "reconcile": {},
+      "expect": {
+        "phase": "awaiting_result",
+        "status": "active",
+        "revision": 3,
+        "pendingSuggestedActualMs": null,
+        "confirmedSetCount": 0,
+        "signals": [
+          "recovery_prompt_required"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T15:00:05Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "reason": "forgot"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 4,
+        "confirmedSetCount": 0
+      }
+    }
+  ]
+}

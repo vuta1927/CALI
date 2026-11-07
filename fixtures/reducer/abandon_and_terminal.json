@@ -1,0 +1,114 @@
+{
+  "name": "abandon_and_terminal",
+  "description": "Abandon from pre_countdown (table: any active session); terminal session rejects commands and reconcile is a no-op; a new session may be created afterwards.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "phase": "pre_countdown",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "reason": "dizzy"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 3,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "error": "session_not_active",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T09:00:00Z",
+      "reconcile": {},
+      "expect": {
+        "phase": "abandoned",
+        "revision": 3,
+        "events": [],
+        "signals": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "sessionId": "00000000-0000-4000-8000-000000005001",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009002",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008002",
+            "exerciseId": "00000000-0000-4000-8000-000000007002",
+            "catalogVersion": 1,
+            "setCount": 2,
+            "target": {
+              "kind": "reps",
+              "repMin": 8,
+              "repMax": 10
+            },
+            "restSeconds": 120
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    }
+  ]
+}
