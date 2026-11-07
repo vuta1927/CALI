@@ -265,6 +265,10 @@ public enum WorkoutReducer {
         b.next.status = .abandoned
         b.next.phase = .abandoned
         b.next.abandonedAt = now
+        // ADR-017: the wire has no abandonedAt; finishedAt is set for both terminal statuses.
+        // Clamped to startedAt so a backward clock jump never blocks abandoning (SQL CHECK
+        // finished_at >= started_at); abandonedAt keeps the raw device time.
+        b.next.finishedAt = max(now, s.startedAt)
         b.next.abandonReason = c.reason
         b.next.phaseStartedAt = now
         b.next.phaseDeadlineAt = nil
