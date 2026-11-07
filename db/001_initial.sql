@@ -77,7 +77,7 @@ CREATE TABLE planned_workouts (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     plan_id uuid NOT NULL,
     weekday int NOT NULL CHECK (weekday BETWEEN 1 AND 7),
-    title text NOT NULL DEFAULT '',
+    title text NOT NULL DEFAULT '' CHECK (length(title) <= 120),
     order_index int NOT NULL DEFAULT 0 CHECK (order_index >= 0),
     version bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -118,12 +118,21 @@ CREATE TABLE workout_sessions (
     phase_deadline_at timestamptz,
     current_execution_id uuid,
     current_set_index int CHECK (current_set_index >= 1),
+    -- ADR-017: pause/abandon state needed to restore a session on another install.
+    paused_at timestamptz,
+    accumulated_exercise_ms bigint CHECK (accumulated_exercise_ms >= 0),
+    abandon_reason text CHECK (length(abandon_reason) <= 500),
     version bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
     updated_at timestamptz NOT NULL DEFAULT now(),
     deleted_at timestamptz,
     UNIQUE (id, user_id),
     FOREIGN KEY (planned_workout_id, user_id) REFERENCES planned_workouts(id, user_id),
-    CHECK (finished_at IS NULL OR finished_at >= started_at)
+    CHECK (finished_at IS NULL OR finished_at >= started_at),
+    -- ADR-023: terminal status and terminal phase move together.
+    CONSTRAINT ck_session_status_phase CHECK (
+        (status = 'completed') = (phase = 'completed')
+        AND (status = 'abandoned') = (phase = 'abandoned')),
+    CONSTRAINT ck_session_paused_at CHECK (paused_at IS NULL OR phase = 'paused')
 );
 CREATE INDEX idx_sessions_user_start ON workout_sessions(user_id, started_at DESC);
 -- One active session per user for MVP. If multi-device simultaneous workouts are
@@ -138,7 +147,9 @@ CREATE TABLE exercise_executions (
     planned_exercise_id uuid,
     exercise_id uuid NOT NULL REFERENCES exercise_catalog(id),
     order_index int NOT NULL CHECK (order_index >= 0),
-    prescribed_snapshot jsonb NOT NULL CHECK (jsonb_typeof(prescribed_snapshot) = 'object'),
+    -- ADR-018: shape = entity-payloads.schema.json#/$defs/prescribed_snapshot (validated by the API).
+    prescribed_snapshot jsonb NOT NULL CHECK (jsonb_typeof(prescribed_snapshot) = 'object'
+        AND prescribed_snapshot ?& ARRAY['target','setCount','restSeconds','catalogVersion']),
     version bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
     updated_at timestamptz NOT NULL DEFAULT now(),
     deleted_at timestamptz,
@@ -159,22 +170,28 @@ CREATE TABLE set_results (
     execution_id uuid NOT NULL,
     set_index int NOT NULL CHECK (set_index BETWEEN 1 AND 100),
     status text NOT NULL CHECK (status IN ('completed','failed','skipped')),
-    prescribed_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(prescribed_snapshot) = 'object'),
+    -- ADR-018: same shape as exercise_executions.prescribed_snapshot; no '{}' default.
+    prescribed_snapshot jsonb NOT NULL CHECK (jsonb_typeof(prescribed_snapshot) = 'object'
+        AND prescribed_snapshot ?& ARRAY['target','setCount','restSeconds','catalogVersion']),
     actual_reps int CHECK (actual_reps >= 0),
     actual_hold_ms bigint CHECK (actual_hold_ms >= 0),
     actual_work_ms bigint CHECK (actual_work_ms >= 0),
     actual_rest_ms bigint CHECK (actual_rest_ms >= 0),
     rpe int CHECK (rpe BETWEEN 1 AND 10),
-    note text,
+    note text CHECK (length(note) <= 1000),
+    skip_reason text CHECK (length(skip_reason) <= 500),
+    pain_reported boolean NOT NULL DEFAULT false,
     confirmed_at timestamptz NOT NULL,
     revision int NOT NULL DEFAULT 1 CHECK (revision >= 1),
     version bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
     updated_at timestamptz NOT NULL DEFAULT now(),
     deleted_at timestamptz,
     UNIQUE (id, user_id),
-    UNIQUE (execution_id, set_index),
     FOREIGN KEY (execution_id, user_id) REFERENCES exercise_executions(id, user_id)
 );
+-- ADR-025: one live result per set; a soft-deleted result does not block its replacement.
+CREATE UNIQUE INDEX ux_set_results_execution_set_live
+    ON set_results(execution_id, set_index) WHERE deleted_at IS NULL;
 CREATE INDEX idx_set_results_execution ON set_results(execution_id, set_index);
 
 CREATE TABLE workout_notes (
@@ -214,8 +231,15 @@ CREATE TABLE sync_mutations (
     -- status returned when a stored receipt is replayed for the same mutation_id.
     status text NOT NULL CHECK (status IN ('applied','conflict','rejected')),
     receipt jsonb NOT NULL,
+    -- ADR-031: SHA-256 (lowercase hex) of the canonical mutation (entityType, entityId, action,
+    -- baseVersion, payload). Same mutation_id + different hash => rejected `mutation_id_reused`.
+    payload_sha256 char(64) NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
     created_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, mutation_id)
+    PRIMARY KEY (user_id, mutation_id),
+    -- ADR-033: the device must belong to the same user. NO ACTION on purpose: receipts are the
+    -- idempotency record, so a device row is never hard-deleted while receipts reference it
+    -- (deleting the user still removes both through the users cascades).
+    FOREIGN KEY (device_id, user_id) REFERENCES devices(id, user_id)
 );
 CREATE INDEX idx_mutations_user_created ON sync_mutations(user_id, created_at DESC);
 CREATE TABLE sync_change_log (

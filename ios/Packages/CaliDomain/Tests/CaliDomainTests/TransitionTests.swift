@@ -205,6 +205,7 @@ final class TransitionTests: XCTestCase {
             XCTAssertEqual(h.s.phase, .abandoned)
             XCTAssertEqual(h.s.abandonReason, "knee")
             XCTAssertEqual(h.s.abandonedAt, h.now)
+            XCTAssertEqual(h.s.finishedAt, h.now, "ADR-017: finishedAt is set for abandoned sessions too")
             XCTAssertNil(h.s.pendingResult, "a pending draft is discarded, never turned into a result")
             XCTAssertEqual(t.setRecords, [])
             XCTAssertEqual(t.events.first?.code, "session_abandoned")

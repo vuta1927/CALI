@@ -202,6 +202,7 @@ public struct SessionState: Codable, Equatable, Sendable {
         case .abandoned:
             if phase != .abandoned { v.append("abandoned status requires abandoned phase") }
             if abandonedAt == nil { v.append("abandoned session without abandonedAt") }
+            if finishedAt == nil { v.append("abandoned session without finishedAt") }
         }
         if let f = finishedAt, f < startedAt { v.append("finishedAt < startedAt") }
         switch phase {

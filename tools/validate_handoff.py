@@ -91,6 +91,20 @@ try:
     for mutation in example['mutations']:
         for error in validator.iter_errors(mutation):
             errors.append(f'Invalid sample sync mutation: {error.message}')
+    # ADR-020: business-rule vectors must be schema-valid (they fail only on cross-field rules).
+    rules = json.loads((ROOT / 'fixtures/validation/business_rules.json').read_text(encoding='utf-8'))
+    for case in rules['cases']:
+        for error in validator.iter_errors(case['mutation']):
+            errors.append(f"fixtures/validation case {case['name']} is not schema-valid: {error.message}")
+        exercise_id = case['mutation']['payload'].get('exerciseId')
+        if exercise_id and exercise_id not in ids:
+            errors.append(f"fixtures/validation case {case['name']} references unknown exercise {exercise_id}")
+    # ADR-028: offline catalog bundle manifest.
+    bundle_schema = json.loads((ROOT / 'contracts/catalog-bundle.schema.json').read_text(encoding='utf-8'))
+    jsonschema.Draft202012Validator.check_schema(bundle_schema)
+    bundle = jsonschema.Draft202012Validator(bundle_schema, format_checker=jsonschema.FormatChecker())
+    for error in bundle.iter_errors(catalog):
+        errors.append(f'fixtures/exercise_catalog.json does not match catalog-bundle schema: {error.message}')
     # Fixtures must also conform to the OpenAPI wire schemas (OpenAPI 3.1
     # schemas are JSON Schema 2020-12, resolved in-document via referencing).
     if spec is not None:

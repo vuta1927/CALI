@@ -20,7 +20,7 @@
         {"type": "object", "required": ["kind", "holdSeconds"], "properties": {"kind": {"const": "static_hold"}, "holdSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "repMin", "repMax"], "properties": {"kind": {"const": "reps"}, "repMin": {"type": "integer", "minimum": 1, "maximum": 500}, "repMax": {"type": "integer", "minimum": 1, "maximum": 500}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "timeSeconds"], "properties": {"kind": {"const": "timed_reps"}, "timeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 100}}, "additionalProperties": false}
       ]
     },
@@ -29,13 +29,26 @@
       "properties": {"id": {"$ref": "#/$defs/uuid"}, "deletedAt": {"$ref": "#/$defs/dateTime"}},
       "additionalProperties": false
     },
+    "prescribed_snapshot": {
+      "description": "ADR-018: immutable copy of the prescription at session start (target + set/rest policy + catalog version). Same shape for exercise_execution and set_result.",
+      "type": "object", "required": ["target", "setCount", "restSeconds", "catalogVersion"],
+      "properties": {
+        "target": {"$ref": "#/$defs/target"},
+        "setCount": {"type": "integer", "minimum": 1, "maximum": 20},
+        "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600},
+        "catalogVersion": {"type": "integer", "minimum": 1},
+        "exerciseId": {"$ref": "#/$defs/uuid"},
+        "plannedExerciseId": {"type": ["string", "null"], "format": "uuid"}
+      }, "additionalProperties": false
+    },
     "mutation_common": {
       "type": "object", "required": ["mutationId", "entityType", "entityId", "action", "baseVersion", "clientChangedAt", "payload"],
       "properties": {
         "mutationId": {"$ref": "#/$defs/uuid"}, "entityType": {"type": "string"}, "entityId": {"$ref": "#/$defs/uuid"},
         "action": {"enum": ["upsert", "delete"]}, "baseVersion": {"type": "integer", "minimum": 0},
         "clientChangedAt": {"$ref": "#/$defs/dateTime"}, "payload": {"type": "object"}
-      }
+      },
+      "additionalProperties": false
     },
     "training_plan_payload": {
       "type": "object", "required": ["id", "title", "revision", "status"],
@@ -46,10 +59,10 @@
       }, "additionalProperties": false
     },
     "planned_workout_payload": {
-      "type": "object", "required": ["id", "planId", "weekday", "title", "orderIndex"],
+      "type": "object", "required": ["id", "planId", "weekday", "orderIndex"],
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
-        "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string"},
+        "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string", "maxLength": 120},
         "orderIndex": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     },
@@ -73,8 +86,19 @@
         "phaseStartedAt": {"type": ["string", "null"], "format": "date-time"},
         "phaseDeadlineAt": {"type": ["string", "null"], "format": "date-time"},
         "currentExecutionId": {"type": ["string", "null"], "format": "uuid"},
-        "currentSetIndex": {"type": ["integer", "null"], "minimum": 1}
-      }, "additionalProperties": false
+        "currentSetIndex": {"type": ["integer", "null"], "minimum": 1},
+        "pausedAt": {"type": ["string", "null"], "format": "date-time"},
+        "accumulatedExerciseMs": {"type": ["integer", "null"], "minimum": 0},
+        "abandonReason": {"type": ["string", "null"], "maxLength": 500}
+      }, "additionalProperties": false,
+      "allOf": [
+        {"$comment": "ADR-023: terminal status and terminal phase move together.",
+         "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]}, "then": {"properties": {"phase": {"const": "completed"}}}},
+        {"if": {"properties": {"phase": {"const": "completed"}}, "required": ["phase"]}, "then": {"properties": {"status": {"const": "completed"}}}},
+        {"if": {"properties": {"status": {"const": "abandoned"}}, "required": ["status"]}, "then": {"properties": {"phase": {"const": "abandoned"}}}},
+        {"if": {"properties": {"phase": {"const": "abandoned"}}, "required": ["phase"]}, "then": {"properties": {"status": {"const": "abandoned"}}}},
+        {"if": {"properties": {"phase": {"not": {"const": "paused"}}}, "required": ["phase"]}, "then": {"properties": {"pausedAt": {"type": "null"}}}}
+      ]
     },
     "exercise_execution_payload": {
       "type": "object", "required": ["id", "sessionId", "exerciseId", "orderIndex", "prescribedSnapshot"],
@@ -82,7 +106,7 @@
         "id": {"$ref": "#/$defs/uuid"}, "sessionId": {"$ref": "#/$defs/uuid"},
         "plannedExerciseId": {"type": ["string", "null"], "format": "uuid"},
         "exerciseId": {"$ref": "#/$defs/uuid"}, "orderIndex": {"type": "integer", "minimum": 0},
-        "prescribedSnapshot": {"type": "object"}
+        "prescribedSnapshot": {"$ref": "#/$defs/prescribed_snapshot"}
       }, "additionalProperties": false
     },
     "set_result_payload": {
@@ -90,12 +114,15 @@
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "executionId": {"$ref": "#/$defs/uuid"},
         "setIndex": {"type": "integer", "minimum": 1, "maximum": 100}, "status": {"enum": ["completed", "failed", "skipped"]},
-        "prescribedSnapshot": {"type": "object"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
+        "prescribedSnapshot": {"$ref": "#/$defs/prescribed_snapshot"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
         "actualHoldMs": {"type": ["integer", "null"], "minimum": 0},
         "actualWorkMs": {"type": ["integer", "null"], "minimum": 0},
         "actualRestMs": {"type": ["integer", "null"], "minimum": 0},
         "rpe": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
-        "note": {"type": ["string", "null"]}, "confirmedAt": {"$ref": "#/$defs/dateTime"},
+        "note": {"type": ["string", "null"], "maxLength": 1000},
+        "skipReason": {"type": ["string", "null"], "maxLength": 500},
+        "painReported": {"type": "boolean"},
+        "confirmedAt": {"$ref": "#/$defs/dateTime"},
         "revision": {"type": "integer", "minimum": 1}
       }, "additionalProperties": false
     },

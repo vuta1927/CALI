@@ -1,0 +1,49 @@
+{
+  "_comment": "ADR-020: mutations that are VALID against contracts/entity-payloads.schema.json but violate a cross-field business rule. Backend sync and CaliDomain must both reject each case with the given code. The validator asserts every mutation stays schema-valid, so a case can never silently become a schema-level failure. Exercise ids refer to fixtures/exercise_catalog.json.",
+  "cases": [
+    {
+      "name": "reps_min_greater_than_max",
+      "rule": "target.repMin <= target.repMax",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "target.repMax"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000001",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000001",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000001",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "reps", "repMin": 10, "repMax": 5},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "target_kind_differs_from_catalog_type",
+      "rule": "target.kind == exercise_catalog.exercise_type (Pull-up is reps)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "target.kind"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000002",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000002",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000002",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "orderIndex": 1,
+          "setCount": 3,
+          "target": {"kind": "static_hold", "holdSeconds": 12},
+          "restSeconds": 120
+        }
+      }
+    }
+  ]
+}

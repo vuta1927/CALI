@@ -97,6 +97,16 @@ final class EdgeCaseTests: XCTestCase {
         XCTAssertEqual(r.signals, [])
     }
 
+    func testEdge4AbandonAfterBackwardJumpClampsFinishedAtToStart() {
+        let h = Harness()
+        h.send(h.create([Specs.reps()]))
+        h.clock.jumpWallClock(by: -600)
+        h.send(h.abandon("clock"))
+        XCTAssertEqual(h.s.status, .abandoned)
+        XCTAssertEqual(h.s.abandonedAt, h.now)
+        XCTAssertEqual(h.s.finishedAt, h.s.startedAt, "finishedAt never precedes startedAt")
+    }
+
     func testEdge4StopSetAfterBackwardJumpDoesNotInventDuration() {
         let h = Harness()
         h.send(h.create([Specs.reps()]))

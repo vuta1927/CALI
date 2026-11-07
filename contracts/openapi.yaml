@@ -14,6 +14,7 @@ tags:
   - name: Plans
   - name: Sync
   - name: Coaching
+  - name: Ops
 security:
   - bearerAuth: []
 paths:
@@ -77,6 +78,11 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token is valid but its subject has no active user record (`code` = `user_not_found`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
   /v1/exercises:
     get:
       tags: [Catalog]
@@ -176,6 +182,8 @@ paths:
       description: >-
         Atomically process each mutation, including idempotent receipt and user
         change-log entry. Per-mutation conflicts do not fail unrelated mutations.
+        The first push from a `deviceId` registers it for the caller (`devices` row
+        upserted in the same transaction, `last_seen_at` refreshed); ADR-033.
       requestBody:
         required: true
         content:
@@ -193,6 +201,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: '`deviceId` is already registered to another user (`code` = `device_owner_mismatch`); nothing is applied (ADR-033).'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/sync/pull:
@@ -290,6 +303,35 @@ paths:
           $ref: '#/components/responses/Conflict'
         '404':
           $ref: '#/components/responses/NotFound'
+  /health/live:
+    get:
+      tags: [Ops]
+      summary: Liveness probe - process is up; no dependency is checked
+      operationId: healthLive
+      security: []
+      responses:
+        '200':
+          description: Process alive
+          content:
+            text/plain:
+              schema: {type: string, example: Healthy}
+  /health/ready:
+    get:
+      tags: [Ops]
+      summary: Readiness probe - database reachable
+      operationId: healthReady
+      security: []
+      responses:
+        '200':
+          description: Ready to serve traffic
+          content:
+            text/plain:
+              schema: {type: string, example: Healthy}
+        '503':
+          description: A dependency (PostgreSQL) is unavailable; details are logged, never returned
+          content:
+            text/plain:
+              schema: {type: string, example: Unhealthy}
 components:
   securitySchemes:
     bearerAuth:
@@ -357,7 +399,7 @@ components:
         status: {type: integer}
         code: {type: string}
         traceId: {type: string}
-        detail: {type: string}
+        detail: {type: string, description: 'Optional human-readable detail; always omitted for 5xx so no server internals leak.'}
         errors: {type: object, additionalProperties: true}
     AppleAuthRequest:
       type: object
@@ -393,7 +435,7 @@ components:
       enum: [static_hold, reps, timed_reps, interval, skill_attempt]
     ExerciseMedia:
       type: object
-      required: [id, kind, contentVersion, mimeType, sha256]
+      required: [id, kind, contentVersion, mimeType, sha256, license]
       properties:
         id: {type: string, format: uuid}
         kind:
@@ -460,7 +502,7 @@ components:
           properties:
             kind: {const: interval}
             workSeconds: {type: integer, minimum: 1, maximum: 3600}
-            restSeconds: {type: integer, minimum: 0, maximum: 3600}
+            restSeconds: {type: integer, minimum: 1, maximum: 3600}
           additionalProperties: false
         - type: object
           required: [kind, attempts]
@@ -484,7 +526,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         weekday: {type: integer, minimum: 1, maximum: 7, description: '1=Monday'}
-        title: {type: string}
+        title: {type: string, maxLength: 120, description: 'Optional; stored as empty string when omitted (ADR-027).'}
         orderIndex: {type: integer, minimum: 0}
         exercises:
           type: array
@@ -522,6 +564,10 @@ components:
       enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note]
     SyncMutation:
       type: object
+      description: >-
+        Envelope fields are closed (ADR-030). `payload` is validated per `entityType`/`action`
+        against contracts/entity-payloads.schema.json, which also rejects unknown payload fields.
+      additionalProperties: false
       required: [mutationId, entityType, entityId, action, baseVersion, clientChangedAt, payload]
       properties:
         mutationId: {type: string, format: uuid}
@@ -554,9 +600,25 @@ components:
         error: {$ref: '#/components/schemas/MutationError'}
     MutationError:
       type: [object, 'null']
+      description: >-
+        ADR-021. Results with `retryable: true` are never persisted as receipts, so the client may
+        resend the same mutationId later (e.g. after the missing parent is applied). Non-retryable
+        results are persisted and replayed for the same mutationId (except mutation_id_reused).
+      required: [code, message, retryable]
       properties:
-        code: {type: string}
+        code:
+          type: string
+          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused]
+          description: >-
+            dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
+            version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
+            validation_failed (status rejected) - schema or business rule violation (ADR-020);
+            forbidden_entity (status rejected) - entityType not writable by devices;
+            cross_user_reference (status rejected) - references an entity owned by another user;
+            mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031).
         message: {type: string}
+        retryable: {type: boolean}
+        details: {type: object, additionalProperties: true}
     SyncPushResponse:
       type: object
       required: [results]
@@ -579,6 +641,22 @@ components:
         payload:
           type: object
           additionalProperties: true
+          description: >-
+            ADR-022. Discriminated by `entityType` + `operation`. delete -> `{id, deletedAt}`.
+            upsert of a device-writable entity -> the same `<entityType>_payload` schema as push
+            (contracts/entity-payloads.schema.json). ai_analysis -> `Analysis`; ai_recommendation ->
+            `AnalysisRecommendation` plus `analysisId`.
+          x-payload-schemas:
+            training_plan: entity-payloads.schema.json#/$defs/training_plan_payload
+            planned_workout: entity-payloads.schema.json#/$defs/planned_workout_payload
+            planned_exercise: entity-payloads.schema.json#/$defs/planned_exercise_payload
+            workout_session: entity-payloads.schema.json#/$defs/workout_session_payload
+            exercise_execution: entity-payloads.schema.json#/$defs/exercise_execution_payload
+            set_result: entity-payloads.schema.json#/$defs/set_result_payload
+            workout_note: entity-payloads.schema.json#/$defs/workout_note_payload
+            ai_analysis: 'components/schemas/Analysis'
+            ai_recommendation: 'components/schemas/AnalysisRecommendation'
+            delete: entity-payloads.schema.json#/$defs/delete_payload
     SyncPullResponse:
       type: object
       required: [changes, nextCursor, hasMore]
@@ -608,9 +686,13 @@ components:
       required: [id, exerciseId, action, rationale, requiresApproval, decision]
       properties:
         id: {type: string, format: uuid}
-        exerciseId: {type: string, format: uuid}
+        exerciseId: {type: [string, 'null'], format: uuid, description: 'Catalog uuid; null for session-level recommendations (ADR-026).'}
         action: {type: string, enum: [maintain, reduce, increase_hold, increase_reps, change_progression, needs_more_data]}
-        proposedTarget: {type: [object, 'null'], additionalProperties: true}
+        proposedTarget:
+          description: 'Full typed target (with `kind`) or null when no target change is proposed (ADR-032).'
+          oneOf:
+            - $ref: '#/components/schemas/PlannedTarget'
+            - type: 'null'
         rationale: {type: string}
         requiresApproval: {type: boolean, const: true}
         decision: {type: string, enum: [proposed, accepted, rejected, superseded]}

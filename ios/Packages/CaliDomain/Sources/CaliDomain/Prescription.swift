@@ -55,8 +55,7 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .timedReps(let s):
             return [ValidationIssue.min("target.timeSeconds", s, 1)].compactMap { $0 }
         case .interval(let work, let rest):
-            // docs/03 §3 says workSeconds/restSeconds > 0; the JSON schema allows restSeconds >= 0.
-            // We follow docs/03 (stricter) — CON-002 question Q7.
+            // ADR-019: workSeconds >= 1 and restSeconds >= 1 (docs/03 §3, JSON Schema and OpenAPI agree).
             return [ValidationIssue.min("target.workSeconds", work, 1), ValidationIssue.min("target.restSeconds", rest, 1)].compactMap { $0 }
         case .skillAttempt(let attempts):
             return [ValidationIssue.min("target.attempts", attempts, 1)].compactMap { $0 }
