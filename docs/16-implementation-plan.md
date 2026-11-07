@@ -17,7 +17,7 @@ Tài liệu này **không thay thế** ADR/contract. Nếu mâu thuẫn, ưu ti�
 | GitHub | Repo **private**, GitHub Free | ~2.000 phút/tháng, macOS tính hệ số 10 ⇒ **~200 phút macOS/tháng**. Ubuntu runner rẻ hơn 10 lần |
 
 ### 1.1 Nguyên tắc tiết kiệm phút macOS
-- Mọi thứ chạy được trên Linux thì **chạy trên ubuntu runner**: backend, contract tests, `CaliDomain` Swift package (image `swift:6.x`).
+- Mọi thứ chạy được trên Linux thì **chạy trên ubuntu runner**: backend, contract tests, `CaliDomain` Swift package (image `swift:6.2-noble`).
 - Workflow macOS chỉ chạy khi: `workflow_dispatch` thủ công, PR có label `ios-build`, hoặc push lên `main` có thay đổi trong `ios/**`.
 - Dùng `paths:` filter + `concurrency: cancel-in-progress` + cache SwiftPM (`~/Library/Caches/org.swift.swiftpm`, `.build`).
 - Đo thời gian mỗi job macOS, ghi vào bảng ở §8 để theo dõi ngân sách (không ước lượng trước).
@@ -233,7 +233,7 @@ Stack: Swift 6 (strict concurrency), SwiftUI + Observation, GRDB, ActivityKit/Wi
 - `reduce(state, command, now: Instant) -> Result<(State, [DomainEvent]), DomainError>` — thuần, không I/O.
 - `Clock` protocol + `FakeClock`; tính deadline, pause/resume (lưu remaining, không cộng dồn timer), phát hiện clock jump.
 - **Tests:** toàn bộ transition hợp lệ + không hợp lệ; edge cases doc 03 §7 (1, 3, 4, 5, 7); fixtures CON-002.
-- Lệnh local: `docker run --rm -v ${PWD}/ios/Packages/CaliDomain:/src -w /src swift:6.x swift test`.
+- Lệnh local: `docker run --rm -v ${PWD}:/src -w /src/ios/Packages/CaliDomain swift:6.2-noble swift test` (mount cả repo root vì test đọc `fixtures/reducer/`).
 
 ### I1 — CaliCore data (IOS-001, IOS-002)
 - GRDB migrations v1: mirror entity dùng offline + `processed_commands`, `sync_outbox`, `sync_cursor`, `media_cache`, `local_session_state` (doc 04 §3).
