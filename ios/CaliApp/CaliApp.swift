@@ -4,9 +4,17 @@ import SwiftUI
 // (tests use `@testable import CaliApp`).
 @main
 struct CaliAppMain: App {
+    @State private var store = AppStore(persists: !CaliAppMain.isRunningTests)
+
     var body: some Scene {
         WindowGroup {
-            ContentView(buildInfo: .current)
+            RootView()
+                .environment(store)
         }
+    }
+
+    /// Unit tests are hosted in the app; keep them away from the user's local data file.
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 }

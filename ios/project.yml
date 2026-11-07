@@ -14,6 +14,11 @@ settings:
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1"
 
+packages:
+  # Pure workout domain (reducer, reconcile, clock). The app links the library product only.
+  CaliDomain:
+    path: Packages/CaliDomain
+
 targets:
   CaliApp:
     type: application
@@ -39,6 +44,8 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     dependencies:
+      - package: CaliDomain
+        product: CaliDomain
       - target: CaliActivityWidget
         embed: true
 

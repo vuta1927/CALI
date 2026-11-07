@@ -54,8 +54,13 @@ extension WorkoutAttributes.ContentState {
     /// Range for `Text(timerInterval:pauseTime:countsDown:showsHours:)`, or `nil` when the
     /// current phase has no countdown. Never inverted: `a...b` traps at runtime when `a > b`,
     /// and a clock change or bad snapshot must not crash the widget.
+    /// Reps / skill sets have no target duration (`targetSeconds == 0`): nothing to count down.
+    var isOpenEndedSet: Bool {
+        targetSeconds == 0 && (phase == .exercising || phase == .paused)
+    }
+
     var countdownInterval: ClosedRange<Date>? {
-        guard phase.showsCountdown else { return nil }
+        guard phase.showsCountdown, !isOpenEndedSet else { return nil }
         let end = max(phaseStartUtc, phaseEndUtc)
         return phaseStartUtc...end
     }
