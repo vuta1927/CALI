@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure domain rules and invariants. Must not reference infrastructure, ASP.NET Core or database packages. -->
+</Project>

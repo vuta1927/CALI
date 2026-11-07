@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Use cases and ports. Depends only on Cali.Domain; adapters live in Cali.Infrastructure / Cali.Api. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Cali.Domain\Cali.Domain.csproj" />
+  </ItemGroup>
+</Project>

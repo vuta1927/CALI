@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- Shared with tools/Cali.DevToken so `dotnet user-secrets` sets the dev signing key once. -->
+    <UserSecretsId>cali-backend-dev</UserSecretsId>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Cali.Application\Cali.Application.csproj" />
+    <ProjectReference Include="..\Cali.Infrastructure\Cali.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cali.UnitTests" />
+    <InternalsVisibleTo Include="Cali.IntegrationTests" />
+    <InternalsVisibleTo Include="Cali.ContractTests" />
+  </ItemGroup>
+</Project>
