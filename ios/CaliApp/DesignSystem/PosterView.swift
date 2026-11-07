@@ -40,6 +40,10 @@ struct PosterView: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+        }
         .accessibilityElement()
         .accessibilityLabel("\(exercise?.name ?? "Bài tập"), ảnh minh hoạ tạm")
     }

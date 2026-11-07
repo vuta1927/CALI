@@ -15,20 +15,28 @@ struct CaliButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 52)
             .padding(.horizontal, Spacing.l)
             .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
+            .background {
+                let shape = RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
+                if kind == .primary {
+                    shape.fill(COAMIGradient.brand)
+                } else {
+                    shape.fill(background)
+                }
+            }
             .overlay {
                 if kind == .secondary {
                     RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
-                        .strokeBorder(Color.caliSurfaceRaised, lineWidth: 1)
+                        .strokeBorder(Color.caliBorder, lineWidth: 1)
                 }
             }
+            .shadow(color: kind == .primary ? Color.coamiTeal.opacity(0.18) : .clear, radius: 14, y: 7)
             .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
             .contentShape(Rectangle())
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary: .caliCanvas
+        case .primary: .coamiNavy
         case .secondary: .caliText
         case .destructive: .caliCanvas
         case .quiet: .caliSecondary
@@ -66,7 +74,8 @@ struct CircleIconButton: View {
                 .font(.system(size: size * 0.4, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: size, height: size)
-                .background(Color.caliSurface, in: Circle())
+                .background(.thinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.caliBorder.opacity(0.7), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -75,28 +84,46 @@ struct CircleIconButton: View {
 
 // MARK: - Card
 
-struct CardModifier: ViewModifier {
+struct GlassCardModifier: ViewModifier {
     var padding: CGFloat = Spacing.l
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .background {
+                if COAMIEffectPolicy.usesMaterial(reduceTransparency: reduceTransparency) {
+                    shape.fill(.thinMaterial)
+                } else {
+                    shape.fill(Color.caliSurface)
+                }
+            }
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(colors: [Color.white.opacity(0.22), Color.caliBorder.opacity(0.45)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1
+                )
+            }
+            .shadow(color: Color.coamiNavy.opacity(0.12), radius: 18, y: 8)
     }
 }
 
+typealias CardModifier = GlassCardModifier
+
 extension View {
     func caliCard(padding: CGFloat = Spacing.l) -> some View {
-        modifier(CardModifier(padding: padding))
+        modifier(GlassCardModifier(padding: padding))
     }
 
     /// Standard screen background for the dark-first theme.
     func caliScreen() -> some View {
         self
             .scrollContentBackground(.hidden)
-            .background(Color.caliCanvas.ignoresSafeArea())
-            .toolbarBackground(Color.caliCanvas, for: .navigationBar)
+            .background(COAMIScreenBackground())
+            .toolbarBackground(Color.caliCanvas.opacity(0.92), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
     }
 }
 
@@ -118,7 +145,7 @@ struct TagChip: View {
         .font(.caption.weight(.semibold))
         .padding(.horizontal, Spacing.s)
         .padding(.vertical, Spacing.xs)
-        .foregroundStyle(filled ? Color.caliCanvas : tint)
+        .foregroundStyle(filled ? Color.coamiNavy : tint)
         .background(
             filled ? tint : tint.opacity(0.15),
             in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
@@ -156,8 +183,9 @@ struct FilterChip: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, Spacing.m)
             .frame(minHeight: minTapTarget)
-            .foregroundStyle(isSelected ? Color.caliCanvas : Color.caliText)
-            .background(isSelected ? Color.caliAccent : Color.caliSurface, in: Capsule())
+            .foregroundStyle(isSelected ? Color.coamiNavy : Color.caliText)
+            .background(isSelected ? Color.caliAccent : Color.caliSurfaceRaised, in: Capsule())
+            .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.caliBorder.opacity(0.7), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])

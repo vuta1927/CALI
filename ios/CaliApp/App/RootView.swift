@@ -12,16 +12,16 @@ struct RootView: View {
     var body: some View {
         @Bindable var store = store
         TabView(selection: $tab) {
-            Tab("Hôm nay", systemImage: "flame", value: AppTab.today) {
+            Tab("Hôm nay", systemImage: "house.fill", value: AppTab.today) {
                 NavigationStack { TodayView(tab: $tab) }
             }
-            Tab("Giáo án", systemImage: "calendar", value: AppTab.plan) {
+            Tab("Giáo án", systemImage: "calendar.badge.clock", value: AppTab.plan) {
                 NavigationStack { PlanView() }
             }
             Tab("Bài tập", systemImage: "figure.strengthtraining.functional", value: AppTab.catalog) {
                 NavigationStack { CatalogView() }
             }
-            Tab("Lịch sử", systemImage: "clock.arrow.circlepath", value: AppTab.history) {
+            Tab("Lịch sử", systemImage: "chart.line.uptrend.xyaxis", value: AppTab.history) {
                 NavigationStack { HistoryView() }
             }
             Tab("Cá nhân", systemImage: "person.crop.circle", value: AppTab.profile) {
@@ -30,7 +30,8 @@ struct RootView: View {
             .badge(store.pendingRecommendationCount)
         }
         .tint(.caliAccent)
-        .preferredColorScheme(.dark)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {
             if let player = store.player {
                 WorkoutPlayerView(model: player)
@@ -70,14 +71,16 @@ struct WelcomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                Image(systemName: "figure.gymnastics")
-                    .font(.system(size: 56))
-                    .foregroundStyle(Color.caliAccent)
+                VStack(alignment: .leading, spacing: Spacing.l) {
+                    COAMISymbol()
+                        .frame(width: 92, height: 92)
+                    COAMIWordmark(includesTagline: true)
+                }
                     .padding(.top, Spacing.xxl)
-                Text("Chào mừng đến CALI")
+                Text("Tập rõ ràng. Tiến bộ bền vững.")
                     .font(.largeTitle.bold())
                     .foregroundStyle(Color.caliText)
-                Text("Bản thử nghiệm (POC) để trải nghiệm giao diện tập luyện calisthenics.")
+                Text("COAMI đồng hành cùng bạn từ giáo án, hướng dẫn trực quan đến từng set và khoảng nghỉ — kể cả khi offline.")
                     .font(.title3)
                     .foregroundStyle(Color.caliSecondary)
                 VStack(alignment: .leading, spacing: Spacing.l) {
@@ -88,7 +91,7 @@ struct WelcomeView: View {
                     WelcomeRow(systemImage: "timer", title: "Thử nhanh trong 3 phút",
                                text: "Ở tab Hôm nay, chọn \"Buổi thử nhanh\" để đi qua đủ 5 loại bài: giữ tĩnh, số lần, theo thời gian, interval và kỹ năng.")
                     WelcomeRow(systemImage: "cross.case", title: "An toàn là trên hết",
-                               text: "CALI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
+                               text: "COAMI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
                 }
                 Button("Bắt đầu", action: onContinue)
                     .buttonStyle(.caliPrimary)
@@ -96,8 +99,7 @@ struct WelcomeView: View {
             }
             .padding(Spacing.xl)
         }
-        .background(Color.caliCanvas.ignoresSafeArea())
-        .preferredColorScheme(.dark)
+        .background(COAMIScreenBackground())
     }
 }
 

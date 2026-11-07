@@ -19,7 +19,7 @@ struct ProfileView: View {
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, Spacing.s)
                                 .padding(.vertical, 2)
-                                .foregroundStyle(Color.caliCanvas)
+                                .foregroundStyle(Color.coamiNavy)
                                 .background(Color.caliAccent, in: Capsule())
                         }
                     }
@@ -42,7 +42,7 @@ struct ProfileView: View {
             } header: {
                 Text("Buổi tập")
             } footer: {
-                Text("Thông báo chỉ để nhắc và có thể đến trễ. CALI không bao giờ tự đánh dấu set hoàn thành — bạn luôn xác nhận kết quả.")
+                Text("Thông báo chỉ để nhắc và có thể đến trễ. COAMI không bao giờ tự đánh dấu set hoàn thành — bạn luôn xác nhận kết quả.")
             }
             .listRowBackground(Color.caliSurface)
 
@@ -62,7 +62,7 @@ struct ProfileView: View {
             } header: {
                 Text("Ứng dụng")
             } footer: {
-                Text("CALI không đưa ra lời khuyên y tế. Hỏi ý kiến chuyên gia trước khi bắt đầu chương trình tập mới.")
+                Text("COAMI không đưa ra lời khuyên y tế. Hỏi ý kiến chuyên gia trước khi bắt đầu chương trình tập mới.")
             }
             .listRowBackground(Color.caliSurface)
         }

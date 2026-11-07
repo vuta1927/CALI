@@ -29,7 +29,6 @@ struct WorkoutPlayerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.caliCanvas.ignoresSafeArea())
-        .preferredColorScheme(.dark)
         .task {
             while !Task.isCancelled {
                 model.tick()
@@ -58,7 +57,7 @@ struct WorkoutPlayerView: View {
                 model.abandon(reason: "Giờ thiết bị thay đổi")
             }
         } message: {
-            Text("\(model.clockAnomaly.map(WorkoutPlayerModel.describe) ?? "") Kết quả đã ghi không bị thay đổi. Nếu giờ hiện tại là đúng, CALI sẽ tính tiếp theo giờ mới.")
+            Text("\(model.clockAnomaly.map(WorkoutPlayerModel.describe) ?? "") Kết quả đã ghi không bị thay đổi. Nếu giờ hiện tại là đúng, COAMI sẽ tính tiếp theo giờ mới.")
         }
         .alert("Tiếp tục buổi tập?", isPresented: $model.showRecoveryPrompt) {
             Button("Tiếp tục buổi tập") {}
@@ -119,6 +118,8 @@ private struct PlayerHeader: View {
         VStack(spacing: Spacing.s) {
             HStack(spacing: Spacing.m) {
                 CircleIconButton(systemImage: model.state.isActive ? "chevron.down" : "xmark", label: model.state.isActive ? "Thu nhỏ hoặc dừng" : "Đóng", action: onClose)
+                COAMISymbol()
+                    .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.title)
                         .font(.headline)

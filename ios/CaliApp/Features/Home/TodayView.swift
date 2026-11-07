@@ -29,7 +29,10 @@ struct TodayView: View {
     }
 
     private func greeting(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            BrandHeader(tagline: nil)
+            Divider()
+                .overlay(Color.caliBorder.opacity(0.7))
             Text(Fmt.fullDate(now).capitalized(with: Fmt.vi))
                 .font(.subheadline)
                 .foregroundStyle(Color.caliSecondary)
@@ -103,7 +106,7 @@ struct TodayView: View {
                                 if completed {
                                     Image(systemName: "checkmark")
                                         .font(.caption.bold())
-                                        .foregroundStyle(Color.caliCanvas)
+                                        .foregroundStyle(Color.coamiNavy)
                                 }
                             }
                             .frame(width: 32, height: 32)
@@ -132,7 +135,7 @@ struct TodayView: View {
                 HStack(spacing: Spacing.m) {
                     Image(systemName: "bolt.fill")
                         .font(.title2)
-                        .foregroundStyle(Color.caliCanvas)
+                        .foregroundStyle(Color.coamiNavy)
                         .frame(width: 52, height: 52)
                         .background(Color.caliWarning, in: RoundedRectangle(cornerRadius: Radius.chip))
                     VStack(alignment: .leading, spacing: 2) {
@@ -194,23 +197,24 @@ private struct ResumeCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Đang tập dở")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.caliCanvas.opacity(0.8))
+                        .foregroundStyle(Color.coamiNavy.opacity(0.72))
                     Text(model.title)
                         .font(.headline)
-                        .foregroundStyle(Color.caliCanvas)
+                        .foregroundStyle(Color.coamiNavy)
                     Text("\(model.state.phase.label) · \(model.state.resolvedSets.count)/\(model.state.totalPlannedSets) set")
                         .font(.subheadline)
-                        .foregroundStyle(Color.caliCanvas.opacity(0.8))
+                        .foregroundStyle(Color.coamiNavy.opacity(0.72))
                 }
                 Spacer()
                 Text("Tiếp tục")
                     .font(.headline)
-                    .foregroundStyle(Color.caliCanvas)
+                    .foregroundStyle(Color.coamiNavy)
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Color.caliCanvas)
+                    .foregroundStyle(Color.coamiNavy)
             }
             .padding(Spacing.m)
-            .background(Color.caliAccent, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .background(COAMIGradient.brand, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .shadow(color: Color.coamiTeal.opacity(0.22), radius: 18, y: 8)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Mở lại buổi tập đang dở")

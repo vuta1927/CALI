@@ -47,7 +47,7 @@ final class NotificationService {
         switch state.phase {
         case .exercising:
             content.title = "Hết thời gian mục tiêu"
-            content.body = "\(exerciseName) — mở CALI để xác nhận kết quả set \(state.currentSetIndex)."
+            content.body = "\(exerciseName) — mở COAMI để xác nhận kết quả set \(state.currentSetIndex)."
         case .resting:
             content.title = "Hết giờ nghỉ"
             content.body = "Sẵn sàng cho \(exerciseName), set \(state.currentSetIndex)."

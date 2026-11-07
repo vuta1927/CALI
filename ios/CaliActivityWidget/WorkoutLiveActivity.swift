@@ -12,9 +12,13 @@ struct WorkoutLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(verbatim: context.state.exerciseShortName)
-                        .font(.headline)
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        CompactCOAMIMark()
+                            .frame(width: 18, height: 18)
+                        Text(verbatim: context.state.exerciseShortName)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     WorkoutCountdownText(state: context.state)
@@ -27,8 +31,12 @@ struct WorkoutLiveActivity: Widget {
                         .lineLimit(1)
                 }
             } compactLeading: {
-                Text(verbatim: "\(context.state.setIndex)/\(context.state.setCount)")
-                    .monospacedDigit()
+                HStack(spacing: 2) {
+                    CompactCOAMIMark()
+                        .frame(width: 12, height: 12)
+                    Text(verbatim: "\(context.state.setIndex)/\(context.state.setCount)")
+                        .monospacedDigit()
+                }
             } compactTrailing: {
                 WorkoutCountdownText(state: context.state)
                     .monospacedDigit()
@@ -48,9 +56,13 @@ struct WorkoutLockScreenView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: state.exerciseShortName)
-                    .font(.headline)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    CompactCOAMIMark()
+                        .frame(width: 20, height: 20)
+                    Text(verbatim: state.exerciseShortName)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 8)
                 WorkoutCountdownText(state: state)
                     .font(.title2.monospacedDigit())
@@ -61,6 +73,32 @@ struct WorkoutLockScreenView: View {
                 .lineLimit(1)
         }
         .padding()
+    }
+}
+
+/// Flat, high-contrast logo for compact system surfaces. It intentionally avoids glass,
+/// blur and animation so the timer and workout state keep visual priority.
+struct CompactCOAMIMark: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                Circle()
+                    .trim(from: 0.12, to: 0.88)
+                    .stroke(.mint, style: StrokeStyle(lineWidth: side * 0.18, lineCap: .round))
+                    .rotationEffect(.degrees(45))
+                Capsule()
+                    .fill(.white)
+                    .frame(width: side * 0.14, height: side * 0.42)
+                    .rotationEffect(.degrees(45))
+                Circle()
+                    .fill(.white)
+                    .frame(width: side * 0.18, height: side * 0.18)
+                    .offset(x: side * 0.24, y: -side * 0.24)
+            }
+            .frame(width: side, height: side)
+        }
+        .accessibilityHidden(true)
     }
 }
 

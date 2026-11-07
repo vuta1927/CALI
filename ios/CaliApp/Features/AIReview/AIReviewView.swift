@@ -10,7 +10,7 @@ struct AIReviewView: View {
         let decided = store.recommendations.filter { $0.decision != nil }
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.l) {
-                Label("Đề xuất dựa trên lịch sử tập. CALI không đưa ra lời khuyên y tế; giáo án chỉ thay đổi khi bạn chấp nhận.", systemImage: "info.circle")
+                Label("Đề xuất dựa trên lịch sử tập. COAMI không đưa ra lời khuyên y tế; giáo án chỉ thay đổi khi bạn chấp nhận.", systemImage: "info.circle")
                     .font(.footnote)
                     .foregroundStyle(Color.caliSecondary)
                     .caliCard(padding: Spacing.m)

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <rect width="1600" height="1000" fill="#F4FAFD"/>
+  <text x="80" y="100" fill="#0B2742" font-family="Arial" font-size="52" font-weight="700">C — Guided Progress</text>
+  <text x="80" y="158" fill="#496B7F" font-family="Arial" font-size="28">A compressed route that turns guidance into steady progress.</text>
+  <rect x="80" y="220" width="650" height="650" rx="48" fill="#FFFFFF"/>
+  <g transform="translate(155 285) scale(.88)">
+    <path d="M70 540C150 540 158 434 246 434S336 306 420 306S466 164 530 112" fill="none" stroke="#000" stroke-width="104" stroke-linecap="round"/>
+    <circle cx="70" cy="540" r="58"/>
+    <path d="M426 112H530V216" fill="none" stroke="#000" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <rect x="870" y="220" width="650" height="650" rx="48" fill="#0B2742"/>
+  <g transform="translate(945 285) scale(.88)">
+    <path d="M70 540C150 540 158 434 246 434S336 306 420 306S466 164 530 112" fill="none" stroke="#00D4C6" stroke-width="104" stroke-linecap="round"/>
+    <circle cx="70" cy="540" r="58" fill="#EAF7FF"/>
+    <path d="M426 112H530V216" fill="none" stroke="#EAF7FF" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="80" y="942" fill="#0B2742" font-family="Arial" font-size="26">Strength: future-proof progress · Risk: analytics resemblance · Weighted score: 4.05 / 5</text>
+</svg>

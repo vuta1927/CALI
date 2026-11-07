@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <rect width="1600" height="1000" fill="#F4FAFD"/>
+  <text x="80" y="100" fill="#0B2742" font-family="Arial" font-size="52" font-weight="700">B — Motion Partner</text>
+  <text x="80" y="158" fill="#496B7F" font-family="Arial" font-size="28">A moving human gesture held by a supportive orbit.</text>
+  <rect x="80" y="220" width="650" height="650" rx="48" fill="#FFFFFF"/>
+  <g transform="translate(155 270) scale(.74)">
+    <path d="M470 90C245 55 80 205 80 405C80 590 222 718 412 710" fill="none" stroke="#000" stroke-width="88" stroke-linecap="round"/>
+    <circle cx="405" cy="240" r="54"/>
+    <path d="M392 324L305 438L434 508M342 389L516 410" fill="none" stroke="#000" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <rect x="870" y="220" width="650" height="650" rx="48" fill="#0B2742"/>
+  <g transform="translate(945 270) scale(.74)">
+    <path d="M470 90C245 55 80 205 80 405C80 590 222 718 412 710" fill="none" stroke="#00D4C6" stroke-width="88" stroke-linecap="round"/>
+    <circle cx="405" cy="240" r="54" fill="#EAF7FF"/>
+    <path d="M392 324L305 438L434 508M342 389L516 410" fill="none" stroke="#EAF7FF" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="80" y="942" fill="#0B2742" font-family="Arial" font-size="26">Strength: training signal · Risk: fitness pictogram detail · Weighted score: 3.75 / 5</text>
+</svg>

@@ -73,7 +73,6 @@ struct WorkoutEditorView: View {
             }
         }
         .interactiveDismissDisabled(draft != original)
-        .preferredColorScheme(.dark)
     }
 }
 
@@ -165,7 +164,6 @@ struct ExercisePickerView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     private var filtered: [Exercise] {

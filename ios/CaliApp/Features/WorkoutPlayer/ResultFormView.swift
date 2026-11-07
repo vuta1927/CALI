@@ -106,7 +106,7 @@ struct ResultFormView: View {
     private func durationInput(title: String, targetSeconds: Int) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             if durationUnknown {
-                Label("CALI không đo được chính xác (app ở nền hoặc giờ thiết bị thay đổi). Hãy nhập thời gian bạn thực sự tập.", systemImage: "exclamationmark.triangle")
+                Label("COAMI không đo được chính xác (app ở nền hoặc giờ thiết bị thay đổi). Hãy nhập thời gian bạn thực sự tập.", systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(Color.caliWarning)
             }

@@ -71,3 +71,30 @@ final class WorkoutContentStateTests: XCTestCase {
         XCTAssertEqual(WorkoutAttributes.Phase.allCases.map(\.rawValue), contract)
     }
 }
+
+final class COAMIThemeTests: XCTestCase {
+    func testBrandTokensMatchTheHandoff() {
+        XCTAssertEqual(COAMIColorToken.mint.rawValue, 0x2FF6C4)
+        XCTAssertEqual(COAMIColorToken.teal.rawValue, 0x00D4C6)
+        XCTAssertEqual(COAMIColorToken.aqua.rawValue, 0x00A7E1)
+        XCTAssertEqual(COAMIColorToken.navy.rawValue, 0x0B2742)
+        XCTAssertEqual(COAMIColorToken.ice.rawValue, 0xEAF7FF)
+    }
+
+    func testSemanticPaletteAdaptsWithoutChangingBrandIdentity() {
+        let light = COAMIThemePalette.palette(for: .light)
+        let dark = COAMIThemePalette.palette(for: .dark)
+
+        XCTAssertEqual(light.canvas, 0xF4FAFD)
+        XCTAssertEqual(light.text, COAMIColorToken.navy.rawValue)
+        XCTAssertEqual(dark.canvas, 0x071927)
+        XCTAssertEqual(dark.text, COAMIColorToken.ice.rawValue)
+        XCTAssertEqual(light.accent, COAMIColorToken.teal.rawValue)
+        XCTAssertEqual(dark.accent, COAMIColorToken.mint.rawValue)
+    }
+
+    func testReduceTransparencyAlwaysUsesOpaqueSurfaces() {
+        XCTAssertFalse(COAMIEffectPolicy.usesMaterial(reduceTransparency: true))
+        XCTAssertTrue(COAMIEffectPolicy.usesMaterial(reduceTransparency: false))
+    }
+}
