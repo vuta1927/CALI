@@ -1,0 +1,19 @@
+// Shared build settings for every CALI target.
+// Included by the per-target xcconfig files; see ios/project.yml.
+//
+// Never commit a real Team ID or a personal bundle prefix here.
+// CI may override CALI_BUNDLE_PREFIX and CALI_BUILD_SHA on the xcodebuild command line.
+
+// Placeholder reverse-DNS prefix. Bundle IDs become $(CALI_BUNDLE_PREFIX).cali[.suffix].
+CALI_BUNDLE_PREFIX = com.example
+
+// Empty on purpose: CI builds unsigned; Sideloadly re-signs with the developer's Apple ID.
+DEVELOPMENT_TEAM =
+
+// Git commit of the build. "local" unless CI passes CALI_BUILD_SHA=<sha>.
+// Exposed to the app through the Info.plist key CaliBuildSHA.
+CALI_BUILD_SHA = local
+
+// App and widget extension must share the same version values.
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1

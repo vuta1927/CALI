@@ -1,0 +1,296 @@
+# iOS build on GitHub-hosted macOS (no local Mac; see docs/16 §1.1–1.2 and ios/README.md).
+# macOS minutes are billed x10 on private repos (~200 macOS min/month), so this workflow
+# only runs on demand: manual dispatch, PRs labelled `ios-build`, or iOS changes merged to main.
+# Output: an UNSIGNED .ipa artifact that the developer re-signs and installs with Sideloadly.
+name: ios-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: "Also run unit tests on an iOS Simulator (extra macOS minutes)"
+        type: boolean
+        default: false
+      bundle_prefix:
+        description: "Bundle ID prefix for this build only (e.g. com.yourname). Never commit a personal prefix."
+        type: string
+        default: com.example
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-build.yml"
+      # CaliDomain is tested on Linux (swift-domain.yml) and not yet referenced by project.yml.
+      # Remove this exclusion once the app links CaliDomain.
+      - "!ios/Packages/CaliDomain/**"
+  pull_request:
+    types: [labeled, synchronize, opened, reopened]
+
+permissions:
+  contents: read
+
+# One build per ref; a newer push cancels the older run. Label events for labels other than
+# `ios-build` get a unique group so they never cancel a real build.
+concurrency:
+  group: ios-build-${{ github.ref }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'ios-build') && github.run_id || 'build' }}
+  cancel-in-progress: true
+
+env:
+  # Preferred Xcode on the macos-15 image; falls back to the image default if absent.
+  XCODE_VERSION: "16.4"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  HOMEBREW_NO_ANALYTICS: "1"
+  # PR builds use the PR head commit (not the synthetic merge commit) so the SHA shown in the app is real.
+  BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-ipa:
+    name: Build unsigned .ipa
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'ios-build') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'ios-build'))
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Record job start
+        run: |
+          echo "JOB_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          echo "Job start (UTC): $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BUILD_SHA }}
+          fetch-depth: 1
+
+      - name: Resolve build parameters
+        env:
+          INPUT_BUNDLE_PREFIX: ${{ inputs.bundle_prefix }}
+        run: |
+          prefix="${INPUT_BUNDLE_PREFIX:-com.example}"
+          if [[ ! "$prefix" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
+            echo "::error::bundle_prefix '$prefix' is not a reverse-DNS identifier (e.g. com.yourname)"
+            exit 1
+          fi
+          short_sha="${BUILD_SHA:0:7}"
+          {
+            echo "CALI_BUNDLE_PREFIX=$prefix"
+            echo "SHORT_SHA=$short_sha"
+            echo "IPA_NAME=CaliApp-unsigned-$short_sha.ipa"
+          } >> "$GITHUB_ENV"
+          echo "Bundle prefix: $prefix | SHA: $BUILD_SHA"
+
+      - name: Select Xcode
+        run: |
+          candidate="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ -d "$candidate" ]; then
+            sudo xcode-select -s "$candidate/Contents/Developer"
+          else
+            echo "::warning::$candidate not found on this image; using default $(xcode-select -p)"
+            ls -d /Applications/Xcode*.app || true
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml
+
+      - name: Archive (unsigned, Debug, iphoneos)
+        run: |
+          log="$RUNNER_TEMP/xcodebuild-archive.log"
+          set +e
+          xcodebuild \
+            -project ios/CaliApp.xcodeproj \
+            -scheme CaliApp \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/CaliApp.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CALI_BUILD_SHA="$BUILD_SHA" \
+            CALI_BUNDLE_PREFIX="$CALI_BUNDLE_PREFIX" \
+            > "$log" 2>&1
+          status=$?
+          set -e
+          echo "---- errors/warnings (deduplicated) ----"
+          grep -E '(error|warning): ' "$log" | sort -u | head -n 200 || true
+          echo "---- tail ----"
+          tail -n 40 "$log"
+          exit $status
+
+      - name: Verify app bundle contains the widget extension
+        run: |
+          app="$RUNNER_TEMP/CaliApp.xcarchive/Products/Applications/CaliApp.app"
+          appex="$app/PlugIns/CaliActivityWidget.appex"
+          if [ ! -d "$app" ]; then
+            echo "::error::CaliApp.app missing from archive"; ls -R "$RUNNER_TEMP/CaliApp.xcarchive/Products" || true; exit 1
+          fi
+          if [ ! -d "$appex" ]; then
+            echo "::error::PlugIns/CaliActivityWidget.appex missing — widget extension was not embedded"
+            ls -la "$app" "$app/PlugIns" || true
+            exit 1
+          fi
+          pb=/usr/libexec/PlistBuddy
+          echo "App bundle id:      $($pb -c 'Print :CFBundleIdentifier' "$app/Info.plist")"
+          echo "App version:        $($pb -c 'Print :CFBundleShortVersionString' "$app/Info.plist") ($($pb -c 'Print :CFBundleVersion' "$app/Info.plist"))"
+          echo "CaliBuildSHA:       $($pb -c 'Print :CaliBuildSHA' "$app/Info.plist")"
+          echo "Live Activities:    $($pb -c 'Print :NSSupportsLiveActivities' "$app/Info.plist")"
+          echo "Widget bundle id:   $($pb -c 'Print :CFBundleIdentifier' "$appex/Info.plist")"
+          echo "Widget ext point:   $($pb -c 'Print :NSExtension:NSExtensionPointIdentifier' "$appex/Info.plist")"
+          actual_sha="$($pb -c 'Print :CaliBuildSHA' "$app/Info.plist")"
+          if [ "$actual_sha" != "$BUILD_SHA" ]; then
+            echo "::error::CaliBuildSHA is '$actual_sha', expected '$BUILD_SHA'"; exit 1
+          fi
+
+      - name: Package unsigned .ipa
+        run: |
+          stage="$RUNNER_TEMP/ipa"
+          rm -rf "$stage" && mkdir -p "$stage/Payload"
+          ditto "$RUNNER_TEMP/CaliApp.xcarchive/Products/Applications/CaliApp.app" "$stage/Payload/CaliApp.app"
+          (cd "$stage" && zip -qry "$RUNNER_TEMP/$IPA_NAME" Payload)
+          unzip -l "$RUNNER_TEMP/$IPA_NAME" | grep -q 'Payload/CaliApp.app/PlugIns/CaliActivityWidget.appex/' \
+            || { echo "::error::.ipa does not contain the widget extension"; exit 1; }
+          ls -lh "$RUNNER_TEMP/$IPA_NAME"
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaliApp-unsigned-${{ env.SHORT_SHA }}
+          path: ${{ runner.temp }}/${{ env.IPA_NAME }}
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-archive-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/xcodebuild-archive.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Record job duration
+        if: always()
+        run: |
+          end=$(date +%s)
+          start="${JOB_START_EPOCH:-$end}"
+          mins=$(( (end - start + 59) / 60 ))
+          line="build-ipa: start $(date -u -r "$start" '+%Y-%m-%dT%H:%M:%SZ'), end $(date -u -r "$end" '+%Y-%m-%dT%H:%M:%SZ'), $((end - start))s (~${mins} macOS min before x10 billing; runner setup not included)"
+          echo "$line"
+          echo "- $line" >> "$GITHUB_STEP_SUMMARY"
+
+  unit-tests:
+    name: Unit tests (iOS Simulator)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Record job start
+        run: |
+          echo "JOB_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          echo "Job start (UTC): $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          candidate="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ -d "$candidate" ]; then
+            sudo xcode-select -s "$candidate/Contents/Developer"
+          else
+            echo "::warning::$candidate not found on this image; using default $(xcode-select -p)"
+            ls -d /Applications/Xcode*.app || true
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml
+
+      - name: Pick an iPhone simulator (iOS 18+)
+        run: |
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/simulators.json"
+          udid=$(python3 - "$RUNNER_TEMP/simulators.json" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1]))["devices"]
+          best = None
+          for runtime, entries in devices.items():
+              # e.g. com.apple.CoreSimulator.SimRuntime.iOS-18-4
+              tail = runtime.rsplit(".", 1)[-1]
+              if not tail.startswith("iOS-"):
+                  continue
+              version = tuple(int(p) for p in tail.split("-")[1:] if p.isdigit())
+              if version < (18,):
+                  continue
+              for d in entries:
+                  if d.get("isAvailable", True) and d["name"].startswith("iPhone"):
+                      if best is None or version > best[0]:
+                          best = (version, d["udid"], d["name"])
+          if best is None:
+              sys.exit("No available iPhone simulator with iOS 18+")
+          print(f"Using {best[2]} iOS {'.'.join(map(str, best[0]))}", file=sys.stderr)
+          print(best[1])
+          PY
+          )
+          echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        run: |
+          log="$RUNNER_TEMP/xcodebuild-test.log"
+          set +e
+          xcodebuild \
+            -project ios/CaliApp.xcodeproj \
+            -scheme CaliApp \
+            -configuration Debug \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            test \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$log" 2>&1
+          status=$?
+          set -e
+          echo "---- errors/warnings (deduplicated) ----"
+          grep -E '(error|warning): ' "$log" | sort -u | head -n 200 || true
+          echo "---- test results ----"
+          grep -E "Test (Case|Suite) .*(passed|failed)|Executed [0-9]+ test" "$log" | tail -n 60 || true
+          tail -n 20 "$log"
+          exit $status
+
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-test-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/xcodebuild-test.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Record job duration
+        if: always()
+        run: |
+          end=$(date +%s)
+          start="${JOB_START_EPOCH:-$end}"
+          mins=$(( (end - start + 59) / 60 ))
+          line="unit-tests: start $(date -u -r "$start" '+%Y-%m-%dT%H:%M:%SZ'), end $(date -u -r "$end" '+%Y-%m-%dT%H:%M:%SZ'), $((end - start))s (~${mins} macOS min before x10 billing; runner setup not included)"
+          echo "$line"
+          echo "- $line" >> "$GITHUB_STEP_SUMMARY"
