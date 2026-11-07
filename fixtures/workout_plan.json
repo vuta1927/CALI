@@ -1,0 +1,74 @@
+{
+  "id": "11111111-1111-4111-8111-111111111111",
+  "title": "Planche Foundation / Pull / Legs — Demo",
+  "revision": 1,
+  "version": 1,
+  "status": "active",
+  "workouts": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "weekday": 1,
+      "title": "Thứ 2 — Planche / Pull / Legs",
+      "orderIndex": 0,
+      "exercises": [
+        {
+          "id": "33333333-3333-4333-8333-333333333331",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          "orderIndex": 0,
+          "setCount": 4,
+          "target": { "kind": "static_hold", "holdSeconds": 12 },
+          "restSeconds": 90
+        },
+        {
+          "id": "33333333-3333-4333-8333-333333333332",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "orderIndex": 1,
+          "setCount": 4,
+          "target": { "kind": "reps", "repMin": 8, "repMax": 10 },
+          "restSeconds": 120
+        },
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+          "orderIndex": 2,
+          "setCount": 3,
+          "target": { "kind": "reps", "repMin": 10, "repMax": 15 },
+          "restSeconds": 90
+        }
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222224",
+      "weekday": 3,
+      "title": "Thứ 4 — Static Hold / Legs",
+      "orderIndex": 1,
+      "exercises": [
+        {
+          "id": "33333333-3333-4333-8333-333333333334",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": { "kind": "static_hold", "holdSeconds": 15 },
+          "restSeconds": 90
+        }
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222226",
+      "weekday": 5,
+      "title": "Thứ 6 — Pull / Legs",
+      "orderIndex": 2,
+      "exercises": [
+        {
+          "id": "33333333-3333-4333-8333-333333333335",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": { "kind": "reps", "repMin": 8, "repMax": 10 },
+          "restSeconds": 120
+        }
+      ]
+    }
+  ],
+  "_comment": "Demo fixture only. UUID exercise IDs must be seeded in catalog. Training volumes are not an individualized prescription."
+}

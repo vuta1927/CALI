@@ -1,0 +1,198 @@
+{
+  "name": "CALI Calisthenics iOS Agent Handoff",
+  "version": "1.0.0",
+  "createdDate": "2026-11-07",
+  "fileCount": 38,
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "size": 4228,
+      "sha256": "5769b6ae3b27c45c177a1fb8a9c43f7b8ae160eb9039c1d12f160e9f94d128ce"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 413,
+      "sha256": "b3f15e5871cce2aafba3bde674596ae6c7e7124e0fd7cda53a42e749859f48e0"
+    },
+    {
+      "path": "HANDOFF.md",
+      "size": 2407,
+      "sha256": "5c7d7ac8d31c6324a584a507cff5435f58204d5d9dff9b862164d61ce971a086"
+    },
+    {
+      "path": "README.md",
+      "size": 7061,
+      "sha256": "ffc6507df477a5cbb1bbc15a94c096f7db34beb418389c7f754d82ab7e6dd988"
+    },
+    {
+      "path": "agents/00-orchestrator.md",
+      "size": 1234,
+      "sha256": "8ef7422cd5daa005110476f58f3bc0d6cc019f05a2607d116b5418b297c195cb"
+    },
+    {
+      "path": "agents/01-ios-agent.md",
+      "size": 1719,
+      "sha256": "f477384395cdc8b0a9a9dee3a9d3238991b4d4950ca7e822be816208cdf7f5f1"
+    },
+    {
+      "path": "agents/02-backend-agent.md",
+      "size": 1646,
+      "sha256": "8170ecc6d9047359c390be64dccf59fe86686ec9f5149328ce3c85b9e195fcc7"
+    },
+    {
+      "path": "agents/03-ai-coach-agent.md",
+      "size": 1409,
+      "sha256": "61821677a561d7567c91031ac670dc86d2cbad4a551566e1e4129f40e6d27938"
+    },
+    {
+      "path": "agents/04-design-agent.md",
+      "size": 1315,
+      "sha256": "0e7e4a884cf29d7a7f2a7c329835cebf8f2cf19b0c74b5cb282163cf34d8a08a"
+    },
+    {
+      "path": "agents/05-qa-agent.md",
+      "size": 1178,
+      "sha256": "5dedeb65a742882a49b1811c03a96548aa6afb1e2817dd905ec5b55d71ab8efe"
+    },
+    {
+      "path": "agents/06-contract-review-agent.md",
+      "size": 1056,
+      "sha256": "d1f2f42f3fbe9a42bf8ab366d220585960d19e4f286346ac8bf5f6ae0e0fffb3"
+    },
+    {
+      "path": "contracts/backlog.csv",
+      "size": 2348,
+      "sha256": "1dc6e1ee855d4639bb3ba0bc695e504c8ab185ea1166dbe4ec8a1376c84f8e44"
+    },
+    {
+      "path": "contracts/entity-payloads.schema.json",
+      "size": 10321,
+      "sha256": "4a96b5488e3e1d8f52790d4ca4cea9276ff42926304c68722a9ac56c2bcccb2a"
+    },
+    {
+      "path": "contracts/openapi.yaml",
+      "size": 22608,
+      "sha256": "5b256001d46fb29d25462b30eab2b70cfb5dc9e80c78401537190aae83f649ff"
+    },
+    {
+      "path": "db/001_initial.sql",
+      "size": 13342,
+      "sha256": "03f75e14fb2b2cd71311d678fb01dc2c370e4d498e44b132c1730d16028d4453"
+    },
+    {
+      "path": "db/002_dev_catalog_seed.sql",
+      "size": 1414,
+      "sha256": "621be34d1cfbece37b66c64ee50946a332439007abb70175aeda384047db98cb"
+    },
+    {
+      "path": "docs/01-product-prd.md",
+      "size": 6839,
+      "sha256": "9ec84d6bf6ae3afb99041e8f23def179542e599cb4b9a205c336ae509996c338"
+    },
+    {
+      "path": "docs/02-ux-spec.md",
+      "size": 7168,
+      "sha256": "45d9978054f60eb75f676538b2e0267317759406fc6a12fb70931ff6f8b2638e"
+    },
+    {
+      "path": "docs/03-workout-domain.md",
+      "size": 8226,
+      "sha256": "cf7d43ee34967c938c474ffa0bfc72dd6f2b25f0cf0b08970ebb72feea2d9c62"
+    },
+    {
+      "path": "docs/04-ios-architecture.md",
+      "size": 4576,
+      "sha256": "f26e570e6461dc0881ac08eddef77c767830c92834c124ab3411f7e75cbf713d"
+    },
+    {
+      "path": "docs/05-lock-screen-poc.md",
+      "size": 5100,
+      "sha256": "98c5a2d3388e559af49210471df662928f6ca77c083a93cefb058c19311f528b"
+    },
+    {
+      "path": "docs/06-backend-architecture.md",
+      "size": 4753,
+      "sha256": "d92c7e6911e6438cf09d3c4269cee95a80abdee6b5f04e4c70336a040482a3a3"
+    },
+    {
+      "path": "docs/07-data-model.md",
+      "size": 4640,
+      "sha256": "6a6a3b70132cf2214dc54663dcd856d5209b1f5e76b5e0857a5d6b08fbb0b19e"
+    },
+    {
+      "path": "docs/08-sync-protocol.md",
+      "size": 5830,
+      "sha256": "a9dbbd69667c4eaf8221c1b0969a6f99cd43eac86484895525a0996cc7a0ff99"
+    },
+    {
+      "path": "docs/09-ai-coach.md",
+      "size": 5359,
+      "sha256": "5f575b1f3d5b8471c1fcb8af5cbbfc20058fed0797fd4caf49670436439d6ed3"
+    },
+    {
+      "path": "docs/10-media-library.md",
+      "size": 2474,
+      "sha256": "2f5942cc4060572855139b6ab1ce84f2b9d9d327d4d10673c57e83cf9be153dd"
+    },
+    {
+      "path": "docs/11-security-observability.md",
+      "size": 2559,
+      "sha256": "1833746b0ec9e6d56b6c4c9c55ff141ffc88d813c95ef2e2b70ea32ad7760174"
+    },
+    {
+      "path": "docs/12-qa-acceptance.md",
+      "size": 3846,
+      "sha256": "50152edfd5e4d3d22928b5bae53993f31b15c8daeb129635114ced58e1aab386"
+    },
+    {
+      "path": "docs/13-delivery-backlog.md",
+      "size": 3765,
+      "sha256": "d679eb996c5ecd145c3d441a1d2ed6d7610955f6f51c7bcc15cfb33e3b296bbc"
+    },
+    {
+      "path": "docs/14-nfr-and-operations.md",
+      "size": 2531,
+      "sha256": "4d40cfa432c3942524e65b4aa915ddd7a0c5cec9bc7f2d73d6022147ea1f956b"
+    },
+    {
+      "path": "docs/15-decisions-risks.md",
+      "size": 4483,
+      "sha256": "92b4d095faf6b1cc0ac8cf7b6f3323c11b33b1dceb2985d051c490dc13ffe1b6"
+    },
+    {
+      "path": "fixtures/exercise_catalog.json",
+      "size": 2047,
+      "sha256": "9ef43767f8729896c3eccddee37c39cda8e01fc26a47c8cb2b28c0150eeaca87"
+    },
+    {
+      "path": "fixtures/sync_push.json",
+      "size": 827,
+      "sha256": "229c4941787421ef292b985245fc3ce5f71657c56107f57c4f68c5e9bc645a48"
+    },
+    {
+      "path": "fixtures/workout_plan.json",
+      "size": 2312,
+      "sha256": "c37c4b37252639980e25dc65f6664f2b7d83b01743da8a281fb95f0aac4b3636"
+    },
+    {
+      "path": "references/ui_concept_reference.png",
+      "size": 1941753,
+      "sha256": "2593e55838e132a464884dcb2a01f0a0172c1b5208675cd209e15930ae8e0b91"
+    },
+    {
+      "path": "tests/acceptance.feature",
+      "size": 4395,
+      "sha256": "03dc8d766008dd02ab2cea245e92a76c13a2721fe51f0035411fb6ac4a86ac06"
+    },
+    {
+      "path": "tools/export_backlog.py",
+      "size": 1138,
+      "sha256": "b0214cef26db2ff0758dfb6c682e44ecaf93107d3a62de49e7be5370e6b9df0d"
+    },
+    {
+      "path": "tools/validate_handoff.py",
+      "size": 3348,
+      "sha256": "2ef4dfa202b47bdefe5bcd1dc199efd9e1de7effe59cab96944ce61b1cc5d97e"
+    }
+  ]
+}

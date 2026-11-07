@@ -1,0 +1,672 @@
+openapi: 3.1.0
+info:
+  title: CALI Training Companion API
+  version: 1.0.0
+  description: >-
+    Offline-first Calisthenics training API. Device writes use idempotent sync
+    mutation IDs; AI analyzes completed, synchronized sessions asynchronously.
+servers:
+  - url: https://api.example.com
+    description: Placeholder only, replace per environment.
+tags:
+  - name: Identity
+  - name: Catalog
+  - name: Plans
+  - name: Sync
+  - name: Coaching
+security:
+  - bearerAuth: []
+paths:
+  /v1/auth/apple:
+    post:
+      tags: [Identity]
+      summary: Exchange validated Apple identity token for application tokens
+      security: []
+      operationId: authenticateWithApple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppleAuthRequest'
+      responses:
+        '200':
+          description: Tokens for authenticated app session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/auth/refresh:
+    post:
+      tags: [Identity]
+      summary: Rotate refresh token
+      operationId: refreshAuthToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Rotated tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/me:
+    get:
+      tags: [Identity]
+      summary: Current user profile
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/exercises:
+    get:
+      tags: [Catalog]
+      summary: List visual exercise catalog
+      operationId: listExercises
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 100}
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExerciseType'
+        - name: equipment
+          in: query
+          schema: {type: string, maxLength: 50}
+        - name: cursor
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: Page of approved exercises
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExercisePage'
+  /v1/exercises/{id}:
+    get:
+      tags: [Catalog]
+      summary: Exercise details and media metadata
+      operationId: getExercise
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ExerciseId'
+      responses:
+        '200':
+          description: Exercise details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exercise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/plans:
+    get:
+      tags: [Plans]
+      summary: List user's synced plan revisions
+      operationId: listPlans
+      parameters:
+        - name: cursor
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: Synced plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Plans]
+      summary: Create a plan online (offline clients should prefer sync push)
+      operationId: createPlan
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: Created plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/sync/push:
+    post:
+      tags: [Sync]
+      summary: Push batch of locally committed mutations
+      operationId: syncPush
+      description: >-
+        Atomically process each mutation, including idempotent receipt and user
+        change-log entry. Per-mutation conflicts do not fail unrelated mutations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+      responses:
+        '200':
+          description: Per-mutation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPushResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/sync/pull:
+    get:
+      tags: [Sync]
+      summary: Pull changes since last acknowledged cursor
+      operationId: syncPull
+      parameters:
+        - name: cursor
+          in: query
+          description: Opaque user-scoped cursor; omit for initial sync.
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 100}
+      responses:
+        '200':
+          description: Ordered change page with next cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '410':
+          description: Cursor expired; client must perform full resync
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/analyses:
+    post:
+      tags: [Coaching]
+      summary: Enqueue AI review for synchronized completed session
+      operationId: requestAnalysis
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '202':
+          description: Job queued or already queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/analyses/{id}:
+    get:
+      tags: [Coaching]
+      summary: Check AI review status and structured output
+      operationId: getAnalysis
+      parameters:
+        - $ref: '#/components/parameters/AnalysisId'
+      responses:
+        '200':
+          description: Analysis result or job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/recommendations/{id}/decision:
+    post:
+      tags: [Coaching]
+      summary: Accept or reject suggestion; accepting creates new plan revision
+      operationId: decideRecommendation
+      parameters:
+        - $ref: '#/components/parameters/RecommendationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationDecisionRequest'
+      responses:
+        '200':
+          description: Recorded decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationDecisionResult'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ExerciseId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AnalysisId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    RecommendationId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: Not authenticated or token invalid
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: Resource not found under current user scope
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Conflict:
+      description: Resource version or business conflict
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    RateLimited:
+      description: Rate limit reached
+      headers:
+        Retry-After:
+          description: Delay before retry in seconds
+          schema: {type: integer, minimum: 1}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code, traceId]
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        code: {type: string}
+        traceId: {type: string}
+        detail: {type: string}
+        errors: {type: object, additionalProperties: true}
+    AppleAuthRequest:
+      type: object
+      required: [identityToken, nonce]
+      properties:
+        identityToken: {type: string, minLength: 10}
+        nonce: {type: string, minLength: 8}
+        deviceId: {type: string, format: uuid}
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: {type: string, minLength: 10}
+        deviceId: {type: string, format: uuid}
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresInSeconds, user]
+      properties:
+        accessToken: {type: string}
+        refreshToken: {type: string}
+        expiresInSeconds: {type: integer, minimum: 1}
+        user: {$ref: '#/components/schemas/UserProfile'}
+    UserProfile:
+      type: object
+      required: [id, timezone, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        displayName: {type: [string, 'null']}
+        timezone: {type: string, example: Asia/Bangkok}
+        createdAt: {type: string, format: date-time}
+    ExerciseType:
+      type: string
+      enum: [static_hold, reps, timed_reps, interval, skill_attempt]
+    ExerciseMedia:
+      type: object
+      required: [id, kind, contentVersion, mimeType, sha256]
+      properties:
+        id: {type: string, format: uuid}
+        kind:
+          type: string
+          enum: [thumbnail, poster, preview, tutorial, correct, incorrect]
+        contentVersion: {type: integer, minimum: 1}
+        url: {type: [string, 'null'], format: uri}
+        mimeType: {type: string}
+        sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        sizeBytes: {type: [integer, 'null'], minimum: 0}
+        durationMs: {type: [integer, 'null'], minimum: 0}
+        license: {type: string}
+        attribution: {type: [string, 'null']}
+    Exercise:
+      type: object
+      required: [id, slug, name, type, equipment, cues, catalogVersion, media]
+      properties:
+        id: {type: string, format: uuid}
+        slug: {type: string, example: tuck-planche}
+        name: {type: string}
+        type: {$ref: '#/components/schemas/ExerciseType'}
+        equipment:
+          type: array
+          items: {type: string}
+        cues:
+          type: array
+          items: {type: string}
+        catalogVersion: {type: integer, minimum: 1}
+        media:
+          type: array
+          items: {$ref: '#/components/schemas/ExerciseMedia'}
+    ExercisePage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Exercise'}
+        nextCursor: {type: [string, 'null']}
+        hasMore: {type: boolean}
+    PlannedTarget:
+      oneOf:
+        - type: object
+          required: [kind, holdSeconds]
+          properties:
+            kind: {const: static_hold}
+            holdSeconds: {type: integer, minimum: 1, maximum: 3600}
+          additionalProperties: false
+        - type: object
+          required: [kind, repMin, repMax]
+          properties:
+            kind: {const: reps}
+            repMin: {type: integer, minimum: 1, maximum: 500}
+            repMax: {type: integer, minimum: 1, maximum: 500}
+          additionalProperties: false
+        - type: object
+          required: [kind, timeSeconds]
+          properties:
+            kind: {const: timed_reps}
+            timeSeconds: {type: integer, minimum: 1, maximum: 3600}
+          additionalProperties: false
+        - type: object
+          required: [kind, workSeconds, restSeconds]
+          properties:
+            kind: {const: interval}
+            workSeconds: {type: integer, minimum: 1, maximum: 3600}
+            restSeconds: {type: integer, minimum: 0, maximum: 3600}
+          additionalProperties: false
+        - type: object
+          required: [kind, attempts]
+          properties:
+            kind: {const: skill_attempt}
+            attempts: {type: integer, minimum: 1, maximum: 100}
+          additionalProperties: false
+    PlannedExercise:
+      type: object
+      required: [id, exerciseId, orderIndex, setCount, target, restSeconds]
+      properties:
+        id: {type: string, format: uuid}
+        exerciseId: {type: string, format: uuid}
+        orderIndex: {type: integer, minimum: 0}
+        setCount: {type: integer, minimum: 1, maximum: 20}
+        target: {$ref: '#/components/schemas/PlannedTarget'}
+        restSeconds: {type: integer, minimum: 0, maximum: 3600}
+    PlannedWorkout:
+      type: object
+      required: [id, weekday, orderIndex, exercises]
+      properties:
+        id: {type: string, format: uuid}
+        weekday: {type: integer, minimum: 1, maximum: 7, description: '1=Monday'}
+        title: {type: string}
+        orderIndex: {type: integer, minimum: 0}
+        exercises:
+          type: array
+          items: {$ref: '#/components/schemas/PlannedExercise'}
+    CreatePlanRequest:
+      type: object
+      required: [id, title, workouts]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string, maxLength: 120}
+        workouts:
+          type: array
+          items: {$ref: '#/components/schemas/PlannedWorkout'}
+    TrainingPlan:
+      allOf:
+        - $ref: '#/components/schemas/CreatePlanRequest'
+        - type: object
+          required: [revision, version, status]
+          properties:
+            revision: {type: integer, minimum: 1}
+            version: {type: integer, minimum: 1, format: int64}
+            status: {type: string, enum: [active, archived]}
+            parentPlanId: {type: [string, 'null'], format: uuid}
+    PlanPage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/TrainingPlan'}
+        nextCursor: {type: [string, 'null']}
+        hasMore: {type: boolean}
+    SyncEntityType:
+      type: string
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note]
+    SyncMutation:
+      type: object
+      required: [mutationId, entityType, entityId, action, baseVersion, clientChangedAt, payload]
+      properties:
+        mutationId: {type: string, format: uuid}
+        entityType: {$ref: '#/components/schemas/SyncEntityType'}
+        entityId: {type: string, format: uuid}
+        action: {type: string, enum: [upsert, delete]}
+        baseVersion: {type: integer, minimum: 0, format: int64}
+        clientChangedAt: {type: string, format: date-time}
+        payload:
+          type: object
+          additionalProperties: true
+    SyncPushRequest:
+      type: object
+      required: [deviceId, mutations]
+      properties:
+        deviceId: {type: string, format: uuid}
+        mutations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: '#/components/schemas/SyncMutation'}
+    SyncMutationResult:
+      type: object
+      required: [mutationId, status]
+      properties:
+        mutationId: {type: string, format: uuid}
+        status: {type: string, enum: [applied, duplicate, conflict, rejected]}
+        serverVersion: {type: [integer, 'null'], format: int64}
+        serverEntity: {type: [object, 'null'], additionalProperties: true}
+        error: {$ref: '#/components/schemas/MutationError'}
+    MutationError:
+      type: [object, 'null']
+      properties:
+        code: {type: string}
+        message: {type: string}
+    SyncPushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: {$ref: '#/components/schemas/SyncMutationResult'}
+    ChangeEntityType:
+      type: string
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, ai_analysis, ai_recommendation]
+    SyncChange:
+      type: object
+      required: [changeId, entityType, entityId, operation, serverVersion, payload]
+      properties:
+        changeId: {type: string, description: Opaque user-scoped sequence token}
+        entityType: {$ref: '#/components/schemas/ChangeEntityType'}
+        entityId: {type: string, format: uuid}
+        operation: {type: string, enum: [upsert, delete]}
+        serverVersion: {type: integer, minimum: 1, format: int64}
+        payload:
+          type: object
+          additionalProperties: true
+    SyncPullResponse:
+      type: object
+      required: [changes, nextCursor, hasMore]
+      properties:
+        changes:
+          type: array
+          items: {$ref: '#/components/schemas/SyncChange'}
+        nextCursor: {type: string}
+        hasMore: {type: boolean}
+    AnalysisRequest:
+      type: object
+      required: [sessionId, sessionVersion]
+      properties:
+        sessionId: {type: string, format: uuid}
+        sessionVersion: {type: integer, minimum: 1, format: int64}
+    AnalysisStatus:
+      type: string
+      enum: [queued, running, completed, failed, superseded]
+    AnalysisReceipt:
+      type: object
+      required: [analysisId, status]
+      properties:
+        analysisId: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/AnalysisStatus'}
+    AnalysisRecommendation:
+      type: object
+      required: [id, exerciseId, action, rationale, requiresApproval, decision]
+      properties:
+        id: {type: string, format: uuid}
+        exerciseId: {type: string, format: uuid}
+        action: {type: string, enum: [maintain, reduce, increase_hold, increase_reps, change_progression, needs_more_data]}
+        proposedTarget: {type: [object, 'null'], additionalProperties: true}
+        rationale: {type: string}
+        requiresApproval: {type: boolean, const: true}
+        decision: {type: string, enum: [proposed, accepted, rejected, superseded]}
+    AnalysisOutput:
+      type: object
+      required: [schemaVersion, summary, confidence, observations, safetyFlags, recommendations]
+      properties:
+        schemaVersion: {type: string, const: '1.0'}
+        summary: {type: string}
+        confidence: {type: string, enum: [low, medium, high]}
+        observations:
+          type: array
+          items:
+            type: object
+            required: [type, evidence]
+            properties:
+              type: {type: string}
+              evidence: {type: string}
+        fatigueLevel: {type: string, enum: [unknown, low, moderate, high]}
+        safetyFlags:
+          type: array
+          items: {type: string}
+        recommendations:
+          type: array
+          items: {$ref: '#/components/schemas/AnalysisRecommendation'}
+    Analysis:
+      type: object
+      required: [id, sessionId, sessionVersion, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        sessionId: {type: string, format: uuid}
+        sessionVersion: {type: integer, format: int64}
+        status: {$ref: '#/components/schemas/AnalysisStatus'}
+        createdAt: {type: string, format: date-time}
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/AnalysisOutput'
+            - type: 'null'
+        failureReason: {type: [string, 'null']}
+    RecommendationDecisionRequest:
+      type: object
+      required: [decision]
+      if:
+        properties:
+          decision: {const: accepted}
+      then:
+        required: [expectedPlanVersion, targetPlanId]
+      properties:
+        decision: {type: string, enum: [accepted, rejected]}
+        expectedPlanVersion: {type: integer, minimum: 1, format: int64}
+        targetPlanId: {type: string, format: uuid}
+    RecommendationDecisionResult:
+      type: object
+      required: [recommendationId, decision]
+      properties:
+        recommendationId: {type: string, format: uuid}
+        decision: {type: string, enum: [accepted, rejected]}
+        newPlanId: {type: [string, 'null'], format: uuid}
+        newPlanVersion: {type: [integer, 'null'], format: int64}

@@ -1,0 +1,13 @@
+{
+  "catalogVersion": 1,
+  "status": "development_fixture_only",
+  "items": [
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1","slug":"tuck-planche","name":"Tuck Planche","type":"static_hold","equipment":[],"cues":["Duỗi thẳng khuỷu tay","Đẩy vai ra trước","Giữ thân ổn định"],"media":{"poster":"assets/placeholder/tuck-planche.webp","preview":"assets/placeholder/tuck-planche.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2","slug":"pull-up","name":"Pull-up","type":"reps","equipment":["pull-up bar"],"cues":["Kiểm soát thân","Kéo không giật mạnh"],"media":{"poster":"assets/placeholder/pull-up.webp","preview":"assets/placeholder/pull-up.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3","slug":"dips","name":"Dips","type":"reps","equipment":["parallel bars"],"cues":["Kiểm soát vai","Không đẩy qua đau khớp"],"media":{"poster":"assets/placeholder/dips.webp","preview":"assets/placeholder/dips.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4","slug":"l-sit","name":"L-sit Hold","type":"static_hold","equipment":["floor or parallettes"],"cues":["Đẩy vai xuống","Giữ gối duỗi theo khả năng"],"media":{"poster":"assets/placeholder/l-sit.webp","preview":"assets/placeholder/l-sit.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5","slug":"squat","name":"Bodyweight Squat","type":"reps","equipment":[],"cues":["Giữ gót chân ổn định","Kiểm soát xuống và lên"],"media":{"poster":"assets/placeholder/squat.webp","preview":"assets/placeholder/squat.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6","slug":"ring-support","name":"Ring Support Hold","type":"static_hold","equipment":["gymnastic rings"],"cues":["Ổn định vai","Dừng nếu đau khớp"],"media":{"poster":"assets/placeholder/ring-support.webp","preview":"assets/placeholder/ring-support.mp4"}}
+  ],
+  "_warning": "Paths are intended placeholders only. No media files are bundled in this handoff package. Licensed exercise-correct images/video must be supplied before release."
+}

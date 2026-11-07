@@ -1,0 +1,29 @@
+task_id,milestone,owner,depends_on,definition_of_done
+PO-001,M0,Integrator,,"review PRD & freeze MVP assumptions, ADR decisions"
+POC-001,M0,iOS,PO-001,"real iPhone Live Activity countdown + auth test, screenshots/logs"
+POC-002,M0,iOS/QA,POC-001,shared DB/AppIntent transactional action; kill/offline test
+CON-001,M0,Integrator/BE/iOS,PO-001,"OpenAPI reviewed, entity naming/time enums consistent"
+CON-002,M0,Integrator,"CON-001, POC-002",Workout reducer transition contract & event schema approved
+IOS-001,M1,iOS,CON-002,"project scaffolding, GRDB migrations, clean build"
+IOS-002,M1,iOS,IOS-001,pure reducer / fake clock / command dedupe unit tests
+IOS-003,M1,iOS,IOS-002,"planner + local catalog seed, validation"
+UX-001,M1,Design,PO-001,"token system, 13 screen specs, clickable journey"
+IOS-004,M1,iOS,"IOS-002,UX-001",Workout Player hold+reps+rest and confirmation flow
+IOS-005,M1,iOS,"IOS-004,POC-001","Live Activity/widget + notifications, fallback"
+IOS-006,M1,iOS,"IOS-003,IOS-004",offline Journal/History/notes + force quit recovery
+MED-001,M1,Design/iOS,UX-001,approved thumbnails/posters + media cache/AVPlayer
+QA-001,M1,QA,"IOS-006,IOS-005","T-01..T-06, T-09..T-12 with real device evidence"
+BE-001,M2,BE,CON-001,".NET modular monolith, auth stubs/prod validation, OpenAPI implementation"
+BE-002,M2,BE,BE-001,"PostgreSQL migration, seed catalog, per-user isolation tests"
+BE-003,M2,BE,BE-002,transactional sync push idempotent + receipts
+BE-004,M2,BE,BE-003,cursor pull/change-log + tombstones
+IOS-007,M2,iOS,"IOS-001,BE-004",outbox push/pull/visible status/conflict inbox
+IOS-008,M2,iOS/BE,IOS-007,"Sign in with Apple, guest attach workflow"
+QA-002,M2,QA,IOS-008,"T-07,T-08,T-16 + 2-device E2E + auth stress"
+AI-001,M3,AI,BE-004,"deterministic metrics, conservative safety policy, unit tests"
+AI-002,M3,AI/BE,AI-001,durable job queue + schema validated LLM adapter
+AI-003,M3,AI/BE,AI-002,analysis request/result + recommendation decision/plan revision
+IOS-009,M3,iOS,AI-003,AI review UI pending/completed/rejected + apply flow
+QA-003,M3,QA,IOS-009,"T-13..T-15, prompt injection, no silent plan mutation"
+OPS-001,M3,Integrator,BE-004,"CI/CD, metrics, secrets, backup+restore, privacy baseline"
+REL-001,M3,Integrator/QA,"QA-001,QA-002,QA-003,OPS-001","pilot release checklist, testflight, rollback playbook"

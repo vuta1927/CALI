@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cali/contracts/entity-payloads.schema.json",
+  "title": "CALI Sync Mutation — Entity Payload Contract",
+  "description": "Normative runtime validation schema for /v1/sync/push. Together with OpenAPI, reject unknown fields and cross-user references.",
+  "oneOf": [
+    {"$ref": "#/$defs/training_plan_mutation"},
+    {"$ref": "#/$defs/planned_workout_mutation"},
+    {"$ref": "#/$defs/planned_exercise_mutation"},
+    {"$ref": "#/$defs/workout_session_mutation"},
+    {"$ref": "#/$defs/exercise_execution_mutation"},
+    {"$ref": "#/$defs/set_result_mutation"},
+    {"$ref": "#/$defs/workout_note_mutation"}
+  ],
+  "$defs": {
+    "uuid": {"type": "string", "format": "uuid"},
+    "dateTime": {"type": "string", "format": "date-time"},
+    "target": {
+      "oneOf": [
+        {"type": "object", "required": ["kind", "holdSeconds"], "properties": {"kind": {"const": "static_hold"}, "holdSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "repMin", "repMax"], "properties": {"kind": {"const": "reps"}, "repMin": {"type": "integer", "minimum": 1}, "repMax": {"type": "integer", "minimum": 1}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "timeSeconds"], "properties": {"kind": {"const": "timed_reps"}, "timeSeconds": {"type": "integer", "minimum": 1}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1}, "restSeconds": {"type": "integer", "minimum": 0}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1}}, "additionalProperties": false}
+      ]
+    },
+    "delete_payload": {
+      "type": "object", "required": ["id", "deletedAt"],
+      "properties": {"id": {"$ref": "#/$defs/uuid"}, "deletedAt": {"$ref": "#/$defs/dateTime"}},
+      "additionalProperties": false
+    },
+    "mutation_common": {
+      "type": "object", "required": ["mutationId", "entityType", "entityId", "action", "baseVersion", "clientChangedAt", "payload"],
+      "properties": {
+        "mutationId": {"$ref": "#/$defs/uuid"}, "entityType": {"type": "string"}, "entityId": {"$ref": "#/$defs/uuid"},
+        "action": {"enum": ["upsert", "delete"]}, "baseVersion": {"type": "integer", "minimum": 0},
+        "clientChangedAt": {"$ref": "#/$defs/dateTime"}, "payload": {"type": "object"}
+      }
+    },
+    "training_plan_payload": {
+      "type": "object", "required": ["id", "title", "revision", "status"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "title": {"type": "string", "minLength": 1, "maxLength": 120},
+        "revision": {"type": "integer", "minimum": 1}, "status": {"enum": ["active", "archived"]},
+        "parentPlanId": {"type": ["string", "null"], "format": "uuid"}
+      }, "additionalProperties": false
+    },
+    "planned_workout_payload": {
+      "type": "object", "required": ["id", "planId", "weekday", "title", "orderIndex"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
+        "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string"},
+        "orderIndex": {"type": "integer", "minimum": 0}
+      }, "additionalProperties": false
+    },
+    "planned_exercise_payload": {
+      "type": "object", "required": ["id", "plannedWorkoutId", "exerciseId", "orderIndex", "setCount", "target", "restSeconds"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "plannedWorkoutId": {"$ref": "#/$defs/uuid"},
+        "exerciseId": {"$ref": "#/$defs/uuid"}, "orderIndex": {"type": "integer", "minimum": 0},
+        "setCount": {"type": "integer", "minimum": 1, "maximum": 20},
+        "target": {"$ref": "#/$defs/target"}, "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600}
+      }, "additionalProperties": false
+    },
+    "workout_session_payload": {
+      "type": "object", "required": ["id", "localDate", "timezone", "status", "phase", "startedAt"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "plannedWorkoutId": {"type": ["string", "null"], "format": "uuid"},
+        "localDate": {"type": "string", "format": "date"}, "timezone": {"type": "string"},
+        "status": {"enum": ["active", "completed", "abandoned"]},
+        "phase": {"enum": ["ready", "pre_countdown", "exercising", "awaiting_result", "resting", "paused", "reviewing_summary", "completed", "abandoned"]},
+        "startedAt": {"$ref": "#/$defs/dateTime"}, "finishedAt": {"type": ["string", "null"], "format": "date-time"},
+        "phaseStartedAt": {"type": ["string", "null"], "format": "date-time"},
+        "phaseDeadlineAt": {"type": ["string", "null"], "format": "date-time"},
+        "currentExecutionId": {"type": ["string", "null"], "format": "uuid"},
+        "currentSetIndex": {"type": ["integer", "null"], "minimum": 1}
+      }, "additionalProperties": false
+    },
+    "exercise_execution_payload": {
+      "type": "object", "required": ["id", "sessionId", "exerciseId", "orderIndex", "prescribedSnapshot"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "sessionId": {"$ref": "#/$defs/uuid"},
+        "plannedExerciseId": {"type": ["string", "null"], "format": "uuid"},
+        "exerciseId": {"$ref": "#/$defs/uuid"}, "orderIndex": {"type": "integer", "minimum": 0},
+        "prescribedSnapshot": {"type": "object"}
+      }, "additionalProperties": false
+    },
+    "set_result_payload": {
+      "type": "object", "required": ["id", "executionId", "setIndex", "status", "prescribedSnapshot", "confirmedAt"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "executionId": {"$ref": "#/$defs/uuid"},
+        "setIndex": {"type": "integer", "minimum": 1}, "status": {"enum": ["completed", "failed", "skipped"]},
+        "prescribedSnapshot": {"type": "object"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
+        "actualHoldMs": {"type": ["integer", "null"], "minimum": 0},
+        "actualWorkMs": {"type": ["integer", "null"], "minimum": 0},
+        "actualRestMs": {"type": ["integer", "null"], "minimum": 0},
+        "rpe": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
+        "note": {"type": ["string", "null"]}, "confirmedAt": {"$ref": "#/$defs/dateTime"},
+        "revision": {"type": "integer", "minimum": 1}
+      }, "additionalProperties": false
+    },
+    "workout_note_payload": {
+      "type": "object", "required": ["id", "sessionId", "noteText", "createdAt"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "sessionId": {"$ref": "#/$defs/uuid"},
+        "noteText": {"type": "string", "maxLength": 10000}, "createdAt": {"$ref": "#/$defs/dateTime"}
+      }, "additionalProperties": false
+    },
+    "training_plan_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "training_plan"}}, "allOf": [{"$ref": "#/$defs/payload_switch_training_plan"}]}]},
+    "planned_workout_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "planned_workout"}}, "allOf": [{"$ref": "#/$defs/payload_switch_planned_workout"}]}]},
+    "planned_exercise_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "planned_exercise"}}, "allOf": [{"$ref": "#/$defs/payload_switch_planned_exercise"}]}]},
+    "workout_session_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "workout_session"}}, "allOf": [{"$ref": "#/$defs/payload_switch_workout_session"}]}]},
+    "exercise_execution_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "exercise_execution"}}, "allOf": [{"$ref": "#/$defs/payload_switch_exercise_execution"}]}]},
+    "set_result_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "set_result"}}, "allOf": [{"$ref": "#/$defs/payload_switch_set_result"}]}]},
+    "workout_note_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "workout_note"}}, "allOf": [{"$ref": "#/$defs/payload_switch_workout_note"}]}]},
+    "payload_switch_training_plan": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/training_plan_payload"}}}},
+    "payload_switch_planned_workout": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/planned_workout_payload"}}}},
+    "payload_switch_planned_exercise": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/planned_exercise_payload"}}}},
+    "payload_switch_workout_session": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_session_payload"}}}},
+    "payload_switch_exercise_execution": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/exercise_execution_payload"}}}},
+    "payload_switch_set_result": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/set_result_payload"}}}},
+    "payload_switch_workout_note": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_note_payload"}}}}
+  }
+}
