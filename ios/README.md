@@ -48,6 +48,10 @@ Tab **Giáo án** → menu **…** để sửa tên/xóa; chạm ngày nghỉ đ
 Mỗi buổi có menu sửa/xóa, editor có chọn ngày, thêm/bớt/sắp xếp bài và mục tiêu.
 Xóa giáo án giữ lịch sử và buổi đang tập; màn hình trống cho phép tạo lại.
 
+Bản tính năng ở commit `67456a8` đã archive app/widget và qua 18/18 XCTest trên
+[GitHub Actions run 42397716104](https://github.com/vuta1927/CALI/actions/runs/42397716104).
+Artifact: `CaliApp-unsigned-67456a8`; kiểm thử iPhone thật còn chờ.
+
 Chi tiết lưu trữ, phạm vi contract và checklist thiết bị: [docs/17](../docs/17-content-editing.md).
 
 ## CI build như thế nào

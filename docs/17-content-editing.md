@@ -49,8 +49,13 @@ receipts, reference/type protection, delete/history/active-session preservation,
 unsafe URL/path rejection, duplicate weekdays, old snapshot decoding, new snapshot
 round trips and imported-file durability after source removal.
 
-XCTest requires the macOS workflow (`run_tests=true`) or Xcode. Windows static parsing
-does not prove Swift type checking or device behavior. No Lock Screen code changed.
+Verified source commit `67456a8` in [macOS run 42397716104](https://github.com/vuta1927/CALI/actions/runs/42397716104): unsigned app/widget archive succeeded and 18/18 XCTest passed, including the nine new content-editing tests. Artifact: `CaliApp-unsigned-67456a8` (retention seven days).
+The first run exposed a test comparing sub-millisecond audit timestamps exactly; the
+round-trip assertion now uses the encoder's documented millisecond precision.
+Local checks passed for 52 Swift source syntax trees, handoff schemas/fixtures/links,
+iOS project config, UI copy, design sources and widget branding. Backend/Testcontainers
+and blank PostgreSQL migration CI also passed. No Lock Screen code changed.
+Real-device behavior and performance remain unverified; use the matrix below.
 
 Run this manual matrix on a real iPhone before closing IOS-009 / MED-002:
 

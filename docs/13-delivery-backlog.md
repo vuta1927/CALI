@@ -22,7 +22,7 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 | IOS-004 | iOS | IOS-002,UX-001 | Workout Player hold+reps+rest and confirmation flow |
 | IOS-005 | iOS | IOS-004,POC-001 | Live Activity/widget + notifications, fallback |
 | IOS-006 | iOS | IOS-003,IOS-004 | offline Journal/History/notes + force quit recovery |
-| IOS-009 | iOS | IOS-003 | personal catalog editor + plan/workout CRUD; local implementation and XCTest cases added; macOS build/XCTest/device validation pending (docs/17-content-editing.md) |
+| IOS-009 | iOS | IOS-003 | personal catalog editor + plan/workout CRUD; local implementation and XCTest cases added; macOS archive and 18 XCTest passed (run 42397716104); real-device validation pending (docs/17-content-editing.md) |
 | MED-002 | iOS/QA | IOS-009 | HTTPS + Photos/Files import and playback; local implementation added; device/offline/media QA pending (docs/17-content-editing.md) |
 | MED-001 | Design/iOS | UX-001 | approved thumbnails/posters + media cache/AVPlayer |
 | QA-001 | QA | IOS-006,IOS-005 | T-01..T-06, T-09..T-12 with real device evidence |
