@@ -24,7 +24,7 @@ If DB transaction fails, do not display successful completion.
   "action":"upsert",
   "baseVersion":0,
   "clientChangedAt":"2026-11-07T10:00:00Z",
-  "payload":{"id":"UUID", "executionId":"UUID", "setIndex":1, "status":"completed", "actualHoldMs":12000}
+  "payload":{"id":"UUID", "executionId":"UUID", "setIndex":1, "status":"completed", "prescribedSnapshot":{"kind":"static_hold","holdSeconds":12}, "actualHoldMs":12000, "confirmedAt":"2026-11-07T10:00:00Z"}
 }
 ```
 Dependency ordering: send parent records first (`training_plan → planned_workout → planned_exercise`; `workout_session → exercise_execution → set_result`). Server processes each batch in supplied order. If parent is missing, return an explicit retryable dependency conflict rather than silently creating an orphan. For multiple local changes on the **same entity**, serialize the outbox: do not send mutation #2 until #1 is acknowledged; before first send of #2, rebase `baseVersion` to the newly acknowledged server version and keep #2’s mutation ID stable throughout retries. Client must never alter a mutation payload once an HTTP attempt has started.

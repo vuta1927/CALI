@@ -159,7 +159,7 @@ CREATE TABLE set_results (
     execution_id uuid NOT NULL,
     set_index int NOT NULL CHECK (set_index BETWEEN 1 AND 100),
     status text NOT NULL CHECK (status IN ('completed','failed','skipped')),
-    prescribed_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+    prescribed_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(prescribed_snapshot) = 'object'),
     actual_reps int CHECK (actual_reps >= 0),
     actual_hold_ms bigint CHECK (actual_hold_ms >= 0),
     actual_work_ms bigint CHECK (actual_work_ms >= 0),
@@ -181,7 +181,7 @@ CREATE TABLE workout_notes (
     id uuid PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     session_id uuid NOT NULL,
-    note_text text NOT NULL,
+    note_text text NOT NULL CHECK (length(note_text) <= 10000),
     version bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -205,10 +205,13 @@ CREATE TABLE sync_mutations (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     mutation_id uuid NOT NULL,
     device_id uuid NOT NULL,
-    entity_type text NOT NULL,
+    -- Mirrors OpenAPI SyncEntityType (client-pushable entities only).
+    entity_type text NOT NULL CHECK (entity_type IN ('training_plan','planned_workout','planned_exercise','workout_session','exercise_execution','set_result','workout_note')),
     entity_id uuid NOT NULL,
     action text NOT NULL CHECK (action IN ('upsert','delete')),
     base_version bigint NOT NULL CHECK (base_version >= 0),
+    -- 'duplicate' (OpenAPI SyncMutationResult.status) is never stored: it is the
+    -- status returned when a stored receipt is replayed for the same mutation_id.
     status text NOT NULL CHECK (status IN ('applied','conflict','rejected')),
     receipt jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -218,7 +221,8 @@ CREATE INDEX idx_mutations_user_created ON sync_mutations(user_id, created_at DE
 CREATE TABLE sync_change_log (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     seq bigint NOT NULL CHECK (seq >= 1),
-    entity_type text NOT NULL,
+    -- Mirrors OpenAPI ChangeEntityType (pushable entities + server-owned AI records).
+    entity_type text NOT NULL CHECK (entity_type IN ('training_plan','planned_workout','planned_exercise','workout_session','exercise_execution','set_result','workout_note','ai_analysis','ai_recommendation')),
     entity_id uuid NOT NULL,
     operation text NOT NULL CHECK (operation IN ('upsert','delete')),
     server_version bigint NOT NULL CHECK (server_version >= 1),
