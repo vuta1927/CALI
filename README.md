@@ -26,6 +26,7 @@ Trạng thái: **Implementation-ready baseline**, còn các quyết định cầ
 15. [`docs/13-delivery-backlog.md`](docs/13-delivery-backlog.md): epics, tasks có dependency, DoD.
 16. [`docs/14-nfr-and-operations.md`](docs/14-nfr-and-operations.md): NFR/SLO, release, vận hành.
 17. [`docs/15-decisions-risks.md`](docs/15-decisions-risks.md): ADR, giả định và rủi ro.
+18. [`docs/16-implementation-plan.md`](docs/16-implementation-plan.md): kế hoạch triển khai chi tiết iOS + backend, môi trường dev không tốn phí.
 
 ## Tham chiếu UI
 - [`references/ui_concept_reference.png`](references/ui_concept_reference.png): mockup minh họa đã trao đổi; **không phải bản giao diện pixel-perfect hay nguồn thiết kế có thể chỉnh sửa**. Thông số thực thi vẫn theo `docs/02-ux-spec.md`.
