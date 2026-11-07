@@ -18,10 +18,10 @@
     "target": {
       "oneOf": [
         {"type": "object", "required": ["kind", "holdSeconds"], "properties": {"kind": {"const": "static_hold"}, "holdSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "repMin", "repMax"], "properties": {"kind": {"const": "reps"}, "repMin": {"type": "integer", "minimum": 1}, "repMax": {"type": "integer", "minimum": 1}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "timeSeconds"], "properties": {"kind": {"const": "timed_reps"}, "timeSeconds": {"type": "integer", "minimum": 1}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1}, "restSeconds": {"type": "integer", "minimum": 0}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1}}, "additionalProperties": false}
+        {"type": "object", "required": ["kind", "repMin", "repMax"], "properties": {"kind": {"const": "reps"}, "repMin": {"type": "integer", "minimum": 1, "maximum": 500}, "repMax": {"type": "integer", "minimum": 1, "maximum": 500}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "timeSeconds"], "properties": {"kind": {"const": "timed_reps"}, "timeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 100}}, "additionalProperties": false}
       ]
     },
     "delete_payload": {
@@ -89,7 +89,7 @@
       "type": "object", "required": ["id", "executionId", "setIndex", "status", "prescribedSnapshot", "confirmedAt"],
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "executionId": {"$ref": "#/$defs/uuid"},
-        "setIndex": {"type": "integer", "minimum": 1}, "status": {"enum": ["completed", "failed", "skipped"]},
+        "setIndex": {"type": "integer", "minimum": 1, "maximum": 100}, "status": {"enum": ["completed", "failed", "skipped"]},
         "prescribedSnapshot": {"type": "object"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
         "actualHoldMs": {"type": ["integer", "null"], "minimum": 0},
         "actualWorkMs": {"type": ["integer", "null"], "minimum": 0},

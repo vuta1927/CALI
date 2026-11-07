@@ -1,0 +1,159 @@
+{
+  "name": "pause_resume",
+  "description": "Paused has no moving deadline; time passing while paused changes nothing; resume recomputes the deadline from frozen remaining time.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 1,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": "2026-11-07T08:00:12Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:04Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000003"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 3,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000004"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000005"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:04Z"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 3,
+        "events": [],
+        "signals": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:00Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000006"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 4,
+        "phaseDeadlineAt": "2026-11-07T08:05:08Z",
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:03Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000007"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 5,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-07T08:06:00Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000008"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 6,
+        "phaseDeadlineAt": "2026-11-07T08:06:05Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:06:05Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:06:00Z",
+        "monotonicElapsed": 5.0
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 7,
+        "pendingMeasuredElapsedMs": 12000,
+        "pendingSuggestedActualMs": 12000
+      }
+    },
+    {
+      "now": "2026-11-07T08:06:10Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000009"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 7
+      }
+    }
+  ]
+}

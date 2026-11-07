@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/TestResults/
+.git/
+.env
+.env.*
+docs/
+references/
+fixtures/
+agents/
+backend/tests/
+backend/tools/

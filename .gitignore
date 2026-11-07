@@ -9,3 +9,5 @@ bin/
 obj/
 .vs/
 .idea/
+.claude/worktrees/
+!.env.example

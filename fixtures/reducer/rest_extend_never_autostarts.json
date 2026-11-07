@@ -1,0 +1,162 @@
+{
+  "name": "rest_extend_never_autostarts",
+  "description": "Edge #5: repeated +30s extensions; rest expiring while locked leads to ready, never exercising.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000003"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:15Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 10000
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "phaseDeadlineAt": "2026-11-07T08:01:45Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:20Z",
+      "command": {
+        "type": "extend_rest",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "seconds": 30
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 5,
+        "phaseDeadlineAt": "2026-11-07T08:02:15Z",
+        "events": [
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:21Z",
+      "command": {
+        "type": "extend_rest",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "seconds": 30
+      },
+      "expect": {
+        "revision": 6,
+        "phaseDeadlineAt": "2026-11-07T08:02:45Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:22Z",
+      "command": {
+        "type": "extend_rest",
+        "commandId": "00000000-0000-4000-8000-000000000007",
+        "seconds": 30
+      },
+      "expect": {
+        "revision": 7,
+        "phaseDeadlineAt": "2026-11-07T08:03:15Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:22Z"
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 7,
+        "events": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:03:00Z"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 8,
+        "currentSetIndex": 2,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:20:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:10:00Z"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 8,
+        "events": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:20:05Z",
+      "command": {
+        "type": "extend_rest",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "seconds": 30
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 8
+      }
+    }
+  ]
+}

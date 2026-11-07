@@ -1,0 +1,303 @@
+{
+  "name": "illegal_transitions",
+  "description": "Representative rejections; a rejected command never changes state or revision.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000001"
+      },
+      "expect": {
+        "error": "no_session"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "sessionId": "00000000-0000-4000-8000-000000005001",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "error": "active_session_exists",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000004"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000005"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000006"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000007",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 1000
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "extend_rest",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "seconds": 30
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "ready_next",
+        "commandId": "00000000-0000-4000-8000-000000000009"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "finish_session",
+        "commandId": "00000000-0000-4000-8000-000000000010"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000011",
+        "countdownSeconds": 11
+      },
+      "expect": {
+        "error": "validation_failed",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000012",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "phase": "pre_countdown",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000013",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000014"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000015",
+        "setResultId": "00000000-0000-4000-8000-000000000102",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:02Z",
+        "monotonicElapsed": 3.0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 3,
+        "phaseDeadlineAt": "2026-11-07T08:00:17Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:07Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000016"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:08Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000017",
+        "setResultId": "00000000-0000-4000-8000-000000000103",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2,
+        "status": "completed",
+        "actualHoldMs": 5000
+      },
+      "expect": {
+        "error": "set_mismatch",
+        "revision": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:08Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000018",
+        "setResultId": "00000000-0000-4000-8000-000000000104",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed"
+      },
+      "expect": {
+        "error": "validation_failed",
+        "revision": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:08Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000019",
+        "setResultId": "00000000-0000-4000-8000-000000000105",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 5000,
+        "rpe": 11
+      },
+      "expect": {
+        "error": "validation_failed",
+        "revision": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:08Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000020",
+        "setResultId": "00000000-0000-4000-8000-000000000106",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "skipped",
+        "actualHoldMs": 5000
+      },
+      "expect": {
+        "error": "validation_failed",
+        "revision": 4,
+        "phase": "awaiting_result",
+        "confirmedSetCount": 0
+      }
+    }
+  ]
+}

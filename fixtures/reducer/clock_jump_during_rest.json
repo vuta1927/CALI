@@ -1,0 +1,121 @@
+{
+  "name": "clock_jump_during_rest",
+  "description": "Edge #4: wall clock changed during rest. Backward jump and monotonic mismatch withhold transitions and signal clock_jump_detected; after acknowledgement rest expiry leads to ready. Confirmed set untouched.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000003"
+      },
+      "expect": {
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:15Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 10000
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "phaseDeadlineAt": "2026-11-07T08:01:45Z",
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T07:00:20Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:20Z",
+        "monotonicElapsed": 0.0
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "phaseDeadlineAt": "2026-11-07T08:01:45Z",
+        "events": [],
+        "signals": [
+          "clock_jump_detected"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T09:00:25Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:20Z",
+        "monotonicElapsed": 5.0
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "events": [],
+        "signals": [
+          "clock_jump_detected"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T09:00:25Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:20Z",
+        "monotonicElapsed": 5.0,
+        "acknowledgeClockJump": true
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 5,
+        "confirmedSetCount": 1,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ],
+        "signals": []
+      }
+    }
+  ]
+}

@@ -494,7 +494,7 @@ components:
       required: [id, title, workouts]
       properties:
         id: {type: string, format: uuid}
-        title: {type: string, maxLength: 120}
+        title: {type: string, minLength: 1, maxLength: 120}
         workouts:
           type: array
           items: {$ref: '#/components/schemas/PlannedWorkout'}

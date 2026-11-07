@@ -1,0 +1,131 @@
+{
+  "name": "duplicate_confirm",
+  "description": "Edge #1: double tap / widget race. A second resolution of the same set (new or replayed command) is rejected and never double counts. commandId dedupe that returns the original transition is CaliCore's job.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009002",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008002",
+            "exerciseId": "00000000-0000-4000-8000-000000007002",
+            "catalogVersion": 1,
+            "setCount": 2,
+            "target": {
+              "kind": "reps",
+              "repMin": 8,
+              "repMax": 10
+            },
+            "restSeconds": 120
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:30Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000004"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:35Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 9
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "confirmedSetCount": 1,
+        "events": [
+          "set_confirmed",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:35.300Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "setResultId": "00000000-0000-4000-8000-000000000102",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 9
+      },
+      "expect": {
+        "error": "duplicate_set_resolution",
+        "phase": "resting",
+        "revision": 4,
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:36Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 9
+      },
+      "expect": {
+        "error": "duplicate_set_resolution",
+        "revision": 4,
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:40Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "setResultId": "00000000-0000-4000-8000-000000000103",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1
+      },
+      "expect": {
+        "error": "duplicate_set_resolution",
+        "revision": 4,
+        "confirmedSetCount": 1,
+        "skippedSetCount": 0
+      }
+    }
+  ]
+}

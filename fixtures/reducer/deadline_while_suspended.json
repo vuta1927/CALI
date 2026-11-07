@@ -1,0 +1,97 @@
+{
+  "name": "deadline_while_suspended",
+  "description": "Edge #3 / ADR-009: hold deadline passes while locked. Reconcile enters awaiting_result with no suggested actual and no set result; only the user's confirm records the set.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 12
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": "2026-11-07T08:00:12Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:00Z"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3,
+        "pendingMeasuredElapsedMs": 12000,
+        "pendingSuggestedActualMs": null,
+        "confirmedSetCount": 0,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ],
+        "signals": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:02:00Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:01:00Z"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3,
+        "confirmedSetCount": 0,
+        "events": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:02:05Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 20000
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "confirmedSetCount": 1,
+        "events": [
+          "set_confirmed",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    }
+  ]
+}

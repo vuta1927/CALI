@@ -1,0 +1,41 @@
+# Local development stack for the CALI backend.
+#   cp .env.example .env   # then set POSTGRES_PASSWORD (and optionally CALI_DEV_TOKEN_SIGNING_KEY)
+#   docker compose up --build
+# The API runs in Development: it applies db/*.sql (including the dev catalog seed) on startup.
+name: cali
+
+services:
+  db:
+    image: postgres:16.15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cali}
+      POSTGRES_USER: ${POSTGRES_USER:-cali}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    ports:
+      - "127.0.0.1:${CALI_DB_HOST_PORT:-55432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/src/Cali.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Cali: Host=db;Port=5432;Database=${POSTGRES_DB:-cali};Username=${POSTGRES_USER:-cali};Password=${POSTGRES_PASSWORD}
+      Auth__DevTokens__SigningKey: ${CALI_DEV_TOKEN_SIGNING_KEY:-}
+      Telemetry__Exporter: ${CALI_TELEMETRY_EXPORTER:-none}
+    ports:
+      - "127.0.0.1:${CALI_API_HOST_PORT:-8080}:8080"
+
+volumes:
+  db-data:

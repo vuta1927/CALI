@@ -1,0 +1,36 @@
+name: handoff-validation
+
+on:
+  push:
+    paths:
+      - 'contracts/**'
+      - 'db/**'
+      - 'docs/**'
+      - 'fixtures/**'
+      - 'tools/**'
+      - '.github/workflows/handoff.yml'
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'db/**'
+      - 'docs/**'
+      - 'fixtures/**'
+      - 'tools/**'
+      - '.github/workflows/handoff.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install validator dependencies
+        # format-nongpl enables RFC 3339 date-time checks in jsonschema.FormatChecker.
+        run: python -m pip install pyyaml "jsonschema[format-nongpl]"
+      - name: Validate handoff contracts, fixtures and docs
+        run: python tools/validate_handoff.py

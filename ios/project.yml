@@ -1,0 +1,100 @@
+# XcodeGen spec for the CALI iOS app (ADR-011: the .xcodeproj is generated, never committed).
+#   xcodegen generate --spec ios/project.yml   ->  ios/CaliApp.xcodeproj
+# Bundle IDs, team and versions live in ios/Config/*.xcconfig (placeholders only).
+# The generated Info.plist files are written next to the sources and are git-ignored.
+name: CaliApp
+
+options:
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "1"
+
+targets:
+  CaliApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: CaliApp
+      # Compiled into both the app and the widget extension (ActivityAttributes must match).
+      - path: Shared
+    configFiles:
+      Debug: Config/CaliApp.xcconfig
+      Release: Config/CaliApp.xcconfig
+    info:
+      path: CaliApp/Info.plist
+      properties:
+        CFBundleDisplayName: CALI
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CaliBuildSHA: $(CALI_BUILD_SHA)
+        NSSupportsLiveActivities: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    dependencies:
+      - target: CaliActivityWidget
+        embed: true
+
+  CaliActivityWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: CaliActivityWidget
+      - path: Shared
+    configFiles:
+      Debug: Config/CaliActivityWidget.xcconfig
+      Release: Config/CaliActivityWidget.xcconfig
+    settings:
+      base:
+        # Installed inside CaliApp.app/PlugIns only, not as a separate archive product.
+        SKIP_INSTALL: "YES"
+    info:
+      path: CaliActivityWidget/Info.plist
+      properties:
+        CFBundleDisplayName: CALI
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+
+  CaliAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CaliAppTests
+    configFiles:
+      Debug: Config/CaliAppTests.xcconfig
+      Release: Config/CaliAppTests.xcconfig
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        # Hosted tests: link against the app so `@testable import CaliApp` resolves.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/CaliApp.app/CaliApp
+        BUNDLE_LOADER: $(TEST_HOST)
+    dependencies:
+      - target: CaliApp
+
+schemes:
+  CaliApp:
+    build:
+      targets:
+        CaliApp: all
+        CaliAppTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CaliAppTests
+    archive:
+      config: Debug

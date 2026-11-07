@@ -1,0 +1,4 @@
+#include "Base.xcconfig"
+
+// An app extension's bundle ID must be prefixed by its host app's bundle ID.
+PRODUCT_BUNDLE_IDENTIFIER = $(CALI_BUNDLE_PREFIX).cali.widget
