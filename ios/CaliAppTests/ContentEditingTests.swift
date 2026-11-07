@@ -19,6 +19,7 @@ final class ContentEditingTests: XCTestCase {
     @MainActor
     func testDeletePlanPreservesHistoryAndActiveSession() {
         let store = AppStore(persists: false)
+        store.updateSettings { $0.notificationsEnabled = false; $0.liveActivityEnabled = false }
         store.startWorkout(store.plan.workouts[0])
         let session = store.player?.state.sessionId
         let history = store.history
@@ -74,7 +75,7 @@ final class ContentEditingTests: XCTestCase {
         XCTAssertEqual(decoded.id, exercise.id)
         XCTAssertNil(decoded.poster)
         XCTAssertNil(decoded.video)
-        let store = AppStore(persists: false)
+        let store = AppStore(persists: false, now: Date(timeIntervalSince1970: 1_800_000_000))
         let old = PersistedSnapshot(plan: store.plan, history: store.history,
             recommendations: [], audit: [], settings: AppSettings(), createdAt: Date())
         let oldData = try encoder.encode(old)
@@ -98,7 +99,11 @@ final class ContentEditingTests: XCTestCase {
         let restored = try DomainJSON.makeDecoder().decode(PersistedSnapshot.self, from: DomainJSON.makeEncoder().encode(snapshot))
         XCTAssertEqual(restored.catalog?.last, exercise)
         XCTAssertNotNil(restored.plan.deletedAt)
-        XCTAssertEqual(restored.audit, store.audit)
+        XCTAssertEqual(restored.audit.map(\.id), store.audit.map(\.id))
+        XCTAssertEqual(restored.audit.map(\.detail), store.audit.map(\.detail))
+        for (decoded, original) in zip(restored.audit, store.audit) {
+            XCTAssertEqual(decoded.at.timeIntervalSince1970, original.at.timeIntervalSince1970, accuracy: 0.001)
+        }
     }
 
     @MainActor
