@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Cali.Api\Cali.Api.csproj" />
+    <ProjectReference Include="..\..\src\Cali.Worker\Cali.Worker.csproj" />
+  </ItemGroup>
+</Project>
