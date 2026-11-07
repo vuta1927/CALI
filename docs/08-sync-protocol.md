@@ -24,15 +24,45 @@ If DB transaction fails, do not display successful completion.
   "action":"upsert",
   "baseVersion":0,
   "clientChangedAt":"2026-11-07T10:00:00Z",
-  "payload":{"id":"UUID", "executionId":"UUID", "setIndex":1, "status":"completed", "prescribedSnapshot":{"kind":"static_hold","holdSeconds":12}, "actualHoldMs":12000, "confirmedAt":"2026-11-07T10:00:00Z"}
+  "payload":{"id":"UUID", "executionId":"UUID", "setIndex":1, "status":"completed", "prescribedSnapshot":{"target":{"kind":"static_hold","holdSeconds":12},"setCount":4,"restSeconds":90,"catalogVersion":1}, "actualHoldMs":12000, "confirmedAt":"2026-11-07T10:00:00Z"}
 }
 ```
 Dependency ordering: send parent records first (`training_plan → planned_workout → planned_exercise`; `workout_session → exercise_execution → set_result`). Server processes each batch in supplied order. If parent is missing, return an explicit retryable dependency conflict rather than silently creating an orphan. For multiple local changes on the **same entity**, serialize the outbox: do not send mutation #2 until #1 is acknowledged; before first send of #2, rebase `baseVersion` to the newly acknowledged server version and keep #2’s mutation ID stable throughout retries. Client must never alter a mutation payload once an HTTP attempt has started.
 
 Server responds per mutation: `applied|duplicate|conflict|rejected`, `serverVersion`, `serverEntity?`, `error?`. `duplicate` receipt is accepted and mark outbox ACK; `conflict` persists unresolved and does not silently overwrite; dependency conflicts may be retried after missing parents are acknowledged, whereas version conflicts require user resolution. Network failure: retry same mutation UUID, never generate new UUID for same committed action.
 
+The envelope and every payload are closed objects, so an unknown field anywhere → HTTP 400 for the batch (ADR-030).
+
+**Receipts and error codes (ADR-021).** `error` = `{code, message, retryable, details?}`.
+
+| `code` | `status` | `retryable` | Receipt persisted? | Client action |
+|---|---|---|---|---|
+| `dependency_missing` | conflict | true | **no** | keep the outbox row; resend the same `mutationId` after the parent is acked |
+| `version_conflict` | conflict | false | yes | surface the conflict (§5); `serverEntity` is returned |
+| `validation_failed` | rejected | false | yes | mark rejected; a client bug or business-rule violation (ADR-020); `details.field` names the field |
+| `forbidden_entity` | rejected | false | yes | mark rejected (server-owned entity type) |
+| `cross_user_reference` | rejected | false | yes | mark rejected |
+| `mutation_id_reused` | rejected | false | **no** (the original receipt is unchanged) | client bug: a payload changed after a send attempt |
+
+**Payload fingerprint (ADR-031).** The server stores `payload_sha256`. This is the SHA-256 (lowercase hex) of the RFC 8785 (JCS) canonical JSON of `{entityType, entityId, action, baseVersion, payload}`. `clientChangedAt` is excluded. A repeated `mutationId` with the same hash replays the stored receipt as `duplicate`. A different hash → `mutation_id_reused`.
+
+**Device registration (ADR-033).** The first push from a `deviceId` upserts the caller's `devices` row in the same transaction and refreshes `last_seen_at`. If the `deviceId` is already registered to another user, the server returns HTTP 409 Problem `device_owner_mismatch` and applies nothing. The client should then generate a new device id (for example after a restore onto another account).
+
+**Times (ADR-024).** `date-time` fields accept any RFC 3339 offset. The server normalizes to UTC and always returns `...Z`. `timezone` must be an IANA id known to the server tz database; otherwise `validation_failed`.
+
 ## 4. Pull
 `GET /v1/sync/pull?cursor=<opaque>&limit=100`; response `{ changes:[{changeId,entityType,entityId,operation,serverVersion,payload}],nextCursor,hasMore }`. For cursor safety, server assigns per-user `change_seq` only after acquiring/updating a row in `user_sync_state` inside the same transaction as business write and change-log append; a global `BIGSERIAL` alone is not commit-order safe. Server includes server-owned AI records and catalog metadata updates via separate versioned catalog endpoint (not feed for MVP). Client applies page and saves `nextCursor` **in one local transaction**; if interrupted, replay safe via idempotent upsert. Do not advance cursor before rows committed.
+
+**Pull payload shapes (ADR-022).** `payload` is discriminated by `entityType` + `operation` (see `x-payload-schemas` on `SyncChange` in OpenAPI):
+
+| entityType | operation | payload |
+|---|---|---|
+| device-writable entities (`training_plan` … `workout_note`) | upsert | the same `<entity>_payload` schema as push (`contracts/entity-payloads.schema.json`) |
+| `ai_analysis` | upsert | OpenAPI `Analysis` |
+| `ai_recommendation` | upsert | OpenAPI `AnalysisRecommendation` + `analysisId` |
+| any | delete | `{id, deletedAt}` |
+
+The entity version is always `serverVersion` on the change, never a payload field.
 
 ## 5. Conflict policy matrix
 | Entity | Concurrent edits | Policy |
@@ -70,3 +100,8 @@ Server responds per mutation: `applied|duplicate|conflict|rejected`, `serverVers
 - Update with wrong `baseVersion` ⇒ conflict, no overwrite.
 - 2 devices change plan simultaneously ⇒ fork/explicit resolution.
 - Guest-to-user merge ⇒ no data loss, no duplicate by date.
+- Same `mutationId`, different payload ⇒ `rejected`/`mutation_id_reused`, original receipt and row unchanged.
+- Child pushed before parent ⇒ `conflict`/`dependency_missing` (retryable, no receipt); resend after parent ⇒ `applied`.
+- `deviceId` of another user ⇒ 409 `device_owner_mismatch`, nothing applied.
+- Unknown envelope field ⇒ 400.
+- `fixtures/validation/business_rules.json` cases ⇒ `rejected`/`validation_failed` with the listed field.

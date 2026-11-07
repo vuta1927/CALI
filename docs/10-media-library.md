@@ -6,6 +6,9 @@ Every catalog exercise must have a poster and thumbnail that show distinctive bo
 ## 2. Media metadata
 `mediaId, exerciseId, kind(thumbnail|poster|preview|tutorial|correct|incorrect), contentVersion, locale, durationMs, width, height, aspectRatio, mimeType, sha256, sizeBytes, attribution, license, sourceUrlOrStorageKey, isPublic, lastReviewedAt`.
 
+### 2.1 Offline bundle manifest (ADR-028)
+The starter catalog that ships in the app uses its own manifest format, `contracts/catalog-bundle.schema.json`. During development the manifest is `fixtures/exercise_catalog.json`. It is **not** the `GET /v1/exercises` wire shape. The app maps both into the same local tables. Media entries are bundle-relative paths: no URL scheme and no leading slash. When `status` is `development_fixture_only`, plain path strings are allowed. When `status` is `release`, every media entry must be an object `{path, sha256, contentVersion, mimeType, license, attribution?}`. `tools/validate_handoff.py` checks the fixture against this schema. On the wire, `ExerciseMedia.license` is required (ADR-033).
+
 ## 3. Offline availability policy
 | Media | Policy |
 |---|---|

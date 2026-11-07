@@ -17,14 +17,34 @@
 - `SetResult(id, executionId, setIndex, prescribedSnapshot, actualReps?, actualHoldMs?, actualWorkMs?, actualRestMs?, rpe?, status, confirmedAtUtc, revision)`.
 - `WorkoutNote(id, sessionId, text, createdAt, revision)`.
 
+**MVP scope (ADR-017).** These fields above are *post-MVP* and are **not** in the MVP contracts: `TrainingPlan.startDate/weeks`, `WorkoutSession.planRevisionId/revision`, `WorkoutNote.revision`, `PlannedExercise.cuesSnapshot`. `ExerciseExecution.setCount` is carried as `prescribedSnapshot.setCount` (ADR-018). The MVP adds these journal fields: `SetResult.skipReason` (≤500), `SetResult.painReported` (subjective pain flag, default false) and `SetResult.note` (≤1000). It adds these pause/abandon fields: `WorkoutSession.pausedAt`, `accumulatedExerciseMs` and `abandonReason` (≤500). `finishedAt` is set for both completed and abandoned sessions.
+
+### 2.1 Concept → wire name mapping (ADR-016)
+This section describes the conceptual model. **Wire names are canonical**: OpenAPI and JSON Schema use camelCase, and `db/001_initial.sql` uses snake_case.
+
+| Concept (this doc) | Wire (OpenAPI / JSON Schema) | SQL |
+|---|---|---|
+| `localDay` | `localDate` | `local_date` |
+| `startedAtUtc` / `finishedAtUtc` | `startedAt` / `finishedAt` (also set on abandon) | `started_at` / `finished_at` |
+| `phaseDeadlineUtc` | `phaseDeadlineAt` | `phase_deadline_at` |
+| `confirmedAtUtc` | `confirmedAt` | `confirmed_at` |
+| `exerciseCatalogId`, `exerciseId` | `exerciseId` | `exercise_id` |
+| `ordering`, `order`, `sequence` | `orderIndex` | `order_index` |
+| `WorkoutNote.text` | `noteText` | `note_text` |
+| `accumulatedElapsed` | `accumulatedExerciseMs` | `accumulated_exercise_ms` |
+| `reason` of AbandonSession / SkipSet | `abandonReason` / `skipReason` | `abandon_reason` / `skip_reason` |
+| phases `READY`, `PRE_COUNTDOWN`, `REST`, `REVIEWING_SUMMARY`, `COMPLETE`… | `ready`, `pre_countdown`, `resting`, `reviewing_summary`, `completed`… | same as wire |
+
 ## 3. Exercise type + validation
 | Type | Planned input | Actual output | Guard |
 |---|---|---|---|
 | STATIC_HOLD | holdSeconds >0, setCount >0 | actualHoldMs >=0 | no rep as primary |
-| REPS | rep target min/max >0 | actualReps >=0 integer | no auto rep sensor |
+| REPS | rep target min/max >0, repMin ≤ repMax (ADR-020) | actualReps >=0 integer | no auto rep sensor |
 | TIMED_REPS | timeSeconds >0 | actualReps >=0, actualWorkMs >=0 | manual count |
-| INTERVAL | workSeconds/restSeconds >0 | actualWorkMs and optional reps | no auto success |
+| INTERVAL | workSeconds ≥1, restSeconds ≥1 (ADR-019; zero-rest work = TIMED_REPS) | actualWorkMs and optional reps | no auto success |
 | SKILL_ATTEMPT | number of attempts | success/fail + optional hold | quality subjective |
+
+`target.kind` must equal the catalog exercise type. JSON Schema cannot express this check or `repMin ≤ repMax`, so the backend and CaliDomain enforce both. Shared test vectors live in `fixtures/validation/business_rules.json` (ADR-020).
 
 Superset design can reuse grouped planned exercises later; MVP executes linear sequence.
 
@@ -34,6 +54,7 @@ stateDiagram-v2
     [*] --> ready
     ready --> pre_countdown: startSet
     pre_countdown --> exercising: countdownElapsed while foreground
+    pre_countdown --> ready: countdownLapsed (reconciled too late)
     exercising --> awaiting_result: userStop or targetDeadlineReached while foreground
     exercising --> paused: pause
     paused --> exercising: resume
@@ -43,13 +64,23 @@ stateDiagram-v2
     reviewing_summary --> completed: finishSession
     reviewing_summary --> abandoned: abandonSession
     resting --> ready: restExpired / userReady
+    ready --> ready: skipSet (next set or exercise, no rest)
+    exercising --> ready: skipSet (next set or exercise, no rest)
+    awaiting_result --> ready: skipSet (next set or exercise, no rest)
+    ready --> reviewing_summary: skipSet (final set)
+    exercising --> reviewing_summary: skipSet (final set)
+    awaiting_result --> reviewing_summary: skipSet (final set)
     ready --> abandoned: abandonSession
+    pre_countdown --> abandoned: abandonSession
+    exercising --> abandoned: abandonSession
     resting --> abandoned: abandonSession
     paused --> abandoned: abandonSession
     awaiting_result --> abandoned: abandonSession
     completed --> [*]
     abandoned --> [*]
 ```
+The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest.
+
 **Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. `restExpired → ready` only updates readiness, never starts exercising.
 
 ### Transition table
@@ -58,15 +89,15 @@ stateDiagram-v2
 | `CreateSession(cmdId)` | no active session | insert session READY + outbox | start/resume screen |
 | `StartSet(cmdId)` | READY, set is not confirmed | phase PRE_COUNTDOWN, start/deadline | update Live Activity |
 | `CountdownElapsed` | PRE_COUNTDOWN & app executing | phase EXERCISING; compute UTC target | schedule deadline notification |
-| `Pause(cmdId)` | EXERCISING | pausedAt, accumulatedElapsed; phase PAUSED | update Activity, cancel/rebuild notifications |
+| `Pause(cmdId)` | EXERCISING | pausedAt, accumulatedExerciseMs; phase PAUSED | update Activity, cancel/rebuild notifications |
 | `Resume(cmdId)` | PAUSED | recompute deadline; EXERCISING | update Activity/notification |
 | `StopSet(cmdId)` | EXERCISING or elapsed deadline reconciled | AWAITING_RESULT draft | prompt actual values |
 | `ConfirmSet(cmdId, payload)` | AWAITING_RESULT; unique set not confirmed | insert `set_result` + advance phase REST/READY/REVIEWING_SUMMARY + outbox | Activity and next notification |
 | `ExtendRest(cmdId, +30s)` | RESTING | recompute deadline, revision | cancel previous reminder, schedule new one |
 | `ReadyNext(cmdId)` | RESTING, manual request or deadline reached | READY | Activity refresh |
-| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED, revision, phase next | Activity |
+| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED + skipReason, revision, phase next READY (no rest) or REVIEWING_SUMMARY | Activity |
 | `FinishSession(cmdId)` | REVIEWING_SUMMARY, no active set pending confirmation | COMPLETED + finishedAt + outbox | end Activity; AI after sync |
-| `AbandonSession(cmdId)` | active session | ABANDONED, reason | end Activity |
+| `AbandonSession(cmdId)` | active session (any non-terminal phase) | ABANDONED, abandonReason, finishedAt | end Activity |
 
 ### Universal domain invariants
 - Exactly one authoritative `WorkoutSession` state per session ID; accepted commands have unique `command_id` across all entrypoints.
@@ -74,6 +105,7 @@ stateDiagram-v2
 - Never infer `COMPLETE` from timer deadline alone; timer is a prompt, not proof of rep/hold.
 - Every `ConfirmedSet` snapshots prescribed target, actual metrics and catalog version.
 - `phaseDeadlineUtc` persisted in same transaction as state revision; iOS may render countdown without per-second writes.
+- `status=completed ⇔ phase=completed` and `status=abandoned ⇔ phase=abandoned`; `pausedAt` is non-null only in PAUSED. This is ADR-023, also enforced by SQL CHECK and JSON Schema.
 - `PAUSED` has no active moving deadline. Recompute remaining duration on resume, rather than adding timers.
 - `RESTING` never auto-triggers a new exercising set without user Start action.
 - On edit set result, increment revision and write a mutation; downstream analysis of old revision is superseded.
