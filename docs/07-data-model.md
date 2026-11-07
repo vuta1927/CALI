@@ -3,22 +3,22 @@
 ## 1. Primary entities
 | Entity | Ownership | Important fields | Rules |
 |---|---|---|---|
-| users | server | id, apple_subject, created_at | user scoped |
-| devices | server | id, user_id, name, last_seen | multiple devices possible |
-| exercise_catalog | server public | id, slug, type, equipment, version, cues | media licensed/versioned |
-| exercise_media | server public | id, exercise_id, kind, file_key, SHA256, license | poster fallback |
-| training_plans | user | id, user_id, title, revision, status | immutable review history via versions |
-| planned_workouts | user | id, plan_id, weekday, sequence | order explicit |
-| planned_exercises | user | id, workout_id, exercise_id, target JSON, rest | validated type |
-| workout_sessions | user | id, planned_workout_id?, status, phase, version | single active per client profile |
-| exercise_executions | user | id, session_id, exercise_id, order_index | snapshot prescribed |
-| set_results | user | id, execution_id, set_index, actual*, status, revision | idempotent by ID |
-| workout_notes | user | id, session_id, text, version | sensitive; avoid lock screen |
-| sync_mutations | server | user_id, mutation_id, receipt_json, result | unique/idempotent |
+| users | server | id, apple_subject, display_name, timezone, created_at | user scoped |
+| devices | server | id, user_id, device_name, last_seen_at | multiple devices possible |
+| exercise_catalog | server public | id, slug, exercise_type, equipment, cues, catalog_version, is_published | media licensed/versioned |
+| exercise_media | server public | id, exercise_id, kind, content_version, storage_key, sha256, license | poster fallback |
+| training_plans | user | id, user_id, title, revision, parent_plan_id, status, version | immutable review history via versions |
+| planned_workouts | user | id, plan_id, weekday, order_index | order explicit |
+| planned_exercises | user | id, planned_workout_id, exercise_id, order_index, set_count, target JSON, rest_seconds | validated type |
+| workout_sessions | user | id, planned_workout_id?, local_date, timezone, status, phase, version | single active per user (`ux_session_one_active_per_user`) |
+| exercise_executions | user | id, session_id, exercise_id, order_index, prescribed_snapshot | snapshot prescribed |
+| set_results | user | id, execution_id, set_index, actual_*, status, revision | idempotent by ID |
+| workout_notes | user | id, session_id, note_text, version | sensitive; avoid lock screen |
+| sync_mutations | server | user_id, mutation_id, status, receipt | unique/idempotent |
 | sync_change_log | server | seq, user_id, entity_type, entity_id, operation, payload | ordered sync feed |
-| ai_analyses | user | id, session_id, session_revision, status, model, result | immutable result version |
-| ai_recommendations | user | id, analysis_id, decision, rationale, delta | approval required |
-| ai_jobs | server | id, kind, entity_id, state, attempts, lease | durable retry |
+| ai_analyses | user | id, session_id, session_version, status, model_provider, model_name, result | immutable result version |
+| ai_recommendations | user | id, analysis_id, decision, rationale, proposed_target | approval required |
+| ai_jobs | server | id, analysis_id, state, attempts, available_at, leased_until | durable retry |
 
 ## 2. Canonical syncable entities
 `training_plan`, `planned_workout`, `planned_exercise`, `workout_session`, `exercise_execution`, `set_result`, `workout_note`, `ai_analysis`, `ai_recommendation` (last two server-owned). Client may push only its allowed entities. Catalog is server-owned and versioned; app bundles initial starter subset.
@@ -28,8 +28,8 @@
 - Client-generated UUID stable across offline and online; `baseVersion=0` for new entity, >0 for update.
 - `set_results` unique `(execution_id,set_index)` for current canonical result. If same set must be edited, update same ID, bump revision, preserve audit via change log/revision history, never insert a second competing set.
 - `actual_reps >= 0`, `actual_hold_ms >= 0`, `rpe between 1 and 10`; not all actual metrics required for skipped set.
-- `finished_at_utc >= started_at_utc` when provided. The session can be `status=active, phase=reviewing_summary` until FinishSession is tapped.
-- `soft_deleted_at` for user-deletable entities; change feed includes tombstone.
+- `finished_at >= started_at` (UTC `timestamptz`) when provided. The session can be `status=active, phase=reviewing_summary` until FinishSession is tapped.
+- `deleted_at` (soft delete) for user-deletable entities; change feed includes tombstone.
 - AI recommendation references analysis+session version; reject stale revisions.
 
 ## 4. Plan revision policy
