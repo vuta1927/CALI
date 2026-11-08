@@ -1,0 +1,119 @@
+{
+  "name": "current_week",
+  "description": "IOS-011 current week (D7, ADR-039). Weekly plans count activation days strictly before today (pauses resume in the week in progress); finished once 7 x totalWeeks days were followed (MP-07). Event plans count calendar days from the first activation fromDate (paused weeks count as elapsed); finished the day after the event, with week = the event day's week. dayInWeek is null when not started, finished, or a weekly plan is paused today. daysUntilEvent is null for weekly plans. 2026-11-09 is a Monday; all keys of expect are always checked.",
+  "cases": [
+    {
+      "name": "weekly_not_started",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 4},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-16", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "notStarted", "week": 0, "dayInWeek": null, "elapsedDays": 0, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_first_day",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 4},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 1, "dayInWeek": 1, "elapsedDays": 0, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_day_eight_is_week_two",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 4},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 2, "dayInWeek": 1, "elapsedDays": 7, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_paused_today",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 4},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-05", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 1, "dayInWeek": null, "elapsedDays": 4, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_resumed_continues_week_in_progress",
+      "comment": "5 followed days, paused 10-31..11-06, resumed 11-07: 7 days followed before today, so week 2 (calendar counting would say week 3).",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 4},
+      "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-26", "toDate": "2026-10-30", "timezone": "Asia/Ho_Chi_Minh"},
+        {"id": "00000000-0000-4000-8000-000000000012", "fromDate": "2026-11-07", "timezone": "Asia/Ho_Chi_Minh"}
+      ],
+      "expect": {"state": "inProgress", "week": 2, "dayInWeek": 1, "elapsedDays": 7, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_last_day_of_program",
+      "today": "2026-11-08",
+      "program": {"kind": "weekly", "totalWeeks": 2},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-26", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 2, "dayInWeek": 7, "elapsedDays": 13, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_finished",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 2},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-26", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "finished", "week": 2, "dayInWeek": null, "elapsedDays": 14, "daysUntilEvent": null}
+    },
+    {
+      "name": "weekly_unknown_length_never_finishes",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-01", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 6, "dayInWeek": 5, "elapsedDays": 39, "daysUntilEvent": null}
+    },
+    {
+      "name": "event_not_started",
+      "today": "2026-11-09",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-16", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "notStarted", "week": 0, "dayInWeek": null, "elapsedDays": 0, "daysUntilEvent": 27}
+    },
+    {
+      "name": "event_first_day",
+      "today": "2026-11-09",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 1, "dayInWeek": 1, "elapsedDays": 0, "daysUntilEvent": 27}
+    },
+    {
+      "name": "event_pause_counts_as_elapsed",
+      "comment": "Same activations as weekly_resumed_continues_week_in_progress: the event plan is in calendar week 3.",
+      "today": "2026-11-09",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-26", "toDate": "2026-10-30", "timezone": "Asia/Ho_Chi_Minh"},
+        {"id": "00000000-0000-4000-8000-000000000012", "fromDate": "2026-11-07", "timezone": "Asia/Ho_Chi_Minh"}
+      ],
+      "expect": {"state": "inProgress", "week": 3, "dayInWeek": 1, "elapsedDays": 14, "daysUntilEvent": 27}
+    },
+    {
+      "name": "event_paused_today_still_on_calendar",
+      "today": "2026-11-09",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-10-26", "toDate": "2026-10-30", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 3, "dayInWeek": 1, "elapsedDays": 14, "daysUntilEvent": 27}
+    },
+    {
+      "name": "event_day_itself",
+      "today": "2026-12-06",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 4, "dayInWeek": 7, "elapsedDays": 27, "daysUntilEvent": 0}
+    },
+    {
+      "name": "event_day_passed",
+      "today": "2026-12-07",
+      "program": {"kind": "event", "eventDate": "2026-12-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "finished", "week": 4, "dayInWeek": null, "elapsedDays": 28, "daysUntilEvent": -1}
+    },
+    {
+      "name": "crosses_month_and_year",
+      "today": "2027-01-04",
+      "program": {"kind": "weekly", "totalWeeks": 12},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-12-28", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": {"state": "inProgress", "week": 2, "dayInWeek": 1, "elapsedDays": 7, "daysUntilEvent": null}
+    }
+  ]
+}

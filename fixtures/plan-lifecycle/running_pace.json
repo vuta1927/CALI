@@ -1,0 +1,47 @@
+{
+  "name": "running_pace",
+  "description": "IOS-011 running rules (CON-004, ADR-055). Pace is derived as durationSeconds / (distanceMeters / 1000), never stored, shown in min/km rounded half up to the second. Distance 0 and duration over 24 h (86400 s) are rejected. Kilometres are shown with two decimals and a decimal comma (vi). Issue reasons use ValidationIssue codes (out_of_range, missing, not_allowed).",
+  "pace": [
+    {"name": "one_km_gherkin", "distanceMeters": 1000, "durationSeconds": 292, "expect": {"roundedSecondsPerKilometer": 292, "formatted": "4:52/km"}},
+    {"name": "five_km", "distanceMeters": 5000, "durationSeconds": 1450, "expect": {"roundedSecondsPerKilometer": 290, "formatted": "4:50/km"}},
+    {"name": "fractional_km", "distanceMeters": 8250, "durationSeconds": 2475, "expect": {"roundedSecondsPerKilometer": 300, "formatted": "5:00/km"}},
+    {"name": "half_second_rounds_up", "distanceMeters": 2000, "durationSeconds": 581, "expect": {"roundedSecondsPerKilometer": 291, "formatted": "4:51/km"}},
+    {"name": "below_half_rounds_down", "distanceMeters": 3, "durationSeconds": 1, "expect": {"roundedSecondsPerKilometer": 333, "formatted": "5:33/km"}},
+    {"name": "slower_than_one_hour_per_km", "distanceMeters": 100, "durationSeconds": 400, "expect": {"roundedSecondsPerKilometer": 4000, "formatted": "1:06:40/km"}},
+    {"name": "marathon_exactly_24h_allowed", "distanceMeters": 42195, "durationSeconds": 86400, "expect": {"roundedSecondsPerKilometer": 2048, "formatted": "34:08/km"}},
+    {"name": "zero_distance_rejected", "distanceMeters": 0, "durationSeconds": 300, "expect": {"error": {"field": "distanceMeters", "reason": "out_of_range"}}},
+    {"name": "zero_duration_rejected", "distanceMeters": 1000, "durationSeconds": 0, "expect": {"error": {"field": "durationSeconds", "reason": "out_of_range"}}},
+    {"name": "over_24h_rejected", "distanceMeters": 42195, "durationSeconds": 86401, "expect": {"error": {"field": "durationSeconds", "reason": "out_of_range"}}},
+    {"name": "over_1000_km_rejected", "distanceMeters": 1000001, "durationSeconds": 3600, "expect": {"error": {"field": "distanceMeters", "reason": "out_of_range"}}}
+  ],
+  "kilometers": [
+    {"distanceMeters": 8250, "expect": "8,25 km"},
+    {"distanceMeters": 8254, "expect": "8,25 km"},
+    {"distanceMeters": 8255, "expect": "8,26 km"},
+    {"distanceMeters": 0, "expect": "0,00 km"},
+    {"distanceMeters": 999, "expect": "1,00 km"},
+    {"distanceMeters": 42195, "expect": "42,20 km"},
+    {"distanceMeters": 1000000, "expect": "1.000,00 km"}
+  ],
+  "targets": [
+    {"name": "distance_with_goal_time", "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800}, "expect": []},
+    {"name": "distance_without_goal_time", "target": {"kind": "distance", "distanceMeters": 1000}, "expect": []},
+    {"name": "distance_zero", "target": {"kind": "distance", "distanceMeters": 0}, "expect": [{"field": "target.distanceMeters", "reason": "out_of_range"}]},
+    {"name": "distance_over_500_km", "target": {"kind": "distance", "distanceMeters": 500001}, "expect": [{"field": "target.distanceMeters", "reason": "out_of_range"}]},
+    {"name": "distance_goal_time_zero", "target": {"kind": "distance", "distanceMeters": 1000, "durationSeconds": 0}, "expect": [{"field": "target.durationSeconds", "reason": "out_of_range"}]},
+    {"name": "duration_24h", "target": {"kind": "duration", "durationSeconds": 86400}, "expect": []},
+    {"name": "duration_over_24h", "target": {"kind": "duration", "durationSeconds": 86401}, "expect": [{"field": "target.durationSeconds", "reason": "out_of_range"}]}
+  ],
+  "results": [
+    {"name": "completed_distance_ok", "snapshotTargetKind": "distance", "isCompleted": true, "distanceMeters": 5000, "durationSeconds": 1500, "expect": []},
+    {"name": "completed_distance_zero_distance", "snapshotTargetKind": "distance", "isCompleted": true, "distanceMeters": 0, "durationSeconds": 1500, "expect": [{"field": "distanceMeters", "reason": "missing"}]},
+    {"name": "completed_distance_without_distance", "snapshotTargetKind": "distance", "isCompleted": true, "durationSeconds": 1750, "expect": [{"field": "distanceMeters", "reason": "missing"}]},
+    {"name": "completed_distance_without_duration", "snapshotTargetKind": "distance", "isCompleted": true, "distanceMeters": 5000, "expect": [{"field": "durationSeconds", "reason": "missing"}]},
+    {"name": "completed_duration_ok_distance_optional", "snapshotTargetKind": "duration", "isCompleted": true, "durationSeconds": 1800, "expect": []},
+    {"name": "completed_duration_zero_duration", "snapshotTargetKind": "duration", "isCompleted": true, "distanceMeters": 3000, "durationSeconds": 0, "expect": [{"field": "durationSeconds", "reason": "missing"}]},
+    {"name": "duration_over_24h", "snapshotTargetKind": "duration", "isCompleted": true, "durationSeconds": 86401, "expect": [{"field": "durationSeconds", "reason": "out_of_range"}]},
+    {"name": "distance_over_1000_km", "snapshotTargetKind": "distance", "isCompleted": true, "distanceMeters": 1000001, "durationSeconds": 100, "expect": [{"field": "distanceMeters", "reason": "out_of_range"}]},
+    {"name": "skipped_distance_set_zero_values", "snapshotTargetKind": "distance", "isCompleted": false, "distanceMeters": 0, "durationSeconds": 0, "expect": []},
+    {"name": "running_fields_on_reps_target", "snapshotTargetKind": "reps", "isCompleted": true, "distanceMeters": 400, "expect": [{"field": "distanceMeters", "reason": "not_allowed"}]}
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "name": "notification_selection",
+  "description": "IOS-011 reminder selection (MP-13). Candidates from all plans; anything with fireAt not strictly after now is dropped; candidates in the same minute (floored, UTC epoch) merge into one notification; the nearest `limit` notifications are kept (iOS allows 64 pending; default limit 64). Items inside a notification are sorted by lineageId then plannedWorkoutId; the same (lineageId, plannedWorkoutId) twice in a minute is one item. identifier = cali.reminder.<epoch seconds of the minute>. Notifications are advisory and never change state. 2026-11-09T23:00:00Z is 06:00 on 2026-11-10 in Asia/Ho_Chi_Minh.",
+  "cases": [
+    {
+      "name": "same_time_reminders_merge_across_plans",
+      "now": "2026-11-09T12:00:00Z",
+      "candidates": [
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201", "fireAt": "2026-11-09T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "fireAt": "2026-11-10T11:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-09T23:00:00Z"}
+      ],
+      "expect": [
+        {"fireAt": "2026-11-09T23:00:00Z", "identifier": "cali.reminder.1794265200", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101"},
+          {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201"}
+        ]},
+        {"fireAt": "2026-11-10T11:00:00Z", "identifier": "cali.reminder.1794308400", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000103"}
+        ]}
+      ]
+    },
+    {
+      "name": "past_and_now_are_dropped",
+      "now": "2026-11-09T23:00:00Z",
+      "candidates": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-08T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "fireAt": "2026-11-09T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "fireAt": "2026-11-09T23:01:00Z"}
+      ],
+      "expect": [
+        {"fireAt": "2026-11-09T23:01:00Z", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000105"}
+        ]}
+      ]
+    },
+    {
+      "name": "seconds_within_a_minute_merge",
+      "now": "2026-11-09T12:00:00Z",
+      "candidates": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-09T23:00:30Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201", "fireAt": "2026-11-09T23:00:00Z"}
+      ],
+      "expect": [
+        {"fireAt": "2026-11-09T23:00:00Z", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101"},
+          {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201"}
+        ]}
+      ]
+    },
+    {
+      "name": "duplicate_occurrence_counted_once",
+      "now": "2026-11-09T12:00:00Z",
+      "candidates": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-09T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-09T23:00:00Z"}
+      ],
+      "expect": [
+        {"fireAt": "2026-11-09T23:00:00Z", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101"}
+        ]}
+      ]
+    },
+    {
+      "name": "nearest_first_within_limit",
+      "now": "2026-11-09T12:00:00Z",
+      "limit": 2,
+      "candidates": [
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "plannedWorkoutId": "00000000-0000-4000-8000-000000000301", "fireAt": "2026-11-12T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "fireAt": "2026-11-10T23:00:00Z"},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201", "fireAt": "2026-11-11T11:00:00Z"}
+      ],
+      "expect": [
+        {"fireAt": "2026-11-10T23:00:00Z", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101"}
+        ]},
+        {"fireAt": "2026-11-11T11:00:00Z", "items": [
+          {"lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000201"}
+        ]}
+      ]
+    }
+  ]
+}

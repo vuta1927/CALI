@@ -1,0 +1,208 @@
+{
+  "name": "missed_sessions",
+  "description": "IOS-011 per-plan planned and missed sessions (I4, MP-07, ADR-052, ADR-054). Slots are planned workouts with ISO weekday (1 = Monday). An occurrence exists on day D when D is inside an activation of the plan and the program has not finished on D. A reschedule moves an occurrence; the latest entry for the same (plannedWorkoutId, originalDate) wins and the old date no longer counts. A session completes an occurrence when it belongs to the same plan and is linked to the same planned workout on that date, or else to another planned workout of the plan on that date; one session completes one occurrence. Sessions of other plans and unlinked sessions (including unlinked backfills) never count. Occurrences are evaluated from the first activation through today and listed by date, then plannedWorkoutId. W1 = ...101 (Mon), W3 = ...103 (Wed), W5 = ...105 (Fri). 2026-11-02 and 2026-11-09 are Mondays.",
+  "cases": [
+    {
+      "name": "other_plan_does_not_make_up",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000201", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "date": "2026-11-02"},
+        {"sessionId": "00000000-0000-4000-8000-000000000202", "lineageId": "00000000-0000-4000-8000-000000000002", "plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "date": "2026-11-04"},
+        {"sessionId": "00000000-0000-4000-8000-000000000203", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "date": "2026-11-06"}
+      ],
+      "expect": {
+        "completed": 2, "missed": 1, "pending": 1,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000201"},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-04", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000203"},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-09", "date": "2026-11-09", "outcome": "pending", "sessionId": null}
+        ]
+      }
+    },
+    {
+      "name": "paused_days_have_no_planned_sessions",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-03", "timezone": "Asia/Ho_Chi_Minh"},
+        {"id": "00000000-0000-4000-8000-000000000012", "fromDate": "2026-11-06", "timezone": "Asia/Ho_Chi_Minh"}
+      ],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [],
+      "expect": {
+        "completed": 0, "missed": 2, "pending": 1,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-09", "date": "2026-11-09", "outcome": "pending", "sessionId": null}
+        ]
+      }
+    },
+    {
+      "name": "other_workout_of_same_plan_same_day_counts",
+      "comment": "On Wednesday the user did the Friday workout of the same plan: it completes Wednesday's occurrence; Friday is then missed.",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-07",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000204", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "date": "2026-11-04"}
+      ],
+      "expect": {
+        "completed": 1, "missed": 2, "pending": 0,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-04", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000204"},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "missed", "sessionId": null}
+        ]
+      }
+    },
+    {
+      "name": "latest_reschedule_counts_on_new_date",
+      "comment": "W3 of 11-04 moved to 11-05, then again to 11-07 (latest wins; 11-04 is not missed). W1 of 11-09 moved to 11-11, so it leaves today's list.",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "newDate": "2026-11-05"},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "newDate": "2026-11-07"},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-09", "newDate": "2026-11-11"}
+      ],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000205", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "date": "2026-11-07"}
+      ],
+      "expect": {
+        "completed": 1, "missed": 2, "pending": 0,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-07", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000205"}
+        ]
+      }
+    },
+    {
+      "name": "backfill_counts_only_when_linked",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-09",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000206", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "date": "2026-11-02", "backfilled": true},
+        {"sessionId": "00000000-0000-4000-8000-000000000207", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": null, "date": "2026-11-04", "backfilled": true},
+        {"sessionId": "00000000-0000-4000-8000-000000000208", "lineageId": null, "plannedWorkoutId": null, "date": "2026-11-06"}
+      ],
+      "expect": {
+        "completed": 1, "missed": 2, "pending": 1,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000206"},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-04", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-09", "date": "2026-11-09", "outcome": "pending", "sessionId": null}
+        ]
+      }
+    },
+    {
+      "name": "no_planned_or_missed_after_weekly_program_ends",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-12",
+      "program": {"kind": "weekly", "totalWeeks": 1},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [],
+      "expect": {
+        "completed": 0, "missed": 3, "pending": 0,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-04", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "missed", "sessionId": null}
+        ]
+      }
+    },
+    {
+      "name": "event_plan_stops_at_event_day",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-12",
+      "program": {"kind": "event", "eventDate": "2026-11-06"},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "weekday": 3},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "weekday": 5}
+      ],
+      "reschedules": [],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000209", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "date": "2026-11-06"}
+      ],
+      "expect": {
+        "completed": 1, "missed": 2, "pending": 0,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-02", "date": "2026-11-02", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000103", "originalDate": "2026-11-04", "date": "2026-11-04", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000105", "originalDate": "2026-11-06", "date": "2026-11-06", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000209"}
+        ]
+      }
+    },
+    {
+      "name": "one_session_completes_one_occurrence",
+      "comment": "Two workouts on Monday (W1 ...101 and W1b ...102); one session linked to W1b completes only W1b.",
+      "lineageId": "00000000-0000-4000-8000-000000000001",
+      "today": "2026-11-10",
+      "program": {"kind": "weekly", "totalWeeks": 8},
+      "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}],
+      "slots": [
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "weekday": 1},
+        {"plannedWorkoutId": "00000000-0000-4000-8000-000000000102", "weekday": 1}
+      ],
+      "reschedules": [],
+      "sessions": [
+        {"sessionId": "00000000-0000-4000-8000-000000000210", "lineageId": "00000000-0000-4000-8000-000000000001", "plannedWorkoutId": "00000000-0000-4000-8000-000000000102", "date": "2026-11-09"}
+      ],
+      "expect": {
+        "completed": 1, "missed": 1, "pending": 0,
+        "occurrences": [
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000101", "originalDate": "2026-11-09", "date": "2026-11-09", "outcome": "missed", "sessionId": null},
+          {"plannedWorkoutId": "00000000-0000-4000-8000-000000000102", "originalDate": "2026-11-09", "date": "2026-11-09", "outcome": "completed", "sessionId": "00000000-0000-4000-8000-000000000210"}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "name": "plan_status",
+  "description": "IOS-011 computed plan status (docs/19 section 4.2). Status is derived from activations (local dates, inclusive, toDate null = open-ended), endedAt, archivedAt and deletedAt; it is never stored. Precedence: deleted > archived > ended > active > scheduled > paused > draft. Only scheduled and active count toward the active-plan limit (D1). 2026-11-09 is a Monday.",
+  "cases": [
+    {
+      "name": "draft_without_activation",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": []},
+      "expect": {"status": "draft", "countsTowardActiveLimit": false}
+    },
+    {
+      "name": "scheduled_future_start",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-16", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "scheduled", "countsTowardActiveLimit": true}
+    },
+    {
+      "name": "active_starting_today",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "active", "countsTowardActiveLimit": true}
+    },
+    {
+      "name": "active_open_ended",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "active", "countsTowardActiveLimit": true}
+    },
+    {
+      "name": "active_on_last_inclusive_day",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "active", "countsTowardActiveLimit": true}
+    },
+    {
+      "name": "paused_after_activation_closed_yesterday",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-08", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "paused", "countsTowardActiveLimit": false}
+    },
+    {
+      "name": "resume_scheduled_after_pause",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "toDate": "2026-11-05", "timezone": "Asia/Ho_Chi_Minh"},
+        {"id": "00000000-0000-4000-8000-000000000012", "fromDate": "2026-11-12", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "scheduled", "countsTowardActiveLimit": true}
+    },
+    {
+      "name": "ended",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "endedAt": "2026-11-08T10:00:00Z", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-08", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "ended", "countsTowardActiveLimit": false}
+    },
+    {
+      "name": "archived_paused_plan",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "archivedAt": "2026-11-08T10:00:00Z", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-05", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "archived", "countsTowardActiveLimit": false}
+    },
+    {
+      "name": "archived_ended_plan_shows_archived",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "endedAt": "2026-11-05T10:00:00Z", "archivedAt": "2026-11-08T10:00:00Z", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "toDate": "2026-11-05", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "archived", "countsTowardActiveLimit": false}
+    },
+    {
+      "name": "deleted_wins_over_everything",
+      "today": "2026-11-09",
+      "plan": {"lineageId": "00000000-0000-4000-8000-000000000001", "archivedAt": "2026-11-07T10:00:00Z", "deletedAt": "2026-11-08T10:00:00Z", "activations": [
+        {"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-02", "timezone": "Asia/Ho_Chi_Minh"}
+      ]},
+      "expect": {"status": "deleted", "countsTowardActiveLimit": false}
+    }
+  ],
+  "activationRules": [
+    {
+      "name": "from_date_before_local_today_rejected",
+      "comment": "17:30Z on 2026-11-08 is 00:30 on 2026-11-09 in Asia/Ho_Chi_Minh (UTC+7), so 2026-11-08 is in the past there.",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-08", "timezone": "Asia/Ho_Chi_Minh"},
+      "existing": [],
+      "expect": [{"field": "fromDate", "reason": "out_of_range"}]
+    },
+    {
+      "name": "from_date_today_allowed_in_utc",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-08", "timezone": "UTC"},
+      "existing": [],
+      "expect": []
+    },
+    {
+      "name": "from_date_tomorrow_allowed",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-10", "toDate": "2026-11-30", "timezone": "Asia/Ho_Chi_Minh"},
+      "existing": [],
+      "expect": []
+    },
+    {
+      "name": "to_date_before_from_date_rejected",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-12", "toDate": "2026-11-11", "timezone": "Asia/Ho_Chi_Minh"},
+      "existing": [],
+      "expect": [{"field": "toDate", "reason": "inconsistent"}]
+    },
+    {
+      "name": "unknown_time_zone_rejected",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-12", "timezone": "Mars/Olympus_Mons"},
+      "existing": [],
+      "expect": [{"field": "timezone", "reason": "out_of_range"}]
+    },
+    {
+      "name": "overlap_with_open_activation_rejected_I1",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-12", "toDate": "2026-11-20", "timezone": "Asia/Ho_Chi_Minh"},
+      "existing": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-10", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": [{"field": "fromDate", "reason": "inconsistent"}]
+    },
+    {
+      "name": "adjacent_activation_allowed",
+      "now": "2026-11-08T17:30:00Z",
+      "activation": {"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-11", "timezone": "Asia/Ho_Chi_Minh"},
+      "existing": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-09", "toDate": "2026-11-10", "timezone": "Asia/Ho_Chi_Minh"}],
+      "expect": []
+    }
+  ]
+}
