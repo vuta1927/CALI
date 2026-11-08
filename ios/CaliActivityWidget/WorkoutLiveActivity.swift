@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -8,7 +9,7 @@ import WidgetKit
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutAttributes.self) { context in
-            WorkoutLockScreenView(state: context.state)
+            WorkoutLockScreenView(state: context.state, showsPOCActions: context.attributes.deviceGatePOC == true)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -25,10 +26,16 @@ struct WorkoutLiveActivity: Widget {
                         .font(.title3.monospacedDigit())
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(verbatim: context.state.phaseAndSetLine)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack {
+                        Text(verbatim: context.state.phaseAndSetLine)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        if context.attributes.deviceGatePOC == true {
+                            Spacer(minLength: 8)
+                            POCLiveActivityActionButton(state: context.state)
+                        }
+                    }
                 }
             } compactLeading: {
                 HStack(spacing: 2) {
@@ -52,6 +59,8 @@ struct WorkoutLiveActivity: Widget {
 
 struct WorkoutLockScreenView: View {
     let state: WorkoutAttributes.ContentState
+    /// POC-001 device gate only (`WorkoutAttributes.deviceGatePOC`); the normal workout stays read-only.
+    var showsPOCActions = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -67,12 +76,47 @@ struct WorkoutLockScreenView: View {
                 WorkoutCountdownText(state: state)
                     .font(.title2.monospacedDigit())
             }
-            Text(verbatim: state.phaseAndSetLine)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            HStack {
+                Text(verbatim: state.phaseAndSetLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if showsPOCActions {
+                    Spacer(minLength: 8)
+                    POCLiveActivityActionButton(state: state)
+                }
+            }
         }
         .padding()
+    }
+}
+
+/// POC-001 Lock Screen button: "+30s" while resting, "Xong set" while awaiting a result. Runs
+/// `POCLiveActivityIntent` (authenticationPolicy = requiresAuthentication) in the app process; the widget
+/// itself never writes state. The intent carries the rendered revision so a stale snapshot is rejected.
+/// TODO(IOS-001): replace with the production buttons after the GO decision.
+struct POCLiveActivityActionButton: View {
+    let state: WorkoutAttributes.ContentState
+
+    var body: some View {
+        switch state.phase {
+        case .resting:
+            button("+30s", action: "extend_rest_30")
+        case .awaitingResult:
+            button("Xong set", action: "confirm_current_set")
+        default:
+            EmptyView()
+        }
+    }
+
+    private func button(_ title: String, action: String) -> some View {
+        Button(intent: POCLiveActivityIntent(sessionId: state.sessionId.uuidString, revision: state.revision, action: action)) {
+            Text(verbatim: title)
+                .font(.subheadline.weight(.semibold))
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color(red: 1.0, green: 0x6A / 255.0, blue: 0x2B / 255.0))
     }
 }
 

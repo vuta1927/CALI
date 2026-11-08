@@ -55,6 +55,20 @@ struct ProfileView: View {
             }
             .listRowBackground(Color.caliSurface)
 
+            // TODO(IOS-001): remove the device-gate entry after the POC-001/002 GO/NO-GO decision.
+            Section {
+                NavigationLink {
+                    POCDeviceGateView()
+                } label: {
+                    Label("POC thiết bị (POC-001/002)", systemImage: "lock.iphone")
+                }
+            } header: {
+                Text("Nhà phát triển")
+            } footer: {
+                Text("Màn kiểm thử Lock Screen / Live Activity / cơ sở dữ liệu cho đợt POC. Dùng cơ sở dữ liệu riêng, không ảnh hưởng buổi tập thường.")
+            }
+            .listRowBackground(Color.caliSurface)
+
             Section {
                 LabeledContent("Phiên bản", value: "\(BuildInfo.current.version) (\(BuildInfo.current.build))")
                 LabeledContent("Commit", value: String(BuildInfo.current.sha.prefix(7)))
