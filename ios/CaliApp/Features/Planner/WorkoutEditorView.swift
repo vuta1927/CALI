@@ -124,6 +124,12 @@ private struct PlannedExerciseEditor: View {
             Stepper("Nghỉ trong hiệp: \(rest) giây", value: binding(rest) { .interval(workSeconds: work, restSeconds: $0) }, in: 5...120, step: 5)
         case .skillAttempt(let attempts):
             Stepper("Số lần thử: \(attempts)", value: binding(attempts) { .skillAttempt(attempts: $0) }, in: 1...10)
+        case .load(let reps, let kg):
+            // Kilograms step by 2.5 in Decimal (docs/18 §4); no Double round-trip, an off-step value stays exact.
+            Stepper("Mức tạ: \(Fmt.loadKg(kg))",
+                    onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + 2.5)) },
+                    onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - 2.5)) })
+            Stepper("Số lần: \(reps)", value: binding(reps) { .load(reps: $0, loadKg: kg) }, in: 1...50)
         }
     }
 

@@ -10,6 +10,8 @@ struct ResultFormView: View {
     @State private var status: SetStatus = .completed
     @State private var reps: Int?
     @State private var seconds: Double?
+    /// CON-006: kilograms for a load set, kept exactly as entered (never rounded).
+    @State private var loadKg: Decimal?
     @State private var rpe: Int?
     @State private var note = ""
     @State private var showSkipReasons = false
@@ -100,6 +102,9 @@ struct ResultFormView: View {
             durationInput(title: "Thời gian tập thực tế", targetSeconds: work)
         case .skillAttempt:
             EmptyView()
+        case .load(let lo, let kg):
+            KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, focused: $focused)
+            RepsInput(title: "Số lần thực tế", value: $reps, hint: "Mục tiêu \(lo) lần", focused: $focused)
         }
     }
 
@@ -178,9 +183,13 @@ struct ResultFormView: View {
 
     private var needsReps: Bool {
         switch target {
-        case .reps, .timedReps: true
+        case .reps, .timedReps, .load: true
         default: false
         }
+    }
+
+    private var needsLoad: Bool {
+        if case .load? = target { true } else { false }
     }
 
     private var needsDuration: Bool {
@@ -191,7 +200,7 @@ struct ResultFormView: View {
     }
 
     private var canSave: Bool {
-        (!needsReps || reps != nil) && (!needsDuration || seconds != nil)
+        (!needsReps || reps != nil) && (!needsDuration || seconds != nil) && (!needsLoad || loadKg != nil)
     }
 
     private func prefill() {
@@ -201,6 +210,10 @@ struct ResultFormView: View {
             seconds = (Double(suggested) / 100).rounded() / 10
         }
         if case .reps(let lo, _)? = target { reps = lo }
+        if case .load(let r, let kg)? = target {
+            reps = r
+            loadKg = kg
+        }
         if case .staticHold(let hold)? = target, let s = seconds, s + 0.05 < Double(hold) {
             status = .failed
         }
@@ -215,7 +228,8 @@ struct ResultFormView: View {
             holdMs: target?.type == .staticHold ? ms : nil,
             workMs: (target?.type == .timedReps || target?.type == .interval) ? ms : nil,
             rpe: rpe,
-            note: note
+            note: note,
+            loadKg: needsLoad ? loadKg : nil
         )
     }
 
@@ -310,6 +324,55 @@ private struct RepsInput: View {
                 .frame(maxWidth: .infinity)
                 CircleIconButton(systemImage: "plus", label: "Thêm 1 lần") {
                     value = (value ?? 0) + 1
+                }
+            }
+            .caliCard(padding: Spacing.m)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Kilogram entry for a load set (docs/18 §4, ADR-046: kg only). The ±2.5 kg buttons are a UI step
+/// hint only: a typed value is kept exactly as entered, never rounded or snapped to the step. Values
+/// with more than 2 decimals are rejected by the domain with a message, not silently fixed (ADR-062).
+private struct KgInput: View {
+    let title: String
+    @Binding var value: Decimal?
+    let targetKg: Decimal
+    var focused: FocusState<Bool>.Binding
+
+    private let step: Decimal = 2.5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.caliSecondary)
+                Spacer()
+                Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = targetKg }
+                    .font(.caption.weight(.semibold))
+                    .frame(minHeight: minTapTarget)
+            }
+            HStack(spacing: Spacing.m) {
+                CircleIconButton(systemImage: "minus", label: "Bớt 2,5 kg") {
+                    value = max(0, (value ?? targetKg) - step)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
+                    // Shows up to 4 decimals so an over-precise entry stays visible until the domain rejects it.
+                    TextField("—", value: $value, format: .number.precision(.fractionLength(0...4)))
+                        .keyboardType(.decimalPad)
+                        .focused(focused)
+                        .multilineTextAlignment(.center)
+                        .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Color.caliText)
+                    Text("kg")
+                        .font(.headline)
+                        .foregroundStyle(Color.caliSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                CircleIconButton(systemImage: "plus", label: "Thêm 2,5 kg") {
+                    value = min(1000, (value ?? targetKg - step) + step)
                 }
             }
             .caliCard(padding: Spacing.m)
