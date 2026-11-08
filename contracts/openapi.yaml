@@ -631,6 +631,107 @@ components:
         timezone: {type: string, minLength: 1, maxLength: 64, description: 'IANA time zone the local dates refer to.'}
         endReason: {type: [string, 'null'], enum: [paused, completed, stopped, deleted, null], description: 'Lifecycle command that closed the activation; requires toDate.'}
         version: {type: integer, minimum: 1, format: int64}
+    # CON-005 begin: plan goals, phases and indicator definitions (docs/18 §6, docs/19 §4).
+    IndicatorKind:
+      type: string
+      enum: [performance, adherence, volume, milestone, body]
+    IndicatorDefinition:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.1, ADR-051). Server/portal-owned, read-only for devices. `id` is a stable
+        slug that is never reused; `kind`, `unit` and `aggregation` never change for an id, while
+        `label`, `step`, `measurementTypes` and `enabled` may change and bump `version`.
+        `enabled: false` only hides the indicator from pickers; existing goals keep it.
+      required: [id, version, kind, label, unit, step, aggregation, measurementTypes, enabled]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        version: {type: integer, minimum: 1}
+        kind: {$ref: '#/components/schemas/IndicatorKind'}
+        label: {type: string, minLength: 1, maxLength: 120}
+        unit: {type: string, maxLength: 16, description: 'Display unit; may be empty for unitless counts.'}
+        step: {type: number, exclusiveMinimum: 0, description: 'Picker increment for baseline and target.'}
+        aggregation: {type: string, enum: [max, sum], description: 'How set results combine into the computed current value.'}
+        measurementTypes:
+          type: array
+          uniqueItems: true
+          description: 'Exercises offered for the indicator are filtered by these types; empty for adherence and body kinds.'
+          items: {$ref: '#/components/schemas/MeasurementType'}
+        enabled: {type: boolean}
+    IndicatorDefinitionSet:
+      type: object
+      description: >-
+        CON-005 / ADR-058. The versioned set of indicator definitions. No endpoint is added in
+        CON-005: CON-008 embeds this object in `GET /v1/criteria-config`; until then the client
+        uses the bundled default set (same content as the db/005 seed).
+      required: [version, publishedAt, indicators]
+      properties:
+        version: {type: integer, minimum: 1}
+        publishedAt: {type: string, format: date-time}
+        indicators:
+          type: array
+          items: {$ref: '#/components/schemas/IndicatorDefinition'}
+    GoalStatus:
+      type: string
+      enum: [active, reached, achieved, missed, archived]
+      description: >-
+        docs/18 §6.2. Changed only by the client. `reached` is a suggestion from computed progress;
+        `achieved` is always a user confirmation (requires achievedAt) and is never set by the server.
+    GoalTarget:
+      description: 'One value, or a {min, max} range (body goals). min <= max (MutationError validation_failed, field target.max).'
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [value]
+          properties:
+            value: {type: number, minimum: 0, maximum: 999999999}
+        - type: object
+          additionalProperties: false
+          required: [min, max]
+          properties:
+            min: {type: number, minimum: 0, maximum: 999999999}
+            max: {type: number, minimum: 0, maximum: 999999999}
+    PlanPhase:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.5). Ordered phase of one plan revision; synced as entity `plan_phase`.
+        Week labels and done/current/upcoming are computed on the device. A new revision gets new
+        phase ids (ADR-057). Every write is audited (ADR-059).
+      required: [id, planId, orderIndex, name, weeks, version]
+      properties:
+        id: {type: string, format: uuid}
+        planId: {type: string, format: uuid, description: 'Plan revision id; immutable.'}
+        orderIndex: {type: integer, minimum: 0}
+        name: {type: string, minLength: 1, maxLength: 120}
+        weeks: {type: integer, minimum: 1, maximum: 52}
+        description: {type: [string, 'null'], maxLength: 500}
+        version: {type: integer, minimum: 1, format: int64}
+    PlanGoal:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.1-§6.4, docs/19 §4). A goal of a plan lineage; synced as entity
+        `plan_goal`. `current` is computed on the device and never sent. `baseline` is the client's
+        snapshot (ADR-044). `scopePhaseId` null = scope plan; a deleted phase is shown as plan.
+        `planLineageId`, `indicatorId` and `exerciseId` are immutable (ADR-047, ADR-057).
+        The server rejects unlock cycles (MutationError goal_unlock_cycle) and more than
+        `pinned_goal_limit` (server setting, default 3, ADR-048) pinned goals per lineage
+        (MutationError pinned_goal_limit). Every write is audited (ADR-059).
+      required: [id, planLineageId, title, indicatorId, target, status, pinned, version]
+      properties:
+        id: {type: string, format: uuid}
+        planLineageId: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        indicatorId: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        exerciseId: {type: [string, 'null'], format: uuid, description: 'Required for performance, volume and milestone indicators; measurement type must match the indicator.'}
+        baseline: {type: [number, 'null'], minimum: 0, maximum: 999999999}
+        target: {$ref: '#/components/schemas/GoalTarget'}
+        scopePhaseId: {type: [string, 'null'], format: uuid}
+        unlockAfterGoalId: {type: [string, 'null'], format: uuid}
+        status: {$ref: '#/components/schemas/GoalStatus'}
+        achievedAt: {type: [string, 'null'], format: date-time, description: 'Required when status = achieved; kept when an achieved goal is archived; null otherwise.'}
+        pinned: {type: boolean}
+        note: {type: [string, 'null'], maxLength: 500}
+        version: {type: integer, minimum: 1, format: int64}
+    # CON-005 end
     PlanPage:
       type: object
       required: [items, hasMore]
@@ -642,7 +743,7 @@ components:
         hasMore: {type: boolean}
     SyncEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal]
     SyncMutation:
       type: object
       description: >-
@@ -689,7 +790,7 @@ components:
       properties:
         code:
           type: string
-          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused, active_plan_limit, plan_count_limit]
+          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused, active_plan_limit, plan_count_limit, pinned_goal_limit, goal_unlock_cycle]
           description: >-
             dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
             version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
@@ -701,7 +802,11 @@ components:
             (default 3) plans followed on one local date (docs/19 I2, BR-2; mutations are applied in
             receive order, the later one is rejected, never retried);
             plan_count_limit (status rejected) - a training_plan would exceed the server limit (default 50)
-            of non-deleted plans (ADR-041, BR-8).
+            of non-deleted plans (ADR-041, BR-8);
+            pinned_goal_limit (status rejected) - a plan_goal write would make more than the server limit
+            (default 3, ADR-048) pinned non-deleted goals in one plan lineage (docs/18 §6.4; CON-005);
+            goal_unlock_cycle (status rejected) - a plan_goal unlockAfterGoalId would close a cycle in the
+            unlock chain (docs/18 §6.3; CON-005).
         message: {type: string}
         retryable: {type: boolean}
         details: {type: object, additionalProperties: true}
@@ -714,7 +819,7 @@ components:
           items: {$ref: '#/components/schemas/SyncMutationResult'}
     ChangeEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, ai_analysis, ai_recommendation]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal, ai_analysis, ai_recommendation]
     SyncChange:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
@@ -741,6 +846,8 @@ components:
             set_result: entity-payloads.schema.json#/$defs/set_result_payload
             workout_note: entity-payloads.schema.json#/$defs/workout_note_payload
             plan_activation: entity-payloads.schema.json#/$defs/plan_activation_payload
+            plan_phase: entity-payloads.schema.json#/$defs/plan_phase_payload
+            plan_goal: entity-payloads.schema.json#/$defs/plan_goal_payload
             ai_analysis: 'components/schemas/Analysis'
             ai_recommendation: 'components/schemas/AnalysisRecommendation'
             delete: entity-payloads.schema.json#/$defs/delete_payload

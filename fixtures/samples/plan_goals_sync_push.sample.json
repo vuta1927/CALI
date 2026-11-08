@@ -1,0 +1,147 @@
+{
+  "_comment": "SAMPLE ONLY (CON-005) - not production data. One weekly calisthenics plan with two phases and three goals: a pinned hold goal scoped to phase 1, a pinned reps goal for the whole plan, and a milestone goal that unlocks after the hold goal. Later the user confirms the hold goal as achieved (status + achievedAt from the user's tap; never set automatically). current is computed on the device and never sent; baseline is the client's snapshot. Order: plan, then phases, then goals (a goal must follow the goal it unlocks after). Ids are illustrative.",
+  "deviceId": "d0000000-0000-4000-8000-000000000005",
+  "mutations": [
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000001",
+      "entityType": "training_plan",
+      "entityId": "f2000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f2000000-0000-4000-8000-000000000001",
+        "title": "Mẫu: Planche và kéo xà",
+        "revision": 1,
+        "status": "current",
+        "parentPlanId": null,
+        "lineageId": "f2000000-0000-4000-8000-000000000001",
+        "kind": "weekly",
+        "primaryDiscipline": "calisthenics"
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000002",
+      "entityType": "plan_phase",
+      "entityId": "f3000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f3000000-0000-4000-8000-000000000001",
+        "planId": "f2000000-0000-4000-8000-000000000001",
+        "orderIndex": 0,
+        "name": "Nền tảng",
+        "weeks": 4,
+        "description": "Làm quen tư thế, giữ ngắn nhiều set."
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000003",
+      "entityType": "plan_phase",
+      "entityId": "f3000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f3000000-0000-4000-8000-000000000002",
+        "planId": "f2000000-0000-4000-8000-000000000001",
+        "orderIndex": 1,
+        "name": "Tăng sức chịu",
+        "weeks": 6,
+        "description": null
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000004",
+      "entityType": "plan_goal",
+      "entityId": "f4000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000001",
+        "planLineageId": "f2000000-0000-4000-8000-000000000001",
+        "title": "Tuck Planche giữ 15 giây",
+        "indicatorId": "best_hold_seconds",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "baseline": 6,
+        "target": {"value": 15},
+        "scopePhaseId": "f3000000-0000-4000-8000-000000000001",
+        "unlockAfterGoalId": null,
+        "status": "active",
+        "achievedAt": null,
+        "pinned": true,
+        "note": null
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000005",
+      "entityType": "plan_goal",
+      "entityId": "f4000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000002",
+        "planLineageId": "f2000000-0000-4000-8000-000000000001",
+        "title": "Pull-up 10 lần một set",
+        "indicatorId": "best_set_reps",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+        "baseline": 5,
+        "target": {"value": 10},
+        "scopePhaseId": null,
+        "unlockAfterGoalId": null,
+        "status": "active",
+        "achievedAt": null,
+        "pinned": true,
+        "note": "Kéo chậm, không giật."
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000006",
+      "entityType": "plan_goal",
+      "entityId": "f4000000-0000-4000-8000-000000000003",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000003",
+        "planLineageId": "f2000000-0000-4000-8000-000000000001",
+        "title": "Lần đầu giữ Tuck Planche 25 giây",
+        "indicatorId": "milestone_hold_seconds",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "baseline": null,
+        "target": {"value": 25},
+        "scopePhaseId": "f3000000-0000-4000-8000-000000000002",
+        "unlockAfterGoalId": "f4000000-0000-4000-8000-000000000001",
+        "status": "active",
+        "achievedAt": null,
+        "pinned": false
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000007",
+      "entityType": "plan_goal",
+      "entityId": "f4000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 1,
+      "clientChangedAt": "2026-12-03T19:30:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000001",
+        "planLineageId": "f2000000-0000-4000-8000-000000000001",
+        "title": "Tuck Planche giữ 15 giây",
+        "indicatorId": "best_hold_seconds",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "baseline": 6,
+        "target": {"value": 15},
+        "scopePhaseId": "f3000000-0000-4000-8000-000000000001",
+        "unlockAfterGoalId": null,
+        "status": "achieved",
+        "achievedAt": "2026-12-03T19:30:00Z",
+        "pinned": true,
+        "note": null
+      }
+    }
+  ]
+}

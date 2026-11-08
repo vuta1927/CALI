@@ -4,6 +4,7 @@
 > **Phạm vi lần này:** chỉ tài liệu và mockup. Chưa đổi OpenAPI, SQL hay payload sync. Khi triển khai, xem mục 8 để biết phần contract cần làm trước (AGENTS rule 7).
 > **Ngày:** 2026-11-08 · Dữ liệu trong mockup là **dữ liệu mẫu**.
 > **PO-002 (2026-11-08):** câu hỏi §9.1, 9.2, 9.5, 9.6 **đã chốt** bằng ADR-045..048 (Accepted; ADR-048 là mặc định tạm) trong [docs/15](15-decisions-risks.md). §9.3, 9.4, 9.7 **đã chốt** bằng ADR-050..052.
+> **CON-005 (2026-11-08, sẵn sàng review):** contract cho §6 (mục tiêu, giai đoạn, chỉ số) đã có: `plan_goal`, `plan_phase`, `IndicatorDefinition` trong OpenAPI/entity schema, `db/005_plan_goals_phases.sql`, docs 03 §2.3, 07, 08. Quyết định còn chờ PO: ADR-057..059 (Proposed). Logic `current`/`reached` phía client thuộc IOS-011; `GET /v1/criteria-config` thuộc CON-008.
 > **Nhiều giáo án:** xem [docs/19](19-multi-plan.md). Người dùng có thể theo song song nhiều giáo án (Calisthenics, chạy giải, Gym). Khi được chốt: "giáo án hiện tại" trong tài liệu này đổi thành "giáo án đang xem", tuần hiện tại tính theo docs/19 D7 (§6.5, §6.6), và §4 thêm môn `running` với kiểu đo `distance` / `duration`.
 
 ## 1. Mục tiêu sản phẩm

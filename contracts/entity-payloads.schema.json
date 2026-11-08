@@ -11,7 +11,9 @@
     {"$ref": "#/$defs/exercise_execution_mutation"},
     {"$ref": "#/$defs/set_result_mutation"},
     {"$ref": "#/$defs/workout_note_mutation"},
-    {"$ref": "#/$defs/plan_activation_mutation"}
+    {"$ref": "#/$defs/plan_activation_mutation"},
+    {"$ref": "#/$defs/plan_phase_mutation"},
+    {"$ref": "#/$defs/plan_goal_mutation"}
   ],
   "$defs": {
     "uuid": {"type": "string", "format": "uuid"},
@@ -87,6 +89,49 @@
       },
       "if": {"required": ["endReason"], "properties": {"endReason": {"type": "string"}}},
       "then": {"required": ["toDate"], "properties": {"toDate": {"type": "string"}}},
+      "additionalProperties": false
+    },
+    "goal_target": {
+      "$comment": "CON-005 (docs/18 section 6.1): a goal target is one value or a {min,max} range (body goals). Units come from the indicator definition. min <= max is a business rule (validation_failed, field target.max).",
+      "oneOf": [
+        {"type": "object", "required": ["value"], "properties": {"value": {"type": "number", "minimum": 0, "maximum": 999999999}}, "additionalProperties": false},
+        {"type": "object", "required": ["min", "max"], "properties": {"min": {"type": "number", "minimum": 0, "maximum": 999999999}, "max": {"type": "number", "minimum": 0, "maximum": 999999999}}, "additionalProperties": false}
+      ]
+    },
+    "plan_phase_payload": {
+      "$comment": "CON-005 (docs/18 section 6.5, docs/19 section 4): an ordered phase of ONE plan revision (planId). Week labels and done/current/upcoming are computed, never sent. A new revision gets new phase ids (ADR-057).",
+      "type": "object", "required": ["id", "planId", "orderIndex", "name", "weeks"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
+        "orderIndex": {"type": "integer", "minimum": 0},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "weeks": {"type": "integer", "minimum": 1, "maximum": 52},
+        "description": {"type": ["string", "null"], "maxLength": 500}
+      }, "additionalProperties": false
+    },
+    "plan_goal_payload": {
+      "$comment": "CON-005 (docs/18 sections 6.1-6.4, docs/19 section 4): a goal belongs to the plan LINEAGE, not to a revision. current is computed on the device and never sent. baseline is the client's snapshot (ADR-044). scopePhaseId null = scope 'plan'. status is only changed by the client; 'achieved' is a user confirmation and needs achievedAt (AGENTS rules 3 and 5). indicatorId and exerciseId are immutable (ADR-047, ADR-057). Pinned limit and unlock cycles are enforced by the server (MutationError pinned_goal_limit, goal_unlock_cycle).",
+      "type": "object", "required": ["id", "planLineageId", "title", "indicatorId", "target", "status", "pinned"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planLineageId": {"$ref": "#/$defs/uuid"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 120},
+        "indicatorId": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+        "exerciseId": {"type": ["string", "null"], "format": "uuid"},
+        "baseline": {"type": ["number", "null"], "minimum": 0, "maximum": 999999999},
+        "target": {"$ref": "#/$defs/goal_target"},
+        "scopePhaseId": {"type": ["string", "null"], "format": "uuid"},
+        "unlockAfterGoalId": {"type": ["string", "null"], "format": "uuid"},
+        "status": {"enum": ["active", "reached", "achieved", "missed", "archived"]},
+        "achievedAt": {"type": ["string", "null"], "format": "date-time"},
+        "pinned": {"type": "boolean"},
+        "note": {"type": ["string", "null"], "maxLength": 500}
+      },
+      "allOf": [
+        {"if": {"required": ["status"], "properties": {"status": {"const": "achieved"}}},
+         "then": {"required": ["achievedAt"], "properties": {"achievedAt": {"type": "string"}}}},
+        {"if": {"required": ["status"], "properties": {"status": {"enum": ["active", "reached", "missed"]}}},
+         "then": {"properties": {"achievedAt": {"type": "null"}}}}
+      ],
       "additionalProperties": false
     },
     "planned_workout_payload": {
@@ -182,6 +227,10 @@
     "payload_switch_exercise_execution": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/exercise_execution_payload"}}}},
     "payload_switch_set_result": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/set_result_payload"}}}},
     "payload_switch_workout_note": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_note_payload"}}}},
-    "payload_switch_plan_activation": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_activation_payload"}}}}
+    "payload_switch_plan_activation": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_activation_payload"}}}},
+    "plan_phase_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_phase"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_phase"}]}]},
+    "plan_goal_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_goal"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_goal"}]}]},
+    "payload_switch_plan_phase": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_phase_payload"}}}},
+    "payload_switch_plan_goal": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_goal_payload"}}}}
   }
 }

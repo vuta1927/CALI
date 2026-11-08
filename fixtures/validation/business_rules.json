@@ -233,6 +233,201 @@
           "primaryDiscipline": "calisthenics"
         }
       }
+    },
+    {
+      "name": "goal_unlock_cycle",
+      "rule": "CON-005 docs/18 §6.3: unlockAfterGoalId chains never form a cycle (SQL trigger plan_goals_guard, SQLSTATE CA004)",
+      "given": "goal c8...0001 of lineage c7...0001 already unlocks after goal c8...0002 (version 1)",
+      "expect": {"status": "rejected", "code": "goal_unlock_cycle", "field": "unlockAfterGoalId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000021",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000002",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000002",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "baseline": 5,
+          "target": {"value": 8},
+          "scopePhaseId": null,
+          "unlockAfterGoalId": "c8000000-0000-4000-8000-000000000001",
+          "status": "active",
+          "achievedAt": null,
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_pinned_limit_exceeded",
+      "rule": "CON-005 docs/18 §6.4 / ADR-048: at most pinned_goal_limit (server setting, default 3) pinned non-deleted goals per plan lineage, any status (SQL trigger plan_goals_guard, SQLSTATE CA003)",
+      "given": "lineage c7...0001 already has 3 pinned non-deleted goals",
+      "expect": {"status": "rejected", "code": "pinned_goal_limit", "field": "pinned"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000022",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000022",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000022",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "L-sit 20 giây",
+          "indicatorId": "best_hold_seconds",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
+          "baseline": 8,
+          "target": {"value": 20},
+          "status": "active",
+          "pinned": true
+        }
+      }
+    },
+    {
+      "name": "goal_indicator_change_on_existing_goal",
+      "rule": "CON-005 ADR-047 / ADR-057: indicatorId and exerciseId of an existing goal are immutable; changing them means archive the goal and create a new one (SQL ck_plan_goals_indicator_immutable)",
+      "given": "goal c8...0023 exists (version 1) with indicatorId best_hold_seconds on Tuck Planche and has progress",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "indicatorId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000023",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000023",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000023",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Tuck Planche lần đầu 10 giây",
+          "indicatorId": "milestone_hold_seconds",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          "baseline": 4,
+          "target": {"value": 10},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_target_min_greater_than_max",
+      "rule": "CON-005: target.min <= target.max (SQL ck_plan_goals_target)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "target.max"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000024",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000024",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000024",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 10 đến 12 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"min": 12, "max": 10},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_exercise_indicator_without_exercise",
+      "rule": "CON-005 docs/18 §6.1: indicators of kind performance, volume and milestone need exerciseId",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "exerciseId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000025",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000025",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000025",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Giữ lâu nhất 30 giây",
+          "indicatorId": "best_hold_seconds",
+          "exerciseId": null,
+          "target": {"value": 30},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_exercise_measurement_not_in_indicator",
+      "rule": "CON-005 docs/18 §6.1: the exercise measurement type must be one of indicator.measurementTypes (best_hold_seconds is hold; Pull-up is reps)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "exerciseId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000026",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000026",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000026",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up giữ 30 giây",
+          "indicatorId": "best_hold_seconds",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 30},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_unknown_indicator",
+      "rule": "CON-005: indicatorId must exist in indicator_definitions (SQL fk_plan_goals_indicator); a pattern-valid unknown id is a business-rule rejection, never dependency_missing",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "indicatorId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000027",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000027",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000027",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Chỉ số không tồn tại",
+          "indicatorId": "best_muscle_up_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 3},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_scope_phase_of_other_plan",
+      "rule": "CON-005 docs/19 §4: scopePhaseId must be a phase of a revision of the same plan lineage (SQL ck_plan_goals_scope_same_lineage)",
+      "given": "phase c9...0028 exists and belongs to a revision of lineage c7...0004",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "scopePhaseId"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000028",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000028",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000028",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Dips 12 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+          "target": {"value": 12},
+          "scopePhaseId": "c9000000-0000-4000-8000-000000000028",
+          "status": "active",
+          "pinned": false
+        }
+      }
     }
   ]
 }

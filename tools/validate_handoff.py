@@ -186,6 +186,53 @@ try:
         for case in rules['cases']:
             if case['expect']['code'] not in error_codes:
                 errors.append(f"fixtures/validation case {case['name']} expects unknown MutationError code {case['expect']['code']}")
+        # CON-005: plan goals, phases and indicator definitions stay in lockstep across OpenAPI,
+        # entity-payloads, the latest SQL migration, the vectors and the sample pushes.
+        for code in ('pinned_goal_limit', 'goal_unlock_cycle'):
+            if code not in error_codes:
+                errors.append(f'MutationError.code is missing {code} (CON-005)')
+        for oas_name, def_name in (('PlanGoal', 'plan_goal_payload'), ('PlanPhase', 'plan_phase_payload')):
+            oas_props = set(schemas[oas_name]['properties']) - {'version'}
+            def_props = set(schema['$defs'][def_name]['properties'])
+            if oas_props != def_props:
+                errors.append(f'{oas_name} fields {sorted(oas_props)} != entity-payloads {def_name} {sorted(def_props)}')
+        goal_status_oas = set(schemas['GoalStatus']['enum'])
+        goal_status_entity = set(schema['$defs']['plan_goal_payload']['properties']['status']['enum'])
+        if goal_status_oas != goal_status_entity:
+            errors.append(f'GoalStatus drift: OpenAPI {sorted(goal_status_oas)} vs entity schema {sorted(goal_status_entity)}')
+        target_shapes_oas = sorted(sorted(o['required']) for o in schemas['GoalTarget']['oneOf'])
+        target_shapes_entity = sorted(sorted(o['required']) for o in schema['$defs']['goal_target']['oneOf'])
+        if target_shapes_oas != target_shapes_entity:
+            errors.append(f'GoalTarget drift: OpenAPI {target_shapes_oas} vs entity schema {target_shapes_entity}')
+        goal_sql = (ROOT / 'db/005_plan_goals_phases.sql').read_text(encoding='utf-8')
+        sql_kinds_match = re.search(r"ck_indicator_definitions_kind\s+CHECK \(kind IN \(([^)]*)\)\)", goal_sql)
+        sql_kinds = set(re.findall(r"'([a-z_]+)'", sql_kinds_match.group(1))) if sql_kinds_match else set()
+        if sql_kinds != set(schemas['IndicatorKind']['enum']):
+            errors.append(f"IndicatorKind drift: OpenAPI {sorted(schemas['IndicatorKind']['enum'])} vs db/005 {sorted(sql_kinds)}")
+        sql_goal_status_match = re.search(r"ck_plan_goals_status\s+CHECK \(status IN \(([^)]*)\)\)", goal_sql)
+        sql_goal_status = set(re.findall(r"'([a-z_]+)'", sql_goal_status_match.group(1))) if sql_goal_status_match else set()
+        if sql_goal_status != goal_status_oas:
+            errors.append(f'GoalStatus drift: OpenAPI {sorted(goal_status_oas)} vs db/005 {sorted(sql_goal_status)}')
+        seeded_indicators = set(re.findall(r"^\s*\('([a-z][a-z0-9_]*)',\s*'(?:performance|adherence|volume|milestone|body)'",
+                                           goal_sql, re.MULTILINE))
+        if not seeded_indicators:
+            errors.append('db/005 seeds no indicator_definitions')
+        # The latest migration that redefines the sync entity CHECK must accept every SyncEntityType.
+        sync_check = None
+        for migration in sorted((ROOT / 'db').glob('[0-9][0-9][0-9]_*.sql')):
+            found = re.findall(r"ck_sync_mutations_entity_type CHECK \(entity_type IN \(([^)]*)\)\)",
+                               migration.read_text(encoding='utf-8'))
+            if found:
+                sync_check = (migration.name, set(re.findall(r"'([a-z_]+)'", found[-1])))
+        if sync_check is None or sync_check[1] != sync_types:
+            errors.append(f'SQL ck_sync_mutations_entity_type {sync_check} != SyncEntityType {sorted(sync_types)}')
+        goal_payloads = [(f"fixtures/validation case {case['name']}", case['mutation']) for case in rules['cases']]
+        goal_payloads += [(f'{path.relative_to(ROOT).as_posix()} mutation', mutation) for path in sample_pushes
+                          for mutation in json.loads(path.read_text(encoding='utf-8'))['mutations']]
+        for label, mutation in goal_payloads:
+            indicator_id = mutation['payload'].get('indicatorId') if mutation['entityType'] == 'plan_goal' else None
+            if indicator_id and indicator_id not in seeded_indicators and not label.endswith('goal_unknown_indicator'):
+                errors.append(f'{label} references indicator {indicator_id} not seeded in db/005')
 except ImportError:
     print('INFO: jsonschema unavailable; skipping JSON Schema semantic checks')
 except Exception as exc:

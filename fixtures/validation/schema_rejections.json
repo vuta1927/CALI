@@ -230,6 +230,137 @@
           "isActive": true
         }
       }
+    },
+    {
+      "name": "goal_achieved_without_achieved_at",
+      "reason": "CON-005 docs/18 §6.2: 'achieved' is a user confirmation and must carry achievedAt (AGENTS rules 3 and 5)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000029",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000029",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000029",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "achieved",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_active_with_achieved_at",
+      "reason": "CON-005: only an achieved (or archived after achieved) goal carries achievedAt",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000030",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000030",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000030",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "active",
+          "achievedAt": "2026-11-08T09:00:00Z",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_target_value_and_range",
+      "reason": "CON-005: a goal target is either {value} or {min,max}, never both",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000031",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000031",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000031",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8, "min": 6, "max": 10},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_current_is_never_sent",
+      "reason": "CON-005 docs/18 §6.1: current is computed on the device from saved set results; payloads are closed (ADR-030)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000032",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000032",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000032",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "current": 6,
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_unknown_status",
+      "reason": "CON-005 docs/18 §6.2: status is one of active|reached|achieved|missed|archived",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000033",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000033",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000033",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "completed",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "phase_zero_weeks",
+      "reason": "CON-005 docs/18 §6.5: a phase lasts 1..52 weeks",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000034",
+        "entityType": "plan_phase",
+        "entityId": "c9000000-0000-4000-8000-000000000034",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c9000000-0000-4000-8000-000000000034",
+          "planId": "c7000000-0000-4000-8000-000000000001",
+          "orderIndex": 0,
+          "name": "Nền tảng",
+          "weeks": 0
+        }
+      }
     }
   ]
 }
