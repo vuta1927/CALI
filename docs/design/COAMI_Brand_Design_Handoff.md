@@ -78,6 +78,8 @@ A **refined, iPhone-inspired translucent glass** treatment: luminous edges, cont
 
 These values are a **starting palette**, not immutable final output. The Design Agent must verify contrast and appearance against real backgrounds.
 
+> **Cập nhật 2026-11-08:** bảng màu đã đổi sang cam (flame `#FF7A2F`, orange `#FC4C02`, ember `#E83F00`, ink `#1A1206`, cream `#FFF3EC`), xem `brand/guidelines/COAMI-brand-guidelines.md`. Bảng dưới là brief gốc (teal), giữ để đối chiếu.
+
 | Token | Hex | Suggested use |
 |---|---|---|
 | `brand.mint` | `#2FF6C4` | Hero highlight / positive energy |

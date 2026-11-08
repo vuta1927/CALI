@@ -10,12 +10,14 @@ Status: recommended implementation candidate pending human approval and trademar
 
 | Token | Hex | Usage |
 |---|---|---|
-| `brand.mint` | `#2FF6C4` | focal highlight and active brand accent |
-| `brand.teal` | `#00D4C6` | signature stroke and primary gradient |
-| `brand.aqua` | `#00A7E1` | gradient depth and refraction |
-| `brand.navy` | `#0B2742` | core dark canvas and flat dark mark |
-| `brand.ice` | `#EAF7FF` | light canvas and high-contrast inner route |
+| `brand.flame` | `#FF7A2F` | focal highlight and gradient start |
+| `brand.orange` | `#FC4C02` | signature stroke and primary brand colour (fills, icons, rings) |
+| `brand.ember` | `#E83F00` | gradient depth and refraction |
+| `brand.ink` | `#1A1206` | core dark canvas, flat dark mark, text on orange |
+| `brand.cream` | `#FFF3EC` | light canvas and high-contrast inner route |
 | `neutral.white` | `#FFFFFF` | dark-surface contrast only |
+
+Orange text on light surfaces uses `accentInk` `#C43C00` (≥ 4.5:1); `#FC4C02` alone is for fills, icons and large numerals. These tokens match `ios/CaliApp/DesignSystem/Theme.swift`. The previous teal palette is archived in `../archive/teal-v1/`.
 
 Brand colors do not replace semantic warning/error colors. Every status still includes an icon or text label.
 
@@ -39,7 +41,7 @@ Use glass only on calm, elevated surfaces. The flat silhouette is always the fal
 
 - Do not insert the tagline or any small text into the app icon.
 - Do not stretch, rotate or recolor individual symbol parts arbitrarily.
-- Do not use mint alone to mean success.
+- Do not use orange alone to mean success or warning.
 - Do not place the glass mark over busy exercise photography without a solid contrast field.
 - Do not enlarge brand decoration during active workouts; media, timer and controls have priority.
 - Do not present this candidate as trademark-cleared or human-approved.

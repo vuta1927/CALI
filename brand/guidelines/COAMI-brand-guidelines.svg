@@ -1,25 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2200">
-  <rect width="1600" height="2200" fill="#F4FAFD"/>
-  <rect width="1600" height="440" fill="#0B2742"/>
-  <text x="100" y="130" fill="#8CB2C8" font-family="Arial" font-size="30" font-weight="700" letter-spacing="8">COAMI · MINI BRAND GUIDELINES</text>
+  <rect width="1600" height="2200" fill="#F9F8F8"/>
+  <rect width="1600" height="440" fill="#1A1206"/>
+  <text x="100" y="130" fill="#B3A9A2" font-family="Arial" font-size="30" font-weight="700" letter-spacing="8">COAMI · MINI BRAND GUIDELINES</text>
   <text x="100" y="255" fill="#FFFFFF" font-family="Arial" font-size="92" font-weight="700">Guided Companion C</text>
-  <text x="100" y="330" fill="#2FF6C4" font-family="Arial" font-size="34">Recommended implementation candidate · human review pending</text>
-  <g transform="translate(100 500) scale(.48)"><path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="#00D4C6" stroke-width="136" stroke-linecap="round"/><path d="M406 638L512 532L620 424" fill="none" stroke="#0B2742" stroke-width="80" stroke-linecap="round"/><circle cx="694" cy="350" r="52" fill="#0B2742"/></g>
-  <text x="680" y="575" fill="#0B2742" font-family="Arial" font-size="42" font-weight="700">Meaning</text>
-  <text x="680" y="640" fill="#35586C" font-family="Arial" font-size="30">Open C = companion space.</text>
-  <text x="680" y="690" fill="#35586C" font-family="Arial" font-size="30">Rising route = guided progress.</text>
-  <text x="680" y="740" fill="#35586C" font-family="Arial" font-size="30">Point = coach presence.</text>
-  <text x="100" y="1060" fill="#0B2742" font-family="Arial" font-size="46" font-weight="700">Color tokens</text>
-  <g font-family="Arial" font-size="25" fill="#0B2742"><rect x="100" y="1110" width="230" height="120" rx="20" fill="#2FF6C4"/><text x="100" y="1270">Mint · #2FF6C4</text><rect x="390" y="1110" width="230" height="120" rx="20" fill="#00D4C6"/><text x="390" y="1270">Teal · #00D4C6</text><rect x="680" y="1110" width="230" height="120" rx="20" fill="#00A7E1"/><text x="680" y="1270">Aqua · #00A7E1</text><rect x="970" y="1110" width="230" height="120" rx="20" fill="#0B2742"/><text x="970" y="1270">Navy · #0B2742</text><rect x="1260" y="1110" width="230" height="120" rx="20" fill="#EAF7FF" stroke="#BDD3DF"/><text x="1260" y="1270">Ice · #EAF7FF</text></g>
-  <text x="100" y="1415" fill="#0B2742" font-family="Arial" font-size="46" font-weight="700">Use and spacing</text>
-  <text x="100" y="1480" fill="#35586C" font-family="Arial" font-size="30">1024 × 1024 master. Keep clear space at least equal to the point diameter.</text>
-  <text x="100" y="1535" fill="#35586C" font-family="Arial" font-size="30">Minimum: 32 px full color; 24 px monochrome. Keep icon canvas square.</text>
-  <text x="100" y="1590" fill="#35586C" font-family="Arial" font-size="30">Use the flat high-contrast mark on Lock Screen and Dynamic Island.</text>
-  <text x="100" y="1645" fill="#35586C" font-family="Arial" font-size="30">Keep exercise media, timer and actions visually first during workouts.</text>
-  <text x="100" y="1770" fill="#0B2742" font-family="Arial" font-size="46" font-weight="700">Typography and effects</text>
-  <text x="100" y="1835" fill="#35586C" font-family="Arial" font-size="30">SwiftUI uses Apple's system font. SVG wordmarks use an Avenir Next / Arial fallback.</text>
-  <text x="100" y="1890" fill="#35586C" font-family="Arial" font-size="30">No font binaries are bundled. Use restrained glass; keep a flat opaque fallback.</text>
-  <text x="100" y="1945" fill="#35586C" font-family="Arial" font-size="30">Do not add taglines to icons, stretch the mark or imply trademark clearance.</text>
-  <line x1="100" y1="2040" x2="1500" y2="2040" stroke="#B8D6E4" stroke-width="3"/>
-  <text x="100" y="2110" fill="#496B7F" font-family="Arial" font-size="25">Source type: platform system font / Avenir Next fallback · Font binaries not redistributed · Trademark review pending</text>
+  <text x="100" y="330" fill="#FF7A2F" font-family="Arial" font-size="34">Recommended implementation candidate · human review pending</text>
+  <g transform="translate(100 500) scale(.48)"><path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="#FC4C02" stroke-width="136" stroke-linecap="round"/><path d="M406 638L512 532L620 424" fill="none" stroke="#1A1206" stroke-width="80" stroke-linecap="round"/><circle cx="694" cy="350" r="52" fill="#1A1206"/></g>
+  <text x="680" y="575" fill="#1A1206" font-family="Arial" font-size="42" font-weight="700">Meaning</text>
+  <text x="680" y="640" fill="#594F48" font-family="Arial" font-size="30">Open C = companion space.</text>
+  <text x="680" y="690" fill="#594F48" font-family="Arial" font-size="30">Rising route = guided progress.</text>
+  <text x="680" y="740" fill="#594F48" font-family="Arial" font-size="30">Point = coach presence.</text>
+  <text x="100" y="1060" fill="#1A1206" font-family="Arial" font-size="46" font-weight="700">Color tokens</text>
+  <g font-family="Arial" font-size="25" fill="#1A1206"><rect x="100" y="1110" width="230" height="120" rx="20" fill="#FF7A2F"/><text x="100" y="1270">Flame · #FF7A2F</text><rect x="390" y="1110" width="230" height="120" rx="20" fill="#FC4C02"/><text x="390" y="1270">Orange · #FC4C02</text><rect x="680" y="1110" width="230" height="120" rx="20" fill="#E83F00"/><text x="680" y="1270">Ember · #E83F00</text><rect x="970" y="1110" width="230" height="120" rx="20" fill="#1A1206"/><text x="970" y="1270">Ink · #1A1206</text><rect x="1260" y="1110" width="230" height="120" rx="20" fill="#FFF3EC" stroke="#D3CDC9"/><text x="1260" y="1270">Cream · #FFF3EC</text></g>
+  <text x="100" y="1415" fill="#1A1206" font-family="Arial" font-size="46" font-weight="700">Use and spacing</text>
+  <text x="100" y="1480" fill="#594F48" font-family="Arial" font-size="30">1024 × 1024 master. Keep clear space at least equal to the point diameter.</text>
+  <text x="100" y="1535" fill="#594F48" font-family="Arial" font-size="30">Minimum: 32 px full color; 24 px monochrome. Keep icon canvas square.</text>
+  <text x="100" y="1590" fill="#594F48" font-family="Arial" font-size="30">Use the flat high-contrast mark on Lock Screen and Dynamic Island.</text>
+  <text x="100" y="1645" fill="#594F48" font-family="Arial" font-size="30">Keep exercise media, timer and actions visually first during workouts.</text>
+  <text x="100" y="1770" fill="#1A1206" font-family="Arial" font-size="46" font-weight="700">Typography and effects</text>
+  <text x="100" y="1835" fill="#594F48" font-family="Arial" font-size="30">SwiftUI uses Apple's system font. SVG wordmarks use an Avenir Next / Arial fallback.</text>
+  <text x="100" y="1890" fill="#594F48" font-family="Arial" font-size="30">No font binaries are bundled. Use restrained glass; keep a flat opaque fallback.</text>
+  <text x="100" y="1945" fill="#594F48" font-family="Arial" font-size="30">Do not add taglines to icons, stretch the mark or imply trademark clearance.</text>
+  <line x1="100" y1="2040" x2="1500" y2="2040" stroke="#D3CDC9" stroke-width="3"/>
+  <text x="100" y="2110" fill="#6E625A" font-family="Arial" font-size="25">Source type: platform system font / Avenir Next fallback · Font binaries not redistributed · Trademark review pending</text>
 </svg>

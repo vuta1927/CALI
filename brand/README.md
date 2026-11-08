@@ -22,4 +22,6 @@ The shipped candidate deliberately adds Concept C's route to Concept A while ret
 - `previews/` contains presentation-only usage mockups.
 - `guidelines/` documents tokens, spacing, typography and misuse in editable SVG, Markdown and PDF forms. The PDF is rendered from the vector guideline page; `COAMI-brand-guidelines.png` is its image source.
 
+Palette: orange (flame `#FF7A2F` → orange `#FC4C02` → ember `#E83F00`, ink `#1A1206`, cream `#FFF3EC`), shared with the iOS theme. The previous teal package is kept unchanged in `archive/teal-v1/`; `concept-exploration/` stays in its original teal as a historical record.
+
 PNG exports are deterministic ImageMagick renders from SVG sources. Run `python tools/validate_brand_assets.py` from the repository root to validate dimensions, opacity, SVG integrity and the Xcode asset reference.

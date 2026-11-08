@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 560" role="img" aria-labelledby="title desc">
+  <title id="title">COAMI primary lockup</title>
+  <desc id="desc">Guided companion symbol with COAMI wordmark and tagline.</desc>
+  <defs>
+    <linearGradient id="g" x1="70" y1="40" x2="510" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2FF6C4"/><stop offset="0.52" stop-color="#00D4C6"/><stop offset="1" stop-color="#00A7E1"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(36 20) scale(.5)">
+    <path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="url(#g)" stroke-width="136" stroke-linecap="round"/>
+    <path d="M406 638L512 532L620 424" fill="none" stroke="#0B2742" stroke-width="80" stroke-linecap="round"/>
+    <circle cx="694" cy="350" r="52" fill="#0B2742"/>
+  </g>
+  <text x="580" y="300" fill="#0B2742" font-family="Avenir Next, Nunito Sans, Arial, sans-serif" font-size="230" font-weight="700" letter-spacing="22">COAMI</text>
+  <text x="596" y="402" fill="#356078" font-family="Avenir Next, Nunito Sans, Arial, sans-serif" font-size="56" font-weight="500" letter-spacing="5">YOUR AI TRAINING COMPANION</text>
+</svg>

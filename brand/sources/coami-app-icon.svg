@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="COAMI app icon">
   <defs>
-    <radialGradient id="bg" cx="30%" cy="18%" r="100%"><stop stop-color="#174B67"/><stop offset=".5" stop-color="#0B2742"/><stop offset="1" stop-color="#061725"/></radialGradient>
-    <linearGradient id="g" x1="180" y1="150" x2="820" y2="860" gradientUnits="userSpaceOnUse"><stop stop-color="#6BFFD9"/><stop offset=".44" stop-color="#00D4C6"/><stop offset="1" stop-color="#00A7E1"/></linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#00111C" flood-opacity=".55"/></filter>
+    <radialGradient id="bg" cx="30%" cy="18%" r="100%"><stop stop-color="#33261C"/><stop offset=".5" stop-color="#1A1206"/><stop offset="1" stop-color="#0D0905"/></radialGradient>
+    <linearGradient id="g" x1="180" y1="150" x2="820" y2="860" gradientUnits="userSpaceOnUse"><stop stop-color="#FF9A5C"/><stop offset=".44" stop-color="#FC4C02"/><stop offset="1" stop-color="#E83F00"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#000000" flood-opacity=".55"/></filter>
   </defs>
   <rect width="1024" height="1024" fill="url(#bg)"/>
-  <circle cx="300" cy="168" r="280" fill="#2FF6C4" opacity=".08"/>
+  <circle cx="300" cy="168" r="280" fill="#FF7A2F" opacity=".08"/>
   <g filter="url(#shadow)">
     <path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="url(#g)" stroke-width="136" stroke-linecap="round"/>
-    <path d="M406 638L512 532L620 424" fill="none" stroke="#EAF7FF" stroke-width="80" stroke-linecap="round"/>
-    <circle cx="694" cy="350" r="52" fill="#EAF7FF"/>
+    <path d="M406 638L512 532L620 424" fill="none" stroke="#FFF3EC" stroke-width="80" stroke-linecap="round"/>
+    <circle cx="694" cy="350" r="52" fill="#FFF3EC"/>
     <path d="M239 326C310 180 479 128 632 182" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" opacity=".34"/>
   </g>
 </svg>
