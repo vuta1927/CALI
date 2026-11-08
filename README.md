@@ -30,6 +30,9 @@ Trạng thái: **Implementation-ready baseline**, còn các quyết định cầ
 19. [`docs/reviews/CON-001-contract-review.md`](docs/reviews/CON-001-contract-review.md): kết quả rà soát contract (C0), các điểm cần ADR.
 20. [`backend/README.md`](backend/README.md): chạy backend local, test, dev token.
 21. [`ios/README.md`](ios/README.md): build iOS qua GitHub Actions và sideload bằng Sideloadly.
+22. [`docs/17-content-editing.md`](docs/17-content-editing.md): sửa bài tập cá nhân, media, giáo án (IOS-009/MED-002).
+23. [`docs/18-plan-module.md`](docs/18-plan-module.md): module Giáo án — nhiều mục tiêu nhỏ, lộ trình sửa được, tiến bộ so với lúc bắt đầu, đa môn (Calisthenics/Gym), bộ tiêu chí nhập set cấu hình động; mockup tại [`docs/design/mockups/`](docs/design/mockups/README.md) (bao quát toàn bộ app: các tab, player, Lock Screen, Đề xuất AI).
+24. [`docs/19-multi-plan.md`](docs/19-multi-plan.md): phân tích yêu cầu **nhiều giáo án song song** (ví dụ Calisthenics + chạy giải + Gym) — tối đa 3 giáo án đang theo, giáo án hướng tới ngày sự kiện, môn chạy bộ (quãng đường / thời gian / pace), vòng đời, Hôm nay gộp nhiều giáo án, bỏ lỡ tính theo từng giáo án, tiêu chí chấp nhận và tác động contract. PO đã chốt (tối đa 3, chạy nhập tay, có tổng hợp chéo); mockup tại [`docs/design/mockups/plan-module.html`](docs/design/mockups/plan-module.html) → mục "Nhiều giáo án".
 
 ## Tham chiếu UI
 - [`references/ui_concept_reference.png`](references/ui_concept_reference.png): mockup minh họa đã trao đổi; **không phải bản giao diện pixel-perfect hay nguồn thiết kế có thể chỉnh sửa**. Thông số thực thi vẫn theo `docs/02-ux-spec.md`.

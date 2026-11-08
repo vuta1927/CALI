@@ -31,7 +31,7 @@ Xem [quy tắc và acceptance](17-content-editing.md).
 | Screen ID | Screen | Data shown | Primary action | Empty/error/offline |
 |---|---|---|---|---|
 | UX-01 | Home/Today | day picker, workout hero poster, exercise cards, duration estimate | Start or Resume | Create sample plan; offline badge |
-| UX-02 | Plan editor | weekly calendar, exercises with media, target sets/hold/reps/rest, reorder | Save local | Validation inline; unsynced marker |
+| UX-02 | Plan editor | weekly calendar, exercises with media, target sets/hold/reps/rest, reorder | Lưu | Validation inline; không hiển thị trạng thái lưu máy/đồng bộ (docs/18 §3) |
 | UX-03 | Catalog | thumbnail grid (min ~100pt image), filter: equipment/skill/type | Open exercise | Bundled fallback poster |
 | UX-04 | Exercise Preview | video loop, play/pause, cue checklist, variant, media download state | Add to plan / close | Show poster + cues if no video |
 | UX-05 | Player Ready | poster, set X/Y, target, previous record, Start | Start countdown | Data from local only |
@@ -39,10 +39,19 @@ Xem [quy tắc và acceptance](17-content-editing.md).
 | UX-07 | Set Result | actual hold/reps, RPE optional, quick note, success/fail/skip reason | Confirm | Autosave draft while editing |
 | UX-08 | Rest | huge countdown, next set card thumbnail, technique cue, +30s, Ready | Start next set | Visible timer if video missing |
 | UX-09 | Summary | planned vs actual, completed/skipped, notes, sync status | Save/Finish | AI pending state |
-| UX-10 | History | cards with photo, date, workout, progression stats | Open details | Offline local history |
+| UX-10 | History | Session list (poster stack, date/time, sets done/planned, minutes, status) with a **Tuần / Tháng** switch; ‹ › period navigation (no future); week = 7-day status strip, month = calendar with status dots (tap a day to filter); period totals (sessions done / scheduled, sets, minutes) vs previous period (§3.1) | Open session details | Empty period/day state; missed sessions shown non-interactive; offline local history |
 | UX-11 | AI Review | summary of insights, uncertainty, recommendation delta, accept/reject | Accept or Reject | Pending/error/retry clear |
 | UX-12 | Lock Screen | type, exercise, phase, set X/Y, deadline timer, optional tiny poster | intent action if unlocked | disabled/unauthorized fallback |
 | UX-13 | Dynamic Island | tiny phase glyph/time; expanded exercise/set/time | Open player | No image/video requirement |
+
+### 3.1 UX-10 History — rules
+- History is a log of **sessions**, independent of plans: sessions from earlier plans stay visible and carry the plan name. Progress since plan start stays in the Giáo án tab (docs/18 §6.6).
+- Views: **Tuần** (default, Monday-first) and **Tháng**. Both open at the current period; the "next" arrow is disabled there.
+- Session states: `done`, `abandoned` (warning chip with reason, never red), `missed` (scheduled but no record; dashed, not tappable), `today` (scheduled, not yet started → opens Today). Future scheduled days appear only as dashed calendar dots, not as list rows.
+- Month view: tapping a past day filters the list to that day ("Xem cả tháng" clears); a rest day shows an empty state. Without a filter, rows are grouped by week with `done/scheduled` per week.
+- Period totals: sessions `done / scheduled`, sets done, minutes. Comparison line uses neutral wording and signed numbers. For the period in progress, compare the same elapsed days of the previous period and exclude today. The oldest period shows "Kỳ đầu tiên có dữ liệu".
+- Accessibility: calendar cells ≥44pt with VoiceOver label "weekday date, status"; status is never conveyed by color alone (icon/border style differs).
+- Mockup: `docs/design/mockups/plan-module.html` → Lịch sử.
 
 ## 4. Visual design system
 - Palette initial: Midnight `#111827`, Surface `#1F2937`, Accent `#34D399`, Text `#F9FAFB`, Secondary `#9CA3AF`, Warning `#FBBF24`, Error `#F87171`.
