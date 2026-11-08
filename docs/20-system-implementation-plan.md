@@ -149,7 +149,7 @@ flowchart TB
 | CON-002 | Duyệt `fixtures/reducer/*.json` bản nháp; bổ sung vector cho pause/resume, skip, abandon từ mọi phase | integrator + ios | S | Fixture được duyệt; CaliDomain đọc fixture và test pass trên Linux |
 | BL-001 | Vệ sinh backlog: đổi `IOS-009` (M3) thành `IOS-010`; thêm ID mới của tài liệu này vào `contracts/backlog.csv` và `docs/13` | integrator | S | `validate_handoff.py` pass |
 
-> **Trạng thái PO-002 (2026-11-08):** đã có bản nháp ADR-034..049 trong docs/15, tất cả ở trạng thái **Proposed** và chờ PO duyệt. Gồm docs/19 D2–D9 (ADR-034..041), docs/19 §11.1–11.3 (ADR-042..044), docs/18 §9.1, 9.2, 9.5, 9.6 (ADR-045..048) và quy ước migration (ADR-049). Sáu câu hỏi chưa có đề xuất được liệt kê ở docs/15 cho PO: docs/18 §9.3, 9.4, 9.7 và docs/19 §11.4–11.6. Việc duyệt ADR-011..015 vẫn để PO; trạng thái các ADR này không đổi. docs/18 và docs/19 chỉ được đánh dấu "đã chốt" sau khi PO duyệt.
+> **Trạng thái PO-002 (2026-11-08):** PO đã duyệt ADR-034..049 trong docs/15 (**Accepted**; ADR-048 là mặc định tạm tới usability test). CON-003/004 có thể bắt đầu. Gồm docs/19 D2–D9 (ADR-034..041), docs/19 §11.1–11.3 (ADR-042..044), docs/18 §9.1, 9.2, 9.5, 9.6 (ADR-045..048) và quy ước migration (ADR-049). Sáu câu hỏi mở (docs/18 §9.3, 9.4, 9.7; docs/19 §11.4–11.6) đã được PO trả lời và ghi thành ADR-050..055: tiêu chí áp theo bài từ v1 (vào CON-008, IOS-016), portal quản lý tất cả nội dung, chuyên cần theo lịch sau lần dời (vào IOS-011, IOS-015), không chuyển mục tiêu khi kết thúc, cho nhập bù, chỉ km. Việc duyệt ADR-011..015 vẫn để PO; trạng thái các ADR này không đổi. docs/18 và docs/19 đã đánh dấu "đã chốt" cho mọi mục mở.
 
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. Việc còn lại: integrator + iOS duyệt (cùng POC-002 theo docs/13).
 
@@ -161,7 +161,7 @@ flowchart TB
 
 Mỗi slice gồm: ADR, `contracts/openapi.yaml`, `contracts/entity-payloads.schema.json`, SQL migration, `fixtures/validation/business_rules.json` và fixture mẫu, docs 03/07/08 (và 09/11 nếu liên quan), test validator, contract test backend.
 
-**Quy ước migration (đề xuất, cần ADR):** từ CON-003 trở đi, viết file **mới** `db/003_*.sql`, `db/004_*.sql`, không sửa `db/001` nữa. Lý do: kiểm thử đường nâng cấp bằng DbUp trước khi có DB thật được triển khai. *Trạng thái: bản nháp ADR-049 (Proposed) trong docs/15.*
+**Quy ước migration (ADR-049):** từ CON-003 trở đi, viết file **mới** `db/003_*.sql`, `db/004_*.sql`, không sửa `db/001` nữa. Lý do: kiểm thử đường nâng cấp bằng DbUp trước khi có DB thật được triển khai. *Trạng thái: đã chốt bằng ADR-049 (Accepted) trong docs/15.*
 
 | ID | Nội dung | Phụ thuộc | Cỡ | Ghi chú |
 |---|---|---|---|---|
@@ -169,7 +169,7 @@ Mỗi slice gồm: ADR, `contracts/openapi.yaml`, `contracts/entity-payloads.sch
 | CON-004 | `discipline` += `running`; `measurementType` += `distance`, `duration`; `set_result.distanceMeters`, `durationSeconds`, `source` (`manual`; `healthkit` dành cho sau); target chạy của `planned_exercise`; pace **không lưu** | PO-002 | M | Song song với CON-003 |
 | CON-005 | `plan_goal` (indicator, baseline, target hoặc min/max, scope, unlockAfter, status, achievedAt, pinned) thay cho `training_plan.goal`; `plan_phase[]` sửa được, có audit; `indicator_definition` có phiên bản | CON-003 | L | docs/18 §6, §8. Mục tiêu "đạt" luôn do người dùng xác nhận |
 | CON-006 | `exercise.discipline`, `exercise.measurementType`, `exercise.focusTags`; prescription kind `load` (`reps`, `loadKg`); `set_result.actualLoadKg` | CON-004 (dùng chung enum) | M | Reducer fixture cho `load` |
-| CON-008 | `criteria_config` + `indicator_definition` chỉ đọc: `GET /v1/criteria-config` có ETag; `set_result.criteriaVersion` + `criteria` (map, có giới hạn kích thước, JSONB). Quyền ghi chỉ dành cho portal (chưa làm) | CON-005, CON-006 | M | iOS gói sẵn một bản cấu hình mặc định để chạy offline |
+| CON-008 | `criteria_config` + `indicator_definition` chỉ đọc: `GET /v1/criteria-config` có ETag; `appliesTo.exerciseIds` (ADR-050); `set_result.criteriaVersion` + `criteria` (map, có giới hạn kích thước, JSONB). Quyền ghi chỉ dành cho portal (chưa làm) | CON-005, CON-006 | M | iOS gói sẵn một bản cấu hình mặc định để chạy offline |
 | CON-007 | `body_measurement` (`kind`, `value`, `measuredAt`): dữ liệu nhạy cảm, mặc định **không** gửi cho AI | CON-005 | S | Cập nhật docs/09, docs/11 |
 | CON-009 | Đồng bộ nội dung cá nhân (bài tập riêng, metadata media; **không** upload file): sở hữu, phân quyền, xung đột | sau BE-004 | M | Biên giới đã nêu ở docs/17. Có thể để sau pilot (§9) |
 
@@ -234,7 +234,7 @@ Chi tiết thuật toán theo docs/16 §6. Bổ sung so với docs/16:
 | QA-003 | T-13..T-15, prompt injection, không có thay đổi giáo án ngầm | qa | IOS-010 | |
 | REL-001 | Checklist pilot, TestFlight, playbook rollback | integrator + qa | QA-001/002/003, OPS-001 | docs/12 §5 |
 
-**Ngoài MVP (ghi nhận, chưa lập kế hoạch):** portal web quản trị `criteria_config` (docs/18 §5.4); nhập dữ liệu chạy từ Apple Health (`source = healthkit`); nhập bù buổi quá khứ (docs/19 §11.5).
+**Ngoài MVP (ghi nhận, chưa lập kế hoạch):** portal web quản trị cho tiêu chí, chỉ số, danh mục bài tập và media (docs/18 §5.4, ADR-051); nhập dữ liệu chạy từ Apple Health (`source = healthkit`); nhập bù buổi quá khứ (đã chốt cho phép, ADR-054).
 
 ---
 
@@ -328,11 +328,11 @@ Bổ sung cho docs/15 và docs/16 §10.
 |---|---|---|
 | Tập luyện cốt lõi | Player, Live Activity read-only, notification, recovery, nhật ký offline | Điều khiển tương tác trên Activity nếu POC-002 NO-GO |
 | Giáo án | Nhiều giáo án (IOS-013), chạy (IOS-014), lịch sử tuần/tháng + tổng hợp chéo (IOS-017), mục tiêu cơ bản (IOS-015 phần goal + tiến bộ) | Thang kỹ năng nâng cao, sửa giai đoạn có audit chi tiết |
-| Gym / cấu hình động | `load` + cấu hình gói sẵn (IOS-016) | Portal sửa `criteria_config` |
+| Gym / cấu hình động | `load` + cấu hình gói sẵn (IOS-016) | Portal quản trị nội dung (ADR-051) |
 | Sync / tài khoản | Push / pull, hộp xung đột, Sign in with Apple | Đồng bộ nội dung cá nhân (CON-009) |
 | AI | Phân tích sau buổi, đề xuất cần duyệt | Đề xuất xuyên giáo án, dùng số đo cơ thể |
 | Media | Poster có giấy phép cho bài trong giáo án mẫu | Video có giấy phép cho toàn bộ catalog |
-| Khác | — | Apple Health, nhập bù buổi quá khứ, đơn vị dặm/lb |
+| Khác | — | Apple Health, nhập bù buổi quá khứ (ADR-054), hiển thị lb (ADR-046). Quãng đường chỉ km (ADR-055) |
 
 ---
 

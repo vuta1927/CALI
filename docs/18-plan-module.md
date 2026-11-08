@@ -3,7 +3,7 @@
 > **Trạng thái:** Đề xuất thiết kế (UX + domain). Mockup tương tác: [`docs/design/mockups/plan-module.html`](design/mockups/plan-module.html).
 > **Phạm vi lần này:** chỉ tài liệu và mockup. Chưa đổi OpenAPI, SQL hay payload sync. Khi triển khai, xem mục 8 để biết phần contract cần làm trước (AGENTS rule 7).
 > **Ngày:** 2026-11-08 · Dữ liệu trong mockup là **dữ liệu mẫu**.
-> **PO-002:** câu hỏi §9.1, 9.2, 9.5, 9.6 đã có ADR-045..048 ở trạng thái **Proposed** trong [docs/15](15-decisions-risks.md), chờ PO duyệt. §9.3, 9.4, 9.7 chưa có đề xuất.
+> **PO-002 (2026-11-08):** câu hỏi §9.1, 9.2, 9.5, 9.6 **đã chốt** bằng ADR-045..048 (Accepted; ADR-048 là mặc định tạm) trong [docs/15](15-decisions-risks.md). §9.3, 9.4, 9.7 **đã chốt** bằng ADR-050..052.
 > **Nhiều giáo án:** xem [docs/19](19-multi-plan.md). Người dùng có thể theo song song nhiều giáo án (Calisthenics, chạy giải, Gym). Khi được chốt: "giáo án hiện tại" trong tài liệu này đổi thành "giáo án đang xem", tuần hiện tại tính theo docs/19 D7 (§6.5, §6.6), và §4 thêm môn `running` với kiểu đo `distance` / `duration`.
 
 ## 1. Mục tiêu sản phẩm
@@ -79,7 +79,8 @@ Bản đầy đủ, có nhãn, gợi ý và icon, nằm trong mockup (panel "Xem
 |--------|---------|
 | `id` | Khoá ổn định, **không tái sử dụng** sau khi đã có dữ liệu. Đổi nhãn được, đổi nghĩa thì phải tạo id mới. |
 | `type` | Một trong `supportedTypes`. Mỗi kiểu có một renderer. Kiểu mà client không biết thì **bỏ qua tiêu chí đó**, không làm vỡ màn hình. |
-| `appliesTo.disciplines` | `*` = mọi môn. Có thể mở rộng thêm `exerciseIds` / `measurementTypes`. |
+| `appliesTo.disciplines` | `*` = mọi môn. |
+| `appliesTo.exerciseIds` | Tuỳ chọn, có từ v1 ([ADR-050](15-decisions-risks.md)). Có thì tiêu chí chỉ hiện cho các bài trong danh sách (vẫn phải khớp môn). Id không có trong catalog thì bỏ qua; bài tập cá nhân chỉ nhận tiêu chí theo môn. `measurementTypes` để sau. |
 | `options[].v` | Giá trị lưu. `label` chỉ dùng để hiển thị và đổi được. |
 | `prefill: previousSet` | Điền sẵn bằng giá trị của set trước trong cùng bài. |
 | `splitsTrend` | Khi giá trị đổi so với set hoặc buổi trước, điểm trên biểu đồ Tiến bộ được tách chuỗi để không so sánh khập khiễng. |
@@ -93,7 +94,7 @@ Bản đầy đủ, có nhãn, gợi ý và icon, nằm trong mockup (panel "Xem
 - Tắt hoặc gỡ một tiêu chí không xoá giá trị đã ghi.
 
 ### 5.4 Portal web quản trị (tương lai)
-Phạm vi tối thiểu:
+Phạm vi ([ADR-051](15-decisions-risks.md)): bộ tiêu chí, `indicator_definition`, danh mục bài tập và media catalog. Media phải qua kiểm tra giấy phép theo docs/10 trước khi xuất bản. Yêu cầu chung:
 - CRUD tiêu chí, kiểm tra `type` / `options` hợp lệ.
 - Xem trước giao diện P6 theo từng môn và cách đo.
 - Xuất bản thành phiên bản mới (immutable), có thể rollback, và có nhật ký thay đổi (ai sửa gì, lúc nào).
@@ -115,7 +116,7 @@ Goal { id, title, indicatorId, exerciseId?, baseline?, current?, target | {min,m
 | Loại (`kind`) | Ví dụ chỉ số | Cách tính `current` |
 |---------------|--------------|---------------------|
 | `performance` (Thành tích) | Giữ lâu nhất (giây), Set tốt nhất (lần), Mức tạ × 5 lần (kg) | Giá trị tốt nhất của bài trong phạm vi |
-| `adherence` (Chuyên cần) | Tỉ lệ đi tập (%) | Buổi đã tập / buổi theo lịch tới hôm nay |
+| `adherence` (Chuyên cần) | Tỉ lệ đi tập (%) | Buổi đã tập / buổi theo lịch tới hôm nay, theo lịch sau lần dời gần nhất ([ADR-052](15-decisions-risks.md)) |
 | `volume` (Khối lượng) | Tổng lần / tuần, Tổng khối lượng / tuần | Tổng của tuần hiện tại |
 | `milestone` (Cột mốc kỹ năng) | Lần đầu giữ được / làm được | Lần đầu đạt mức đích |
 | `body` (Số đo cơ thể) | Cân nặng TB 7 ngày | Người dùng tự nhập; đích là khoảng `{min,max}` |
@@ -183,10 +184,10 @@ Hiện trạng: `set_result` đã có `actualReps`, `actualHoldMs`, `rpe`, `pain
 Đề xuất tách thành các slice: **CON-0xx Plan goals (goal + indicator + phases)** → **CON-0xx Body measurement** → **CON-0xx Discipline + load** → **CON-0xx Criteria config**. Mỗi slice gồm ADR, contract, fixtures và test.
 
 ## 9. Câu hỏi mở
-1. `rpe` hiện là cột riêng (1–10). Có chuyển thành một tiêu chí cấu hình hay giữ cột riêng vì AI và analytics dùng nhiều? *Đề xuất: giữ cột riêng; trong cấu hình chỉ điều khiển việc hiển thị.* → [ADR-045](15-decisions-risks.md) (Proposed)
-2. Đơn vị tạ: chỉ kg, hay cho phép lb theo cài đặt người dùng? *Đề xuất: lưu kg, hiển thị theo cài đặt.* → [ADR-046](15-decisions-risks.md) (Proposed)
-3. Tiêu chí có nên áp theo từng bài (`exerciseIds`) ngay từ phiên bản đầu không? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md), "Câu hỏi mở chưa có đề xuất").
-4. Phạm vi của portal: chỉ tiêu chí, hay cả danh mục bài tập và media? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)).
-5. Đổi bài hoặc chỉ số của một mục tiêu đã có tiến độ: sửa tại chỗ hay lưu trữ mục tiêu cũ và tạo mới? *Đề xuất: chỉ cho sửa tên và mức đích; đổi bài / chỉ số thì tạo mục tiêu mới để giữ lịch sử.* → [ADR-047](15-decisions-risks.md) (Proposed)
-6. Ngưỡng 3 mục tiêu ghim và cách lấy "hiện tại" cho chỉ số tổng (tuần gần nhất) cần kiểm chứng bằng usability test. → [ADR-048](15-decisions-risks.md) (Proposed): giữ giá trị hiện tại làm mặc định tạm.
-7. Mục tiêu `adherence` tính theo lịch đã lên tại thời điểm nào khi người dùng dời buổi tập? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)).
+1. `rpe` hiện là cột riêng (1–10). Có chuyển thành một tiêu chí cấu hình hay giữ cột riêng vì AI và analytics dùng nhiều? *Đề xuất: giữ cột riêng; trong cấu hình chỉ điều khiển việc hiển thị.* → [ADR-045](15-decisions-risks.md) (Accepted)
+2. Đơn vị tạ: chỉ kg, hay cho phép lb theo cài đặt người dùng? *Đề xuất: lưu kg, hiển thị theo cài đặt.* → [ADR-046](15-decisions-risks.md) (Accepted)
+3. Tiêu chí có nên áp theo từng bài (`exerciseIds`) ngay từ phiên bản đầu không? **Có.** → [ADR-050](15-decisions-risks.md) (Accepted)
+4. Phạm vi của portal: chỉ tiêu chí, hay cả danh mục bài tập và media? **Tất cả.** → [ADR-051](15-decisions-risks.md) (Accepted)
+5. Đổi bài hoặc chỉ số của một mục tiêu đã có tiến độ: sửa tại chỗ hay lưu trữ mục tiêu cũ và tạo mới? *Đề xuất: chỉ cho sửa tên và mức đích; đổi bài / chỉ số thì tạo mục tiêu mới để giữ lịch sử.* → [ADR-047](15-decisions-risks.md) (Accepted)
+6. Ngưỡng 3 mục tiêu ghim và cách lấy "hiện tại" cho chỉ số tổng (tuần gần nhất) cần kiểm chứng bằng usability test. → [ADR-048](15-decisions-risks.md) (Accepted): giữ giá trị hiện tại làm mặc định tạm.
+7. Mục tiêu `adherence` tính theo lịch đã lên tại thời điểm nào khi người dùng dời buổi tập? **Ngay sau khi dời**: buổi tính ở ngày mới, ngày cũ không tính bỏ lỡ. → [ADR-052](15-decisions-risks.md) (Accepted)
