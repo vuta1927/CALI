@@ -37,6 +37,9 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
         result.AppliedScripts.ShouldContain("003_running_measurement.sql");
         result.AppliedScripts.ShouldContain("004_plan_lineage_activation.sql");
         (await PublicTablesAsync(connectionString)).ShouldContain("plan_activations");
+        // CON-005
+        result.AppliedScripts.ShouldContain("005_plan_goals_phases.sql");
+        (await PublicTablesAsync(connectionString)).ShouldContain("plan_goals");
 
         var expected = TablesDeclaredIn001();
         expected.Length.ShouldBeGreaterThanOrEqualTo(17);

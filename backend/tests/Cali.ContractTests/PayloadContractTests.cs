@@ -160,6 +160,107 @@ public sealed class PayloadContractTests : IClassFixture<OpenApiContractTests.Sp
         codes.ShouldContain("plan_count_limit");
     }
 
+    // ---- CON-005 plan goals, phases and indicator definitions ----
+
+    [Fact]
+    public void Plan_goal_and_plan_phase_are_sync_entities_in_every_contract()
+    {
+        var syncTypes = Enum("SyncEntityType");
+
+        syncTypes.ShouldContain("plan_goal");
+        syncTypes.ShouldContain("plan_phase");
+        Enum("ChangeEntityType").ShouldContain("plan_goal");
+        Enum("ChangeEntityType").ShouldContain("plan_phase");
+        // Plan_activation_is_a_sync_entity_in_every_contract checks the entity-payloads oneOf equals SyncEntityType.
+        Def("plan_goal_mutation").ValueKind.ShouldBe(JsonValueKind.Object);
+        Def("plan_phase_mutation").ValueKind.ShouldBe(JsonValueKind.Object);
+    }
+
+    [Theory]
+    [InlineData("PlanGoal", "plan_goal_payload")]
+    [InlineData("PlanPhase", "plan_phase_payload")]
+    public void Goal_and_phase_payloads_are_closed_and_match_openapi(string openApiName, string defName)
+    {
+        var payload = Def(defName);
+        var openApi = Schema(openApiName);
+
+        payload.GetProperty("additionalProperties").GetBoolean().ShouldBeFalse();
+        // The wire payload is the OpenAPI resource minus the server-owned version.
+        payload.GetProperty("properties").EnumerateObject().Select(p => p.Name)
+            .ShouldBe(openApi.Properties!.Keys.Where(k => k != "version"), ignoreOrder: true);
+        payload.GetProperty("required").EnumerateArray().Select(e => e.GetString()!)
+            .ShouldBe(openApi.Required!.Where(k => k != "version"), ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Goal_status_matches_and_current_is_never_on_the_wire()
+    {
+        var entity = Def("plan_goal_payload").GetProperty("properties").GetProperty("status").GetProperty("enum")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+
+        Enum("GoalStatus").ShouldBe(["active", "reached", "achieved", "missed", "archived"], ignoreOrder: true);
+        entity.ShouldBe(Enum("GoalStatus"), ignoreOrder: true);
+        // docs/18 §6.1: current is computed on the device from saved set results.
+        Schema("PlanGoal").Properties!.Keys.ShouldNotContain("current");
+        Def("plan_goal_payload").GetProperty("properties").TryGetProperty("current", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Achieved_requires_achieved_at_and_open_statuses_forbid_it()
+    {
+        var rules = Def("plan_goal_payload").GetProperty("allOf").EnumerateArray().ToList();
+
+        var achieved = rules.Single(r => r.GetProperty("if").GetProperty("properties").GetProperty("status")
+            .TryGetProperty("const", out var c) && c.GetString() == "achieved");
+        achieved.GetProperty("then").GetProperty("required").EnumerateArray().Select(e => e.GetString())
+            .ShouldContain("achievedAt");
+        achieved.GetProperty("then").GetProperty("properties").GetProperty("achievedAt").GetProperty("type").GetString()
+            .ShouldBe("string");
+
+        var open = rules.Single(r => r.GetProperty("if").GetProperty("properties").GetProperty("status")
+            .TryGetProperty("enum", out _));
+        open.GetProperty("if").GetProperty("properties").GetProperty("status").GetProperty("enum").EnumerateArray()
+            .Select(e => e.GetString()!).ShouldBe(["active", "reached", "missed"], ignoreOrder: true);
+        open.GetProperty("then").GetProperty("properties").GetProperty("achievedAt").GetProperty("type").GetString()
+            .ShouldBe("null");
+    }
+
+    [Fact]
+    public void Goal_target_is_a_value_or_a_range_in_both_contracts()
+    {
+        var openApi = Schema("GoalTarget").OneOf!.Select(o => string.Join(',', o.Required!.Order(StringComparer.Ordinal))).ToHashSet();
+        var entity = Def("goal_target").GetProperty("oneOf").EnumerateArray()
+            .Select(o => string.Join(',', o.GetProperty("required").EnumerateArray().Select(e => e.GetString()!).Order(StringComparer.Ordinal)))
+            .ToHashSet();
+
+        openApi.ShouldBe(["value", "max,min"], ignoreOrder: true);
+        entity.ShouldBe(openApi, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Indicator_definition_is_read_only_and_uses_the_measurement_type_enum()
+    {
+        Enum("IndicatorKind").ShouldBe(["performance", "adherence", "volume", "milestone", "body"], ignoreOrder: true);
+        var definition = Schema("IndicatorDefinition");
+        Values(definition.Properties!["aggregation"]).ShouldBe(["max", "sum"], ignoreOrder: true);
+        definition.Properties["measurementTypes"].Items!.Enum!.Count.ShouldBe(Schema("MeasurementType").Enum!.Count);
+        Schema("IndicatorDefinitionSet").Required!.ShouldBe(["version", "publishedAt", "indicators"], ignoreOrder: true);
+
+        // ADR-058: devices never write indicators, so they are neither a sync entity nor a payload.
+        Enum("SyncEntityType").ShouldNotContain(t => t.Contains("indicator", StringComparison.Ordinal));
+        _entity.GetProperty("$defs").EnumerateObject().Select(p => p.Name)
+            .ShouldNotContain(name => name.Contains("indicator", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Goal_limits_are_reported_as_mutation_errors()
+    {
+        var codes = Values(Schema("MutationError").Properties!["code"]);
+
+        codes.ShouldContain("pinned_goal_limit");
+        codes.ShouldContain("goal_unlock_cycle");
+    }
+
     private HashSet<string> Enum(string schema) => Values(Schema(schema));
 
     // Microsoft.OpenApi reads a YAML `null` enum member as a sentinel string; nullable enums keep only real values.
