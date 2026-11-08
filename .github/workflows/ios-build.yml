@@ -20,9 +20,7 @@ on:
     paths:
       - "ios/**"
       - ".github/workflows/ios-build.yml"
-      # CaliDomain is tested on Linux (swift-domain.yml) and not yet referenced by project.yml.
-      # Remove this exclusion once the app links CaliDomain.
-      - "!ios/Packages/CaliDomain/**"
+      # ios/** includes ios/Packages/CaliDomain: the app links it through CaliCore (POC-002).
   pull_request:
     types: [labeled, synchronize, opened, reopened]
 
