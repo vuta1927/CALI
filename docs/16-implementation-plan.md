@@ -79,6 +79,8 @@ Windows: tải artifact → Sideloadly (Apple ID free) ký + cài qua USB → iP
 
 ## 3. Quyết định kỹ thuật đề xuất (cần duyệt → ghi ADR)
 
+> **PO duyệt 2026-11-08:** ADR-011..015 ở bảng dưới đã Accepted ([docs/15](15-decisions-risks.md)). ADR-013 vẫn phải có bằng chứng POC-001/002 trước khi sửa docs/04, docs/05 (ghi chú ở cuối bảng).
+
 | ID đề xuất | Quyết định | Lý do | Ảnh hưởng nếu từ chối |
 |---|---|---|---|
 | ADR-011 | Sinh Xcode project bằng **XcodeGen** (`project.yml`), không commit `.xcodeproj` | Không có Mac; tránh conflict file pbxproj | Cần Mac để tạo/sửa project |

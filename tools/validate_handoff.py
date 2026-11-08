@@ -96,9 +96,26 @@ try:
     for case in rules['cases']:
         for error in validator.iter_errors(case['mutation']):
             errors.append(f"fixtures/validation case {case['name']} is not schema-valid: {error.message}")
-        exercise_id = case['mutation']['payload'].get('exerciseId')
-        if exercise_id and exercise_id not in ids:
-            errors.append(f"fixtures/validation case {case['name']} references unknown exercise {exercise_id}")
+        payload = case['mutation']['payload']
+        for exercise_id in (payload.get('exerciseId'), (payload.get('prescribedSnapshot') or {}).get('exerciseId')):
+            if exercise_id and exercise_id not in ids:
+                errors.append(f"fixtures/validation case {case['name']} references unknown exercise {exercise_id}")
+    # CON-004: schema-level rejections must stay schema-INVALID.
+    rejections = json.loads((ROOT / 'fixtures/validation/schema_rejections.json').read_text(encoding='utf-8'))
+    for case in rejections['cases']:
+        if validator.is_valid(case['mutation']):
+            errors.append(f"fixtures/validation/schema_rejections case {case['name']} is unexpectedly schema-valid")
+    # Sample sync pushes (fixtures/samples/*.sample.json) must be valid mutations on known exercises.
+    sample_pushes = sorted((ROOT / 'fixtures/samples').glob('*sync_push.sample.json'))
+    for sample_path in sample_pushes:
+        sample_rel = sample_path.relative_to(ROOT).as_posix()
+        for mutation in json.loads(sample_path.read_text(encoding='utf-8'))['mutations']:
+            for error in validator.iter_errors(mutation):
+                errors.append(f'{sample_rel} mutation {mutation["mutationId"]} invalid: {error.message}')
+            payload = mutation.get('payload', {})
+            for exercise_id in (payload.get('exerciseId'), (payload.get('prescribedSnapshot') or {}).get('exerciseId')):
+                if exercise_id and exercise_id not in ids:
+                    errors.append(f'{sample_rel} references unknown exercise {exercise_id}')
     # ADR-028: offline catalog bundle manifest.
     bundle_schema = json.loads((ROOT / 'contracts/catalog-bundle.schema.json').read_text(encoding='utf-8'))
     jsonschema.Draft202012Validator.check_schema(bundle_schema)
@@ -115,7 +132,7 @@ try:
         wire_fixtures = [
             ('fixtures/workout_plan.json', 'TrainingPlan'),
             ('fixtures/sync_push.json', 'SyncPushRequest'),
-        ]
+        ] + [(path.relative_to(ROOT).as_posix(), 'SyncPushRequest') for path in sample_pushes]
         for rel, name in wire_fixtures:
             if name not in spec.get('components', {}).get('schemas', {}):
                 errors.append(f'Missing OpenAPI schema {name}')
@@ -126,6 +143,49 @@ try:
             instance = json.loads((ROOT / rel).read_text(encoding='utf-8'))
             for error in wire.iter_errors(instance):
                 errors.append(f'{rel} does not match OpenAPI {name}: {error.message}')
+        # CON-004: prescription kinds stay in lockstep across contracts (catalog type == target kind).
+        schemas = spec['components']['schemas']
+        kind_sets = {
+            'entity-payloads $defs.target': {o['properties']['kind']['const'] for o in schema['$defs']['target']['oneOf']},
+            'OpenAPI PlannedTarget': {o['properties']['kind']['const'] for o in schemas['PlannedTarget']['oneOf']},
+            'OpenAPI ExerciseType': set(schemas['ExerciseType']['enum']),
+            'catalog-bundle item.type': set(bundle_schema['$defs']['item']['properties']['type']['enum']),
+        }
+        reference = kind_sets['entity-payloads $defs.target']
+        for label, kinds in kind_sets.items():
+            if kinds != reference:
+                errors.append(f'Exercise type/target kind drift: {label} = {sorted(kinds)} vs {sorted(reference)}')
+        # CON-003: sync entity types, payload mapping, plan revision status and limit error codes stay in lockstep.
+        entity_consts = set()
+        for ref in schema['oneOf']:
+            mutation_def = schema['$defs'][ref['$ref'].rsplit('/', 1)[-1]]
+            entity_consts |= {part['properties']['entityType']['const'] for part in mutation_def['allOf']
+                              if 'entityType' in part.get('properties', {})}
+        sync_types = set(schemas['SyncEntityType']['enum'])
+        if sync_types != entity_consts:
+            errors.append(f'SyncEntityType {sorted(sync_types)} != entity-payloads mutation entityTypes {sorted(entity_consts)}')
+        change_types = set(schemas['ChangeEntityType']['enum'])
+        if not sync_types <= change_types:
+            errors.append(f'ChangeEntityType is missing sync entity types {sorted(sync_types - change_types)}')
+        payload_map = schemas['SyncChange']['properties']['payload'].get('x-payload-schemas', {})
+        if not sync_types <= set(payload_map):
+            errors.append(f'SyncChange x-payload-schemas is missing {sorted(sync_types - set(payload_map))}')
+        for entity_type, target in payload_map.items():
+            if not target.startswith('entity-payloads.schema.json#/$defs/'):
+                continue
+            if target.rsplit('/', 1)[-1] not in schema['$defs']:
+                errors.append(f'x-payload-schemas {entity_type} points to unknown {target}')
+        plan_status_oas = set(schemas['TrainingPlan']['allOf'][1]['properties']['status']['enum'])
+        plan_status_entity = set(schema['$defs']['training_plan_payload']['properties']['status']['enum'])
+        if plan_status_oas != plan_status_entity:
+            errors.append(f'TrainingPlan.status drift: OpenAPI {sorted(plan_status_oas)} vs entity schema {sorted(plan_status_entity)}')
+        error_codes = set(schemas['MutationError']['properties']['code']['enum'])
+        for code in ('active_plan_limit', 'plan_count_limit'):
+            if code not in error_codes:
+                errors.append(f'MutationError.code is missing {code} (CON-003)')
+        for case in rules['cases']:
+            if case['expect']['code'] not in error_codes:
+                errors.append(f"fixtures/validation case {case['name']} expects unknown MutationError code {case['expect']['code']}")
 except ImportError:
     print('INFO: jsonschema unavailable; skipping JSON Schema semantic checks')
 except Exception as exc:

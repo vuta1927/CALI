@@ -27,11 +27,13 @@ If DB transaction fails, do not display successful completion.
   "payload":{"id":"UUID", "executionId":"UUID", "setIndex":1, "status":"completed", "prescribedSnapshot":{"target":{"kind":"static_hold","holdSeconds":12},"setCount":4,"restSeconds":90,"catalogVersion":1}, "actualHoldMs":12000, "confirmedAt":"2026-11-07T10:00:00Z"}
 }
 ```
-Dependency ordering: send parent records first (`training_plan → planned_workout → planned_exercise`; `workout_session → exercise_execution → set_result`). Server processes each batch in supplied order. If parent is missing, return an explicit retryable dependency conflict rather than silently creating an orphan. For multiple local changes on the **same entity**, serialize the outbox: do not send mutation #2 until #1 is acknowledged; before first send of #2, rebase `baseVersion` to the newly acknowledged server version and keep #2’s mutation ID stable throughout retries. Client must never alter a mutation payload once an HTTP attempt has started.
+Dependency ordering: send parent records first (`training_plan → planned_workout → planned_exercise`; `training_plan → plan_activation`; `workout_session → exercise_execution → set_result`). Server processes each batch in supplied order. If parent is missing, return an explicit retryable dependency conflict rather than silently creating an orphan. For multiple local changes on the **same entity**, serialize the outbox: do not send mutation #2 until #1 is acknowledged; before first send of #2, rebase `baseVersion` to the newly acknowledged server version and keep #2’s mutation ID stable throughout retries. Client must never alter a mutation payload once an HTTP attempt has started.
 
 Server responds per mutation: `applied|duplicate|conflict|rejected`, `serverVersion`, `serverEntity?`, `error?`. `duplicate` receipt is accepted and mark outbox ACK; `conflict` persists unresolved and does not silently overwrite; dependency conflicts may be retried after missing parents are acknowledged, whereas version conflicts require user resolution. Network failure: retry same mutation UUID, never generate new UUID for same committed action.
 
 The envelope and every payload are closed objects, so an unknown field anywhere → HTTP 400 for the batch (ADR-030).
+
+**Chạy bộ (CON-004).** `set_result` nhận thêm `distanceMeters` (mét, 0..1000000), `durationSeconds` (giây, 0..86400) và `source` (chỉ `manual`; `healthkit` bị từ chối tới slice Apple Health, ADR-043). Cả ba đều không bắt buộc nên client v1 không phải đổi. `planned_exercise.target` có thêm kind `distance` và `duration`. Pace không có trên wire: client tự tính từ `durationSeconds / distanceMeters`; payload gửi trường pace bị từ chối như mọi trường lạ. Ví dụ đầy đủ (chỉ là mẫu): `fixtures/samples/running_sync_push.sample.json`.
 
 **Receipts and error codes (ADR-021).** `error` = `{code, message, retryable, details?}`.
 
@@ -43,6 +45,10 @@ The envelope and every payload are closed objects, so an unknown field anywhere 
 | `forbidden_entity` | rejected | false | yes | mark rejected (server-owned entity type) |
 | `cross_user_reference` | rejected | false | yes | mark rejected |
 | `mutation_id_reused` | rejected | false | **no** (the original receipt is unchanged) | client bug: a payload changed after a send attempt |
+| `active_plan_limit` | rejected | false | yes | CON-003, BR-2: activation làm số giáo án được theo trong một ngày vượt giới hạn server (mặc định 3). Đánh dấu rejected, hoàn tác activation cục bộ và báo người dùng chọn giáo án để tạm dừng; không tự gửi lại |
+| `plan_count_limit` | rejected | false | yes | CON-003, BR-8: vượt giới hạn server (mặc định 50) giáo án chưa xoá. Đánh dấu rejected và gợi ý xoá bớt giáo án cũ |
+
+**Nhiều giáo án (CON-003).** `training_plan` có thêm `lineageId`, `kind`, `eventDate`, `eventName`, `primaryDiscipline`, `endedAt`, `endReason`, `endNote`, `archivedAt`, đều không bắt buộc trên wire (server suy `lineageId` từ `parentPlanId`). `status` nay là trạng thái phiên bản `current|superseded`; giá trị v1 `active|archived` bị JSON Schema từ chối (breaking, ADR-056). Entity mới `plan_activation` `{id, planLineageId, fromDate, toDate?, timezone, endReason?}`, đẩy sau `training_plan` gốc của lineage; lineage chưa có trên server ⇒ `dependency_missing`. Trạng thái người dùng thấy không có trên wire. Hai thiết bị offline cùng bắt đầu giáo án (BR-2): server áp dụng theo thứ tự nhận trong giao dịch riêng của mỗi mutation; mutation đến sau mà vượt I2 nhận `active_plan_limit`, cùng một lineage chồng ngày (I1) nhận `validation_failed` với field `fromDate`. Ví dụ (chỉ là mẫu): `fixtures/samples/plan_activation_sync_push.sample.json`.
 
 **Payload fingerprint (ADR-031).** The server stores `payload_sha256`. This is the SHA-256 (lowercase hex) of the RFC 8785 (JCS) canonical JSON of `{entityType, entityId, action, baseVersion, payload}`. `clientChangedAt` is excluded. A repeated `mutationId` with the same hash replays the stored receipt as `duplicate`. A different hash → `mutation_id_reused`.
 
@@ -70,6 +76,7 @@ The entity version is always `serverVersion` on the change, never a payload fiel
 | set_result | same ID different version | **reject + surface**; current user chooses local/server or edits as newer revision, preserving audit |
 | workout_session | active on two devices | server conflict, prompt choose device; no auto union of competing phase timelines |
 | training_plan | concurrent revision | fork/duplicate plan or explicit choose, preserve both variants |
+| plan_activation | cùng activation, khác version (BR-3) | `version_conflict` như entity khác; client giải quyết theo docs/19 BR-3 (kết thúc thắng tạm dừng). Khác activation, cùng lineage chồng ngày ⇒ `validation_failed` (I1) |
 | workout_note | simultaneous edits | keep conflicting copies in conflict inbox; no destructive LWW |
 | local media cache | different versions | higher approved contentVersion wins, verified by checksum |
 | ai_analysis/recommendation | client attempts edit | server-owned; reject unless decision endpoint |
@@ -98,10 +105,12 @@ The entity version is always `serverVersion` on the change, never a payload fiel
 - HTTP 200 received then app killed before ACK write ⇒ retry duplicate accepted.
 - Pull page applied but cursor not saved (simulated crash) ⇒ replay safe.
 - Update with wrong `baseVersion` ⇒ conflict, no overwrite.
+- Payload trong `fixtures/validation/schema_rejections.json` (source `healthkit`, thời gian > 24 giờ, quãng đường > 1000 km, có trường pace…) ⇒ không qua JSON Schema; `tools/validate_handoff.py` kiểm tra mỗi case vẫn bị từ chối.
 - 2 devices change plan simultaneously ⇒ fork/explicit resolution.
 - Guest-to-user merge ⇒ no data loss, no duplicate by date.
 - Same `mutationId`, different payload ⇒ `rejected`/`mutation_id_reused`, original receipt and row unchanged.
 - Child pushed before parent ⇒ `conflict`/`dependency_missing` (retryable, no receipt); resend after parent ⇒ `applied`.
 - `deviceId` of another user ⇒ 409 `device_owner_mismatch`, nothing applied.
 - Unknown envelope field ⇒ 400.
-- `fixtures/validation/business_rules.json` cases ⇒ `rejected`/`validation_failed` with the listed field.
+- `fixtures/validation/business_rules.json` cases ⇒ `rejected` with the listed `code` (`validation_failed`, `active_plan_limit`, `plan_count_limit`) and field; `given` mô tả trạng thái server cần có trước.
+- Hai thiết bị offline, mỗi bên bắt đầu một giáo án khác khi user đã theo 2 giáo án ⇒ mutation nhận trước `applied`, mutation sau `rejected`/`active_plan_limit` (đã kiểm ở mức SQL bằng hai giao dịch đồng thời trong `PlanLineageActivationMigrationTests`).

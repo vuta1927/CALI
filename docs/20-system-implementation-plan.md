@@ -1,6 +1,6 @@
 # 20. Kế hoạch triển khai hệ thống: thành phần và tính năng
 
-**Phiên bản:** v0.1 (2026-11-08) · **Trạng thái:** đề xuất, chờ chủ dự án duyệt
+**Phiên bản:** v0.1 (2026-11-08) · **Trạng thái:** PO duyệt 2026-11-08 (thứ tự giai đoạn, đường cắt MVP §9, các quyết định §10)
 **Phạm vi:** toàn bộ hệ thống: iOS app, widget / Live Activity, backend .NET, sync, AI Coach, media, module Giáo án ([docs/18](18-plan-module.md)), nhiều giáo án ([docs/19](19-multi-plan.md)), sửa nội dung ([docs/17](17-content-editing.md)), brand / UI, vận hành và phát hành.
 **Quan hệ với tài liệu khác:**
 - [`16-implementation-plan.md`](16-implementation-plan.md) vẫn là chi tiết kỹ thuật cho C0, B0–B4 và I0–I6, gồm môi trường dev không tốn phí, thuật toán sync push/pull và CI.
@@ -149,7 +149,7 @@ flowchart TB
 | CON-002 | Duyệt `fixtures/reducer/*.json` bản nháp; bổ sung vector cho pause/resume, skip, abandon từ mọi phase | integrator + ios | S | Fixture được duyệt; CaliDomain đọc fixture và test pass trên Linux |
 | BL-001 | Vệ sinh backlog: đổi `IOS-009` (M3) thành `IOS-010`; thêm ID mới của tài liệu này vào `contracts/backlog.csv` và `docs/13` | integrator | S | `validate_handoff.py` pass |
 
-> **Trạng thái PO-002 (2026-11-08):** PO đã duyệt ADR-034..049 trong docs/15 (**Accepted**; ADR-048 là mặc định tạm tới usability test). CON-003/004 có thể bắt đầu. Gồm docs/19 D2–D9 (ADR-034..041), docs/19 §11.1–11.3 (ADR-042..044), docs/18 §9.1, 9.2, 9.5, 9.6 (ADR-045..048) và quy ước migration (ADR-049). Sáu câu hỏi mở (docs/18 §9.3, 9.4, 9.7; docs/19 §11.4–11.6) đã được PO trả lời và ghi thành ADR-050..055: tiêu chí áp theo bài từ v1 (vào CON-008, IOS-016), portal quản lý tất cả nội dung, chuyên cần theo lịch sau lần dời (vào IOS-011, IOS-015), không chuyển mục tiêu khi kết thúc, cho nhập bù, chỉ km. Việc duyệt ADR-011..015 vẫn để PO; trạng thái các ADR này không đổi. docs/18 và docs/19 đã đánh dấu "đã chốt" cho mọi mục mở.
+> **Trạng thái PO-002 (2026-11-08):** PO đã duyệt ADR-034..049 trong docs/15 (**Accepted**; ADR-048 là mặc định tạm tới usability test). CON-003/004 có thể bắt đầu. Gồm docs/19 D2–D9 (ADR-034..041), docs/19 §11.1–11.3 (ADR-042..044), docs/18 §9.1, 9.2, 9.5, 9.6 (ADR-045..048) và quy ước migration (ADR-049). Sáu câu hỏi mở (docs/18 §9.3, 9.4, 9.7; docs/19 §11.4–11.6) đã được PO trả lời và ghi thành ADR-050..055: tiêu chí áp theo bài từ v1 (vào CON-008, IOS-016), portal quản lý tất cả nội dung, chuyên cần theo lịch sau lần dời (vào IOS-011, IOS-015), không chuyển mục tiêu khi kết thúc, cho nhập bù, chỉ km. PO cũng đã duyệt ADR-011..015 (Accepted; ADR-013 vẫn chờ bằng chứng POC-001/002 trước khi sửa docs/04, docs/05). PO-002 hoàn tất. docs/18 và docs/19 đã đánh dấu "đã chốt" cho mọi mục mở.
 
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. Việc còn lại: integrator + iOS duyệt (cùng POC-002 theo docs/13).
 
@@ -172,6 +172,10 @@ Mỗi slice gồm: ADR, `contracts/openapi.yaml`, `contracts/entity-payloads.sch
 | CON-008 | `criteria_config` + `indicator_definition` chỉ đọc: `GET /v1/criteria-config` có ETag; `appliesTo.exerciseIds` (ADR-050); `set_result.criteriaVersion` + `criteria` (map, có giới hạn kích thước, JSONB). Quyền ghi chỉ dành cho portal (chưa làm) | CON-005, CON-006 | M | iOS gói sẵn một bản cấu hình mặc định để chạy offline |
 | CON-007 | `body_measurement` (`kind`, `value`, `measuredAt`): dữ liệu nhạy cảm, mặc định **không** gửi cho AI | CON-005 | S | Cập nhật docs/09, docs/11 |
 | CON-009 | Đồng bộ nội dung cá nhân (bài tập riêng, metadata media; **không** upload file): sở hữu, phân quyền, xung đột | sau BE-004 | M | Biên giới đã nêu ở docs/17. Có thể để sau pilot (§9) |
+
+> **Trạng thái CON-004 (2026-11-08):** contract **đã review, đã commit**. Đã có `db/003_running_measurement.sql` (thêm `distance`/`duration` vào `exercise_type`; `set_results.distance_meters`, `duration_seconds`, `source` chỉ `manual`), target `distance`/`duration` ở OpenAPI và entity schema, enum `Discipline`/`MeasurementType` (chỉ định nghĩa, trường do CON-006 thêm), vector `business_rules.json` + `schema_rejections.json`, mẫu `fixtures/samples/running_sync_push.sample.json`, docs 03 §3.1, 07, 08. Pace không lưu. Logic CaliDomain thuộc IOS-011. Seed dev `db/002` chưa có bài chạy.
+
+> **Trạng thái CON-003 (2026-11-08):** contract **đã review (PO duyệt ADR-056 ngày 2026-11-08)**. `db/004_plan_lineage_activation.sql` thêm lineage và các trường giáo án, `status` = `current|superseded` (ADR-056), bảng `plan_activations` (I1 exclusion constraint, I2 trigger với advisory lock, `active_plan_limit` = 3 trong `server_settings`), giới hạn 50 giáo án chưa xoá (`plan_count_limit`) và chuyển dữ liệu BR-10 (không ghi `sync_change_log`). OpenAPI/entity schema có `plan_activation`, mã lỗi mới; vector trong `business_rules.json`/`schema_rejections.json`, mẫu `fixtures/samples/plan_activation_sync_push.sample.json`, docs 03 §2.2, 07, 08. Kiểm thử SQL gồm hai thiết bị đồng thời cho I1/I2. Backend chưa có API sync nên ánh xạ SQLSTATE → `MutationError` làm ở B-slice; logic CaliDomain thuộc IOS-011.
 
 ### Giai đoạn 2 — iOS nền tảng local-first
 
@@ -322,7 +326,9 @@ Bổ sung cho docs/15 và docs/16 §10.
 
 ---
 
-## 9. Đường cắt MVP pilot (đề xuất, chờ PO)
+## 9. Đường cắt MVP pilot (PO duyệt 2026-11-08)
+
+> PO đã duyệt bảng dưới đây làm phạm vi pilot. Mục ở cột "Sau pilot" chỉ vào pilot khi PO quyết định lại. Riêng điều khiển tương tác trên Activity phụ thuộc kết quả POC-002.
 
 | Nhóm | Trong pilot | Sau pilot |
 |---|---|---|
@@ -337,6 +343,8 @@ Bổ sung cho docs/15 và docs/16 §10.
 ---
 
 ## 10. Quyết định cần chủ dự án
+
+> **PO duyệt 2026-11-08:** cả năm mục dưới đây theo đề xuất của tài liệu này. Mục 2 và 3 đã thành ADR-034..055 (docs/15); mục 4 ghi ở §9; mục 5 lấy mốc muộn nhất là trước IOS-008 / QA-002, sớm hơn nếu POC-002 cần App Group.
 
 1. Duyệt thứ tự: cổng thiết bị (Giai đoạn 0) trước GRDB, và GRDB sau CON-003/004 (nguyên tắc 1, 3).
 2. Chốt các ADR của PO-002 (docs/19 D2–D9, docs/18 §9). Đề xuất: theo cột "Đề xuất" của từng tài liệu.

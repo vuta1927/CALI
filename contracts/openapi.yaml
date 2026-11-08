@@ -432,7 +432,35 @@ components:
         createdAt: {type: string, format: date-time}
     ExerciseType:
       type: string
-      enum: [static_hold, reps, timed_reps, interval, skill_attempt]
+      description: >-
+        Catalog exercise type; also the prescription kind of PlannedTarget. `distance` and
+        `duration` are running types (CON-004, docs/19 §4.1).
+      enum: [static_hold, reps, timed_reps, interval, skill_attempt, distance, duration]
+    Discipline:
+      type: string
+      description: >-
+        Training discipline (docs/18 §4, docs/19 §4.1). CON-004 adds `running`. Definition only:
+        the `exercise.discipline` field arrives with CON-006.
+      enum: [calisthenics, gym, running]
+    PrimaryDiscipline:
+      type: string
+      description: >-
+        Main discipline of a training plan (CON-003, docs/19 §4.1): a Discipline value or `mixed`.
+        v1 plans default to `calisthenics`.
+      enum: [calisthenics, running, gym, mixed]
+    PlanKind:
+      type: string
+      description: >-
+        CON-003 (ADR-035). `weekly` repeats by weekday; `event` prepares for a dated event and
+        requires `eventDate`.
+      enum: [weekly, event]
+    MeasurementType:
+      type: string
+      description: >-
+        Primary measured quantity of an exercise (docs/18 §4, docs/19 §4.1). CON-004 adds
+        `distance` and `duration`; CON-006 adds `load` together with the `exercise.measurementType`
+        field. Pace is derived from distance and duration and is never stored.
+      enum: [hold, reps, distance, duration]
     ExerciseMedia:
       type: object
       required: [id, kind, contentVersion, mimeType, sha256, license]
@@ -510,6 +538,23 @@ components:
             kind: {const: skill_attempt}
             attempts: {type: integer, minimum: 1, maximum: 100}
           additionalProperties: false
+        - type: object
+          description: >-
+            Running segment by distance (CON-004). Optional `durationSeconds` is the target time;
+            target pace is derived, never stored. One set = one segment; rest uses restSeconds.
+          required: [kind, distanceMeters]
+          properties:
+            kind: {const: distance}
+            distanceMeters: {type: integer, minimum: 1, maximum: 500000}
+            durationSeconds: {type: integer, minimum: 1, maximum: 86400}
+          additionalProperties: false
+        - type: object
+          description: Running segment by time (CON-004).
+          required: [kind, durationSeconds]
+          properties:
+            kind: {const: duration}
+            durationSeconds: {type: integer, minimum: 1, maximum: 86400}
+          additionalProperties: false
     PlannedExercise:
       type: object
       required: [id, exerciseId, orderIndex, setCount, target, restSeconds]
@@ -537,6 +582,10 @@ components:
       properties:
         id: {type: string, format: uuid}
         title: {type: string, minLength: 1, maxLength: 120}
+        kind: {$ref: '#/components/schemas/PlanKind'}
+        eventDate: {type: [string, 'null'], format: date, description: 'Required when kind = event (ADR-035).'}
+        eventName: {type: [string, 'null'], minLength: 1, maxLength: 120}
+        primaryDiscipline: {$ref: '#/components/schemas/PrimaryDiscipline'}
         workouts:
           type: array
           items: {$ref: '#/components/schemas/PlannedWorkout'}
@@ -548,8 +597,40 @@ components:
           properties:
             revision: {type: integer, minimum: 1}
             version: {type: integer, minimum: 1, format: int64}
-            status: {type: string, enum: [active, archived]}
+            status:
+              type: string
+              enum: [current, superseded]
+              description: >-
+                CON-003: revision status (ADR-036, breaking change ADR-056). Exactly one
+                non-deleted `current` revision per lineage. The user-facing plan status (draft,
+                scheduled, active, paused, completed, stopped, archived) is computed from
+                activations, `endedAt` and `archivedAt` (docs/19 §4.2) and is never stored.
             parentPlanId: {type: [string, 'null'], format: uuid}
+            lineageId:
+              type: string
+              format: uuid
+              description: 'Id of the plan across its revisions; the root revision id. Derived by the server from parentPlanId when omitted.'
+            endedAt: {type: [string, 'null'], format: date-time}
+            endReason: {type: [string, 'null'], enum: [completed, stopped, null], description: 'Set together with endedAt.'}
+            endNote: {type: [string, 'null'], maxLength: 500}
+            archivedAt: {type: [string, 'null'], format: date-time, description: 'Archived plans are hidden from lists; independent of endedAt.'}
+    PlanActivation:
+      type: object
+      description: >-
+        CON-003 (docs/19 §4, BR-1). A period during which a plan lineage is followed. Pushed and
+        pulled as sync entity `plan_activation`. I1: activations of one lineage never overlap.
+        I2: on any local date at most `active_plan_limit` (server setting, default 3) lineages
+        whose current revision is neither deleted nor ended have an activation; violations are
+        rejected with MutationError `active_plan_limit`.
+      required: [id, planLineageId, fromDate, timezone, version]
+      properties:
+        id: {type: string, format: uuid}
+        planLineageId: {type: string, format: uuid}
+        fromDate: {type: string, format: date}
+        toDate: {type: [string, 'null'], format: date, description: 'Inclusive; null = open-ended.'}
+        timezone: {type: string, minLength: 1, maxLength: 64, description: 'IANA time zone the local dates refer to.'}
+        endReason: {type: [string, 'null'], enum: [paused, completed, stopped, deleted, null], description: 'Lifecycle command that closed the activation; requires toDate.'}
+        version: {type: integer, minimum: 1, format: int64}
     PlanPage:
       type: object
       required: [items, hasMore]
@@ -561,7 +642,7 @@ components:
         hasMore: {type: boolean}
     SyncEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation]
     SyncMutation:
       type: object
       description: >-
@@ -608,14 +689,19 @@ components:
       properties:
         code:
           type: string
-          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused]
+          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused, active_plan_limit, plan_count_limit]
           description: >-
             dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
             version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
             validation_failed (status rejected) - schema or business rule violation (ADR-020);
             forbidden_entity (status rejected) - entityType not writable by devices;
             cross_user_reference (status rejected) - references an entity owned by another user;
-            mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031).
+            mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031);
+            active_plan_limit (status rejected) - a plan_activation would make more than the server limit
+            (default 3) plans followed on one local date (docs/19 I2, BR-2; mutations are applied in
+            receive order, the later one is rejected, never retried);
+            plan_count_limit (status rejected) - a training_plan would exceed the server limit (default 50)
+            of non-deleted plans (ADR-041, BR-8).
         message: {type: string}
         retryable: {type: boolean}
         details: {type: object, additionalProperties: true}
@@ -628,7 +714,7 @@ components:
           items: {$ref: '#/components/schemas/SyncMutationResult'}
     ChangeEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, ai_analysis, ai_recommendation]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, ai_analysis, ai_recommendation]
     SyncChange:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
@@ -654,6 +740,7 @@ components:
             exercise_execution: entity-payloads.schema.json#/$defs/exercise_execution_payload
             set_result: entity-payloads.schema.json#/$defs/set_result_payload
             workout_note: entity-payloads.schema.json#/$defs/workout_note_payload
+            plan_activation: entity-payloads.schema.json#/$defs/plan_activation_payload
             ai_analysis: 'components/schemas/Analysis'
             ai_recommendation: 'components/schemas/AnalysisRecommendation'
             delete: entity-payloads.schema.json#/$defs/delete_payload

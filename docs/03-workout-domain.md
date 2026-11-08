@@ -9,13 +9,22 @@
 - **Coaching**: deterministic stats + AI suggestions requiring approval.
 
 ## 2. Domain objects
-- `TrainingPlan(id, title, revision, startDate, weeks, status)`.
+- `TrainingPlan(id, lineageId, title, revision, parentPlanId?, status, kind, eventDate?, eventName?, primaryDiscipline, endedAt?, endReason?, endNote?, archivedAt?, startDate, weeks)`. Từ CON-003 `status` là trạng thái **phiên bản** (`current|superseded`); `lineageId` gom các phiên bản của cùng một giáo án (§2.2).
+- `PlanActivation(id, planLineageId, fromDate, toDate?, timezone, endReason?, version)` (CON-003): một khoảng ngày người dùng theo giáo án.
 - `PlannedWorkout(id, planId, weekday, ordering, exercises[])`.
-- `PlannedExercise(id, exerciseId, order, setCount, target{holdSeconds?|repMin?|repMax?|timeSeconds?}, restSeconds, cuesSnapshot)`.
+- `PlannedExercise(id, exerciseId, order, setCount, target{holdSeconds?|repMin?|repMax?|timeSeconds?|distanceMeters?|durationSeconds?}, restSeconds, cuesSnapshot)`.
 - `WorkoutSession(id, planRevisionId?, plannedWorkoutId?, localDay, startedAtUtc, finishedAtUtc?, status, currentExecutionId?, phase, phaseDeadlineUtc?, revision)`. The final confirmed set leads to `REVIEWING_SUMMARY` while `status=active`; only explicit FinishSession sets completed status.
 - `ExerciseExecution(id, sessionId, plannedExerciseId?, exerciseCatalogId, sequence, setCount)`.
-- `SetResult(id, executionId, setIndex, prescribedSnapshot, actualReps?, actualHoldMs?, actualWorkMs?, actualRestMs?, rpe?, status, confirmedAtUtc, revision)`.
+- `SetResult(id, executionId, setIndex, prescribedSnapshot, actualReps?, actualHoldMs?, actualWorkMs?, actualRestMs?, distanceMeters?, durationSeconds?, source, rpe?, status, confirmedAtUtc, revision)`. `distanceMeters`, `durationSeconds`, `source` thêm ở CON-004 (§3.1).
 - `WorkoutNote(id, sessionId, text, createdAt, revision)`.
+
+### 2.2 Giáo án: lineage, phiên bản và activation (CON-003, docs/19 §4)
+- **Lineage** = một giáo án người dùng thấy (ADR-036). Mỗi lần Lưu hoặc áp dụng đề xuất AI tạo một **phiên bản** mới (`parentPlanId`, `revision+1`) cùng `lineageId`; phiên bản gốc có `lineageId = id`. Mỗi lineage có đúng một phiên bản chưa xoá ở trạng thái `current`, các bản cũ là `superseded`.
+- **Trạng thái người dùng thấy là giá trị tính ra, không lưu** (docs/19 §4.2): nháp, đã lên lịch, đang theo, tạm dừng, đã hoàn thành, đã dừng, lưu trữ được suy từ activation, `endedAt`/`endReason` và `archivedAt` của phiên bản hiện hành. `kind=event` bắt buộc có `eventDate` (ADR-035); `primaryDiscipline` ∈ `calisthenics|running|gym|mixed`; `endNote` ≤ 500 ký tự (docs/19 §4.3).
+- **Activation** gắn với lineage, không gắn với phiên bản, nên sửa giáo án không ngắt khoảng đang theo. Ngày là ngày địa phương kèm `timezone` (BR-1); `toDate` tính cả ngày đó, `null` = chưa kết thúc. Lệnh tạm dừng, hoàn thành, dừng, xoá đóng activation đang mở bằng `toDate` + `endReason` (`paused|completed|stopped|deleted`); tiếp tục mở activation mới. Lưu trữ không đóng activation.
+- **I1**: các activation của một lineage không chồng lấn. **I2**: mỗi ngày có tối đa `active_plan_limit` (mặc định 3, cài đặt phía server) lineage được theo; chỉ tính lineage có phiên bản hiện hành chưa xoá và chưa kết thúc. Vi phạm bị từ chối với `active_plan_limit` (BR-2), không bao giờ tự sửa ngày.
+- **Ràng buộc khi tạo** (ADR-041): `fromDate` không ở quá khứ so với ngày địa phương của `clientChangedAt` theo `timezone` (cho phép hôm nay); tối đa `plan_count_limit` (mặc định 50) phiên bản giáo án chưa xoá mỗi người dùng (BR-8, mã `plan_count_limit`). Xoá là xoá mềm (ADR-040) và không bao giờ xoá buổi tập đã ghi (I3).
+- Logic chuyển trạng thái trong CaliDomain thuộc IOS-011; slice này chỉ có contract, SQL và vector.
 
 **MVP scope (ADR-017).** These fields above are *post-MVP* and are **not** in the MVP contracts: `TrainingPlan.startDate/weeks`, `WorkoutSession.planRevisionId/revision`, `WorkoutNote.revision`, `PlannedExercise.cuesSnapshot`. `ExerciseExecution.setCount` is carried as `prescribedSnapshot.setCount` (ADR-018). The MVP adds these journal fields: `SetResult.skipReason` (≤500), `SetResult.painReported` (subjective pain flag, default false) and `SetResult.note` (≤1000). It adds these pause/abandon fields: `WorkoutSession.pausedAt`, `accumulatedExerciseMs` and `abandonReason` (≤500). `finishedAt` is set for both completed and abandoned sessions.
 
@@ -43,8 +52,19 @@ This section describes the conceptual model. **Wire names are canonical**: OpenA
 | TIMED_REPS | timeSeconds >0 | actualReps >=0, actualWorkMs >=0 | manual count |
 | INTERVAL | workSeconds ≥1, restSeconds ≥1 (ADR-019; zero-rest work = TIMED_REPS) | actualWorkMs and optional reps | no auto success |
 | SKILL_ATTEMPT | number of attempts | success/fail + optional hold | quality subjective |
+| DISTANCE (CON-004) | distanceMeters 1..500000, durationSeconds 1..86400 tuỳ chọn (thời gian mục tiêu) | completed: distanceMeters >0 **và** durationSeconds >0 | pace chỉ tính ra, không lưu |
+| DURATION (CON-004) | durationSeconds 1..86400 | completed: durationSeconds >0; distanceMeters tuỳ chọn | nhập tay (`source=manual`) |
 
 `target.kind` must equal the catalog exercise type. JSON Schema cannot express this check or `repMin ≤ repMax`, so the backend and CaliDomain enforce both. Shared test vectors live in `fixtures/validation/business_rules.json` (ADR-020).
+
+### 3.1 Chạy bộ (CON-004, docs/19 §4.1)
+- Môn `running` dùng hai loại bài mới `distance` và `duration`. Cùng một tập giá trị phải có ở `ExerciseType` (OpenAPI), `$defs.target` (entity schema) và `item.type` (catalog bundle); `tools/validate_handoff.py` và `PayloadContractTests` kiểm tra ba nơi không lệch nhau. `Discipline` (`calisthenics|gym|running`) và `MeasurementType` (`hold|reps|distance|duration`) mới được định nghĩa trong OpenAPI; trường dùng chúng ở giáo án và bài tập do CON-006 thêm.
+- **Một set = một chặng.** Ví dụ chạy biến tốc 3 × 5 phút, nghỉ 2 phút: `setCount=3`, `target={kind:duration, durationSeconds:300}`, `restSeconds=120`. Nghỉ giữa chặng vẫn dùng `restSeconds`, không có loại mục tiêu riêng.
+- Kết quả lưu `distanceMeters` (số nguyên, mét) và `durationSeconds` (số nguyên, giây). UI hiển thị km với 2 chữ số thập phân và pace phút/km (ADR-055); thời gian dạng h:mm:ss, quá 24 giờ (86400 s) bị từ chối (IOS-014).
+- **Pace luôn là giá trị tính ra** = `durationSeconds / (distanceMeters / 1000)`, không bao giờ nằm trong payload hay cột SQL. Payload có trường pace bị từ chối vì object đóng (ADR-030); vector ở `fixtures/validation/schema_rejections.json`.
+- `source` chỉ nhận `manual`. `healthkit` được giữ chỗ cho slice Apple Health sau pilot (ADR-043) và hiện bị từ chối ở cả JSON Schema lẫn CHECK SQL. Trường này không bắt buộc trên wire nên payload v1 vẫn hợp lệ; server ghi mặc định `manual`.
+- Quy tắc chéo trường (backend + CaliDomain, ADR-020; vector ở `fixtures/validation/business_rules.json`): `distanceMeters`/`durationSeconds` chỉ được có khi `prescribedSnapshot.target.kind` là `distance` hoặc `duration`; set `completed` loại distance cần cả hai giá trị >0 để tính được pace; set `completed` loại duration cần `durationSeconds` >0.
+- Logic CaliDomain cho các loại này thuộc IOS-011, không nằm trong slice contract này.
 
 Superset design can reuse grouped planned exercises later; MVP executes linear sequence.
 

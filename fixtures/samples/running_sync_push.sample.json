@@ -1,0 +1,67 @@
+{
+  "_comment": "SAMPLE ONLY (CON-004) - not production data. A running plan entry (distance target with optional target time, plus a timed segment x3) and one manual result. Pace (1750 s / 5 km = 5:50/km) is derived by the client and never sent. Ids are illustrative; parents must be synced before children.",
+  "deviceId": "d0000000-0000-4000-8000-000000000001",
+  "mutations": [
+    {
+      "mutationId": "d1000000-0000-4000-8000-000000000001",
+      "entityType": "planned_exercise",
+      "entityId": "d2000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-07T09:00:00Z",
+      "payload": {
+        "id": "d2000000-0000-4000-8000-000000000001",
+        "plannedWorkoutId": "d3000000-0000-4000-8000-000000000001",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
+        "orderIndex": 0,
+        "setCount": 1,
+        "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+        "restSeconds": 0
+      }
+    },
+    {
+      "mutationId": "d1000000-0000-4000-8000-000000000002",
+      "entityType": "planned_exercise",
+      "entityId": "d2000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-07T09:00:00Z",
+      "payload": {
+        "id": "d2000000-0000-4000-8000-000000000002",
+        "plannedWorkoutId": "d3000000-0000-4000-8000-000000000001",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8",
+        "orderIndex": 1,
+        "setCount": 3,
+        "target": {"kind": "duration", "durationSeconds": 300},
+        "restSeconds": 120
+      }
+    },
+    {
+      "mutationId": "d1000000-0000-4000-8000-000000000003",
+      "entityType": "set_result",
+      "entityId": "d4000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-07T10:30:00Z",
+      "payload": {
+        "id": "d4000000-0000-4000-8000-000000000001",
+        "executionId": "d5000000-0000-4000-8000-000000000001",
+        "setIndex": 1,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+          "setCount": 1,
+          "restSeconds": 0,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
+          "plannedExerciseId": "d2000000-0000-4000-8000-000000000001"
+        },
+        "distanceMeters": 5000,
+        "durationSeconds": 1750,
+        "source": "manual",
+        "rpe": 6,
+        "confirmedAt": "2026-11-07T10:30:00Z"
+      }
+    }
+  ]
+}

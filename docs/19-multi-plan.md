@@ -1,6 +1,7 @@
 # 19. Nhiều giáo án (Multi-plan): phân tích yêu cầu và đặc tả
 
 > **Trạng thái:** Đề xuất của BA, PO đã chốt các quyết định chính ở §3; mockup đã dựng (§7). D2–D9 và các câu hỏi §11.1–11.3 **đã chốt** bằng ADR-034..044 (Accepted 2026-11-08, PO-002) trong [docs/15](15-decisions-risks.md); §11.4–11.6 **đã chốt** bằng ADR-053..055. Chỉ có tài liệu: chưa đổi OpenAPI, SQL, payload sync hay code (AGENTS rule 7, xem §10).
+> **Contract CON-003 (2026-11-08):** đã review (PO duyệt ADR-056 ngày 2026-11-08): `db/004_plan_lineage_activation.sql`, `plan_activation` và trường giáo án mới trong OpenAPI và entity schema, mã lỗi `active_plan_limit`/`plan_count_limit`, vector và mẫu đồng bộ (docs/03 §2.2, docs/07, docs/08). Thay đổi `status` là ADR-056. Logic CaliDomain thuộc IOS-011.
 > **Yêu cầu gốc (2026-11-08):** "Cho phép tạo nhiều giáo án", PO làm rõ bằng ví dụ: **giáo án tập Calisthenics, giáo án chạy giải, giáo án tập Gym**. Người dùng theo **song song** nhiều giáo án, mỗi giáo án phục vụ một mục đích riêng. Lịch sử **giữ nguyên là tab riêng** (đã chốt cùng ngày, docs/02 §3.1).
 > **Liên quan:** [docs/18](18-plan-module.md) (mục tiêu, lộ trình, tiến bộ, đa môn §4), [docs/02 §3.1](02-ux-spec.md) (Lịch sử), [docs/07 §4](07-data-model.md) (chính sách phiên bản giáo án), [docs/08](08-sync-protocol.md) (xung đột).
 
@@ -56,7 +57,7 @@
 Plan (giáo án người dùng thấy)
  ├─ kind: weekly | event        eventDate? (khi kind = event)      primaryDiscipline
  ├─ 1..n PlanRevision     (phiên bản; mới nhất = hiện hành)   → PlannedWorkout → PlannedExercise, Phase[]
- ├─ 0..n PlanActivation   { id, planId, fromDate, toDate?, timezone, endReason? }   (khoảng thời gian được theo)
+ ├─ 0..n PlanActivation   { id, planId, fromDate, toDate?, timezone, endReason? (paused | completed | stopped | deleted) }   (khoảng thời gian được theo)
  ├─ 0..n Goal             (docs/18 §6.1, gắn với Plan, không nhân theo phiên bản)
  └─ endedAt?, endReason? (completed | stopped), archivedAt?, deletedAt?
 WorkoutSession → plannedWorkoutId → PlanRevision → Plan
@@ -140,7 +141,7 @@ Tính từ `PlanActivation`, `endedAt`, `archivedAt`, `deletedAt`, để hai thi
 | BR-7 | Trùng tên giáo án | Cho phép. Phân biệt bằng môn, trạng thái, khoảng ngày. |
 | BR-8 | Vượt 50 giáo án | Chặn tạo mới, gợi ý xoá bớt giáo án cũ. |
 | BR-9 | Sửa giáo án đang theo | Như hiện nay: sửa trên bản nháp rồi Lưu. Buổi đã ghi không đổi (I3). |
-| BR-10 | Migrate dữ liệu hiện có | Giáo án duy nhất hiện có → *Đang theo*, `kind = weekly`, `primaryDiscipline` suy từ bài (một môn → môn đó, nhiều môn → `mixed`), `fromDate` = ngày buổi tập đầu tiên hoặc ngày tạo. Đã đánh dấu xoá → đã xoá. Các phiên bản AI tạo gộp chung một giáo án theo chuỗi `parent_plan_id`. |
+| BR-10 | Migrate dữ liệu hiện có | Giáo án duy nhất hiện có → *Đang theo* (nếu dữ liệu có nhiều giáo án `active`: bật tối đa giới hạn D1, ưu tiên cập nhật gần nhất, số còn lại thành *Nháp*; PO duyệt 2026-11-08), `kind = weekly`, `primaryDiscipline` suy từ bài (một môn → môn đó, nhiều môn → `mixed`), `fromDate` = ngày buổi tập đầu tiên hoặc ngày tạo. Đã đánh dấu xoá → đã xoá. Các phiên bản AI tạo gộp chung một giáo án theo chuỗi `parent_plan_id`. |
 
 ## 7. Khung UX (đã dựng trong mockup `docs/design/mockups/plan-module.html`, mục "Nhiều giáo án")
 - **Hôm nay:** danh sách buổi của mọi giáo án, chip giáo án trên mỗi thẻ, dòng đếm ngược ngày thi, lối vào Tuần của tôi.

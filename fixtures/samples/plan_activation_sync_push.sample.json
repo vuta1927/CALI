@@ -1,0 +1,91 @@
+{
+  "_comment": "SAMPLE ONLY (CON-003) - not production data. One weekly calisthenics plan and one running event plan, each started with a plan_activation, then the weekly plan is paused by closing its activation (toDate + endReason). The user-facing status (active/paused/...) is computed by the client from these rows and never sent. Ids are illustrative; a plan must be synced before its activations.",
+  "deviceId": "d0000000-0000-4000-8000-000000000003",
+  "mutations": [
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000001",
+      "entityType": "training_plan",
+      "entityId": "e2000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "e2000000-0000-4000-8000-000000000001",
+        "title": "Mẫu: Kéo / Đẩy / Chân",
+        "revision": 1,
+        "status": "current",
+        "parentPlanId": null,
+        "lineageId": "e2000000-0000-4000-8000-000000000001",
+        "kind": "weekly",
+        "primaryDiscipline": "calisthenics"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000002",
+      "entityType": "plan_activation",
+      "entityId": "e3000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "e3000000-0000-4000-8000-000000000001",
+        "planLineageId": "e2000000-0000-4000-8000-000000000001",
+        "fromDate": "2026-11-09",
+        "toDate": null,
+        "timezone": "Asia/Ho_Chi_Minh",
+        "endReason": null
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000003",
+      "entityType": "training_plan",
+      "entityId": "e2000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "e2000000-0000-4000-8000-000000000002",
+        "title": "Mẫu: Chuẩn bị chạy 10K",
+        "revision": 1,
+        "status": "current",
+        "parentPlanId": null,
+        "lineageId": "e2000000-0000-4000-8000-000000000002",
+        "kind": "event",
+        "eventDate": "2026-12-20",
+        "eventName": "Giải chạy 10K (mẫu)",
+        "primaryDiscipline": "running"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000004",
+      "entityType": "plan_activation",
+      "entityId": "e3000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:00:00Z",
+      "payload": {
+        "id": "e3000000-0000-4000-8000-000000000002",
+        "planLineageId": "e2000000-0000-4000-8000-000000000002",
+        "fromDate": "2026-11-09",
+        "toDate": "2026-12-20",
+        "timezone": "Asia/Ho_Chi_Minh"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000005",
+      "entityType": "plan_activation",
+      "entityId": "e3000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 1,
+      "clientChangedAt": "2026-11-15T20:00:00Z",
+      "payload": {
+        "id": "e3000000-0000-4000-8000-000000000001",
+        "planLineageId": "e2000000-0000-4000-8000-000000000001",
+        "fromDate": "2026-11-09",
+        "toDate": "2026-11-15",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "endReason": "paused"
+      }
+    }
+  ]
+}

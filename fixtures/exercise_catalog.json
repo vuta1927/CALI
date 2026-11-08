@@ -7,7 +7,9 @@
     {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3","slug":"dips","name":"Dips","type":"reps","equipment":["parallel bars"],"cues":["Kiểm soát vai","Không đẩy qua đau khớp"],"media":{"poster":"assets/placeholder/dips.webp","preview":"assets/placeholder/dips.mp4"}},
     {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4","slug":"l-sit","name":"L-sit Hold","type":"static_hold","equipment":["floor or parallettes"],"cues":["Đẩy vai xuống","Giữ gối duỗi theo khả năng"],"media":{"poster":"assets/placeholder/l-sit.webp","preview":"assets/placeholder/l-sit.mp4"}},
     {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5","slug":"squat","name":"Bodyweight Squat","type":"reps","equipment":[],"cues":["Giữ gót chân ổn định","Kiểm soát xuống và lên"],"media":{"poster":"assets/placeholder/squat.webp","preview":"assets/placeholder/squat.mp4"}},
-    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6","slug":"ring-support","name":"Ring Support Hold","type":"static_hold","equipment":["gymnastic rings"],"cues":["Ổn định vai","Dừng nếu đau khớp"],"media":{"poster":"assets/placeholder/ring-support.webp","preview":"assets/placeholder/ring-support.mp4"}}
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6","slug":"ring-support","name":"Ring Support Hold","type":"static_hold","equipment":["gymnastic rings"],"cues":["Ổn định vai","Dừng nếu đau khớp"],"media":{"poster":"assets/placeholder/ring-support.webp","preview":"assets/placeholder/ring-support.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7","slug":"easy-run","name":"Chạy nhẹ","type":"distance","equipment":[],"cues":["Giữ nhịp thở đều","Bước ngắn, tiếp đất nhẹ"],"media":{"poster":"assets/placeholder/easy-run.webp","preview":"assets/placeholder/easy-run.mp4"}},
+    {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8","slug":"timed-run","name":"Chạy theo thời gian","type":"duration","equipment":[],"cues":["Chạy ở mức nói chuyện được","Thả lỏng vai"],"media":{"poster":"assets/placeholder/timed-run.webp","preview":"assets/placeholder/timed-run.mp4"}}
   ],
   "_warning": "Paths are intended placeholders only. No media files are bundled in this handoff package. Licensed exercise-correct images/video must be supplied before release."
 }

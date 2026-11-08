@@ -44,6 +44,195 @@
           "restSeconds": 120
         }
       }
+    },
+    {
+      "name": "running_exercise_with_non_running_target",
+      "rule": "target.kind == exercise_catalog.exercise_type (Easy run is distance, not reps)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "target.kind"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000003",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000003",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000003",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
+          "orderIndex": 2,
+          "setCount": 1,
+          "target": {"kind": "reps", "repMin": 5, "repMax": 8},
+          "restSeconds": 0
+        }
+      }
+    },
+    {
+      "name": "running_fields_on_non_running_set",
+      "rule": "distanceMeters/durationSeconds are only allowed when prescribedSnapshot.target.kind is distance or duration (CON-004)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "distanceMeters"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000004",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000004",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000004",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "static_hold", "holdSeconds": 12},
+            "setCount": 4,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualHoldMs": 12000,
+          "distanceMeters": 400
+        }
+      }
+    },
+    {
+      "name": "completed_distance_set_without_distance",
+      "rule": "a completed set with target.kind distance needs distanceMeters > 0 and durationSeconds > 0 so pace can be derived (docs/19 §4.1)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "distanceMeters"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000005",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000005",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000005",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "durationSeconds": 1750
+        }
+      }
+    },
+    {
+      "name": "completed_duration_set_without_duration",
+      "rule": "a completed set with target.kind duration needs durationSeconds > 0 (distanceMeters optional)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "durationSeconds"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000006",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000006",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000006",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "duration", "durationSeconds": 1200},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "durationSeconds": 0
+        }
+      }
+    },
+    {
+      "name": "activation_from_date_in_the_past",
+      "rule": "plan_activation.fromDate >= local date of clientChangedAt in payload.timezone for a new activation (docs/19 BR-1: no backdated start; 2026-11-07 in Asia/Ho_Chi_Minh)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "fromDate"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000012",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000012",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000012",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "fromDate": "2026-11-01",
+          "timezone": "Asia/Ho_Chi_Minh"
+        }
+      }
+    },
+    {
+      "name": "activation_to_date_before_from_date",
+      "rule": "plan_activation.toDate >= fromDate (toDate inclusive; SQL ck_plan_activations_dates)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "toDate"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000013",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000013",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000013",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "fromDate": "2026-11-10",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "toDate": "2026-11-09",
+          "endReason": "paused"
+        }
+      }
+    },
+    {
+      "name": "activation_exceeds_active_plan_limit",
+      "rule": "docs/19 I2: at most active_plan_limit (server setting, default 3) lineages followed on any local date; the later mutation is rejected, never retried",
+      "given": "three other lineages of the same user, each with a non-deleted, non-ended current revision and an open-ended activation from 2026-11-08",
+      "expect": {"status": "rejected", "code": "active_plan_limit", "field": "fromDate"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000014",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000014",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000014",
+          "planLineageId": "c7000000-0000-4000-8000-000000000004",
+          "fromDate": "2026-11-10",
+          "timezone": "Asia/Ho_Chi_Minh"
+        }
+      }
+    },
+    {
+      "name": "plan_count_limit_exceeded",
+      "rule": "ADR-041 / BR-8: at most plan_count_limit (server setting, default 50) non-deleted training_plan rows per user; a new revision of an existing lineage counts too",
+      "given": "the user already has 50 non-deleted training_plan rows",
+      "expect": {"status": "rejected", "code": "plan_count_limit", "field": null},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000015",
+        "entityType": "training_plan",
+        "entityId": "c7000000-0000-4000-8000-000000000015",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c7000000-0000-4000-8000-000000000015",
+          "title": "Giáo án thứ 51",
+          "revision": 1,
+          "status": "current",
+          "kind": "weekly",
+          "primaryDiscipline": "calisthenics"
+        }
+      }
     }
   ]
 }

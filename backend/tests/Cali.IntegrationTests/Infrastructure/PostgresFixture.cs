@@ -49,6 +49,35 @@ public sealed class PostgresFixture : IAsyncLifetime
         result.Successful.ShouldBeTrue(result.Error?.ToString());
         return connectionString;
     }
+
+    /// <summary>
+    /// Blank database migrated only up to and including <paramref name="lastScript"/>,
+    /// so a test can seed data in an older schema and then run the full upgrade path.
+    /// </summary>
+    public async Task<string> CreateDatabaseMigratedUpToAsync(string prefix, string lastScript, bool includeDevelopmentScripts = false)
+    {
+        var connectionString = await CreateBlankDatabaseAsync(prefix);
+        var staged = Directory.CreateTempSubdirectory("cali-db-staged-");
+        try
+        {
+            foreach (var script in Directory.GetFiles(RepoPaths.DbDirectory, "*.sql")
+                         .Where(path => string.CompareOrdinal(Path.GetFileName(path), lastScript) <= 0))
+            {
+                File.Copy(script, Path.Combine(staged.FullName, Path.GetFileName(script)));
+            }
+
+            var result = new DatabaseMigrator(NullLogger<DatabaseMigrator>.Instance)
+                .Run(connectionString, staged.FullName, includeDevelopmentScripts);
+            result.Successful.ShouldBeTrue(result.Error?.ToString());
+            result.AppliedScripts.ShouldContain(lastScript);
+        }
+        finally
+        {
+            staged.Delete(recursive: true);
+        }
+
+        return connectionString;
+    }
 }
 
 [CollectionDefinition(Name)]
