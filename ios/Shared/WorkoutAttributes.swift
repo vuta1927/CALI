@@ -10,6 +10,12 @@ import Foundation
 /// `ContentState` is a small display snapshot only (docs/05 §2). It is never the source
 /// of truth for workout state: the app's durable session state is.
 struct WorkoutAttributes: ActivityAttributes, Sendable {
+    /// `true` only for activities started by the POC-001/002 device-gate screen. The widget shows the
+    /// Lock Screen buttons (`POCLiveActivityIntent`) for these activities only, so the normal workout
+    /// Live Activity stays read-only. Optional so existing activities decode unchanged.
+    /// TODO(IOS-001): remove once the GO decision moves Live Activity buttons to the real workout.
+    var deviceGatePOC: Bool? = nil
+
     struct ContentState: Codable, Hashable, Sendable {
         var sessionId: UUID
         var exerciseShortName: String

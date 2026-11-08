@@ -99,7 +99,7 @@ final class LiveActivityController {
 
     private nonisolated static func upsert(_ content: WorkoutAttributes.ContentState) async {
         let activityContent = ActivityContent(state: content, staleDate: nil)
-        let existing = Activity<WorkoutAttributes>.activities
+        let existing = workoutActivities
         if existing.isEmpty {
             guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
             _ = try? Activity<WorkoutAttributes>.request(
@@ -123,10 +123,16 @@ final class LiveActivityController {
     }
 
     private nonisolated static func endAll(final content: WorkoutAttributes.ContentState? = nil) async {
-        for activity in Activity<WorkoutAttributes>.activities {
+        for activity in workoutActivities {
             let finalContent = content.map { ActivityContent(state: $0, staleDate: nil) }
             await activity.end(finalContent, dismissalPolicy: content == nil ? .immediate : .after(.now.addingTimeInterval(15 * 60)))
         }
+    }
+
+    /// Activities of the normal workout; the POC device-gate activity (`WorkoutAttributes/deviceGatePOC`)
+    /// is owned by `POCSideEffects` and never ended or updated from here.
+    private nonisolated static var workoutActivities: [Activity<WorkoutAttributes>] {
+        Activity<WorkoutAttributes>.activities.filter { $0.attributes.deviceGatePOC != true }
     }
 
     /// Display snapshot for a session state; `nil` when there is nothing to show.
