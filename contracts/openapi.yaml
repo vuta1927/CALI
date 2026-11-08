@@ -434,13 +434,14 @@ components:
       type: string
       description: >-
         Catalog exercise type; also the prescription kind of PlannedTarget. `distance` and
-        `duration` are running types (CON-004, docs/19 §4.1).
-      enum: [static_hold, reps, timed_reps, interval, skill_attempt, distance, duration]
+        `duration` are running types (CON-004, docs/19 §4.1). CON-006 adds `load` (weight x reps,
+        ADR-062).
+      enum: [static_hold, reps, timed_reps, interval, skill_attempt, distance, duration, load]
     Discipline:
       type: string
       description: >-
-        Training discipline (docs/18 §4, docs/19 §4.1). CON-004 adds `running`. Definition only:
-        the `exercise.discipline` field arrives with CON-006.
+        Training discipline (docs/18 §4, docs/19 §4.1). CON-004 adds `running`. Used by
+        `Exercise.discipline` (CON-006, ADR-061); `mixed` exists only for plans (PrimaryDiscipline).
       enum: [calisthenics, gym, running]
     PrimaryDiscipline:
       type: string
@@ -459,8 +460,11 @@ components:
       description: >-
         Primary measured quantity of an exercise (docs/18 §4, docs/19 §4.1). CON-004 adds
         `distance` and `duration`; CON-006 adds `load` together with the `exercise.measurementType`
-        field. Pace is derived from distance and duration and is never stored.
-      enum: [hold, reps, distance, duration]
+        field. Pace is derived from distance and duration and is never stored. CON-006 (ADR-060):
+        derived from ExerciseType, never stored or chosen separately: static_hold->hold,
+        reps/timed_reps/skill_attempt->reps, interval/duration->duration, distance->distance,
+        load->load.
+      enum: [hold, reps, load, distance, duration]
     ExerciseMedia:
       type: object
       required: [id, kind, contentVersion, mimeType, sha256, license]
@@ -479,12 +483,24 @@ components:
         attribution: {type: [string, 'null']}
     Exercise:
       type: object
-      required: [id, slug, name, type, equipment, cues, catalogVersion, media]
+      required: [id, slug, name, type, discipline, measurementType, equipment, cues, catalogVersion, media]
       properties:
         id: {type: string, format: uuid}
         slug: {type: string, example: tuck-planche}
         name: {type: string}
         type: {$ref: '#/components/schemas/ExerciseType'}
+        # CON-006 (ADR-060, ADR-061): discipline, derived measurementType and focus tags.
+        discipline: {$ref: '#/components/schemas/Discipline'}
+        measurementType:
+          allOf: [{$ref: '#/components/schemas/MeasurementType'}]
+          readOnly: true
+          description: Derived from `type` by the server (ADR-060); not stored.
+        focusTags:
+          type: array
+          description: Free slugs such as `push` or `core` (ADR-061). Empty when none.
+          maxItems: 10
+          uniqueItems: true
+          items: {type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 40}
         equipment:
           type: array
           items: {type: string}
@@ -554,6 +570,16 @@ components:
           properties:
             kind: {const: duration}
             durationSeconds: {type: integer, minimum: 1, maximum: 86400}
+          additionalProperties: false
+        - type: object
+          description: >-
+            Weight x reps (CON-006, ADR-062). One `loadKg` per set, kilograms only (ADR-046), at most
+            2 decimals (server rule, ADR-020). Volume (reps x kg) is derived, never stored.
+          required: [kind, reps, loadKg]
+          properties:
+            kind: {const: load}
+            reps: {type: integer, minimum: 1, maximum: 500}
+            loadKg: {type: number, minimum: 0, maximum: 1000}
           additionalProperties: false
     PlannedExercise:
       type: object

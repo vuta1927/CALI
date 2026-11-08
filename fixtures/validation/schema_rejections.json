@@ -1,5 +1,5 @@
 {
-  "_comment": "CON-004/CON-003: mutations that MUST fail contracts/entity-payloads.schema.json itself (validation_failed at schema level, ADR-020). tools/validate_handoff.py asserts each one is schema-INVALID, so a later schema change cannot silently start accepting them. Exercise ids refer to fixtures/exercise_catalog.json.",
+  "_comment": "CON-004/CON-003/CON-006: mutations that MUST fail contracts/entity-payloads.schema.json itself (validation_failed at schema level, ADR-020). tools/validate_handoff.py asserts each one is schema-INVALID, so a later schema change cannot silently start accepting them. Exercise ids refer to fixtures/exercise_catalog.json.",
   "cases": [
     {
       "name": "source_healthkit_not_accepted_yet",
@@ -228,6 +228,126 @@
           "fromDate": "2026-11-10",
           "timezone": "Asia/Ho_Chi_Minh",
           "isActive": true
+        }
+      }
+    },
+    {
+      "name": "load_negative_actual",
+      "reason": "CON-006 / ADR-062: actualLoadKg >= 0 (0 kg is allowed, negative never)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000025",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000025",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000025",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5,
+          "actualLoadKg": -2.5
+        }
+      }
+    },
+    {
+      "name": "load_target_without_load_kg",
+      "reason": "CON-006 / ADR-062: a load prescription needs reps and loadKg",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000026",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000026",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000026",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 5},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "load_target_over_1000_kg",
+      "reason": "CON-006 / ADR-062: loadKg <= 1000",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000027",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000027",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000027",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 5, "loadKg": 1000.5},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "load_target_zero_reps",
+      "reason": "CON-006 / ADR-062: load reps are 1..500",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000028",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000028",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000028",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 0, "loadKg": 60},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "set_result_with_volume_field",
+      "reason": "CON-006 / ADR-062 + ADR-030: volume (reps x kg) is derived, never sent or stored",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000029",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000029",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000029",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5,
+          "actualLoadKg": 60,
+          "volumeKg": 300
         }
       }
     }

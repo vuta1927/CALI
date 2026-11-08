@@ -12,10 +12,10 @@
 - `TrainingPlan(id, lineageId, title, revision, parentPlanId?, status, kind, eventDate?, eventName?, primaryDiscipline, endedAt?, endReason?, endNote?, archivedAt?, startDate, weeks)`. Từ CON-003 `status` là trạng thái **phiên bản** (`current|superseded`); `lineageId` gom các phiên bản của cùng một giáo án (§2.2).
 - `PlanActivation(id, planLineageId, fromDate, toDate?, timezone, endReason?, version)` (CON-003): một khoảng ngày người dùng theo giáo án.
 - `PlannedWorkout(id, planId, weekday, ordering, exercises[])`.
-- `PlannedExercise(id, exerciseId, order, setCount, target{holdSeconds?|repMin?|repMax?|timeSeconds?|distanceMeters?|durationSeconds?}, restSeconds, cuesSnapshot)`.
+- `PlannedExercise(id, exerciseId, order, setCount, target{holdSeconds?|repMin?|repMax?|timeSeconds?|distanceMeters?|durationSeconds?|reps?|loadKg?}, restSeconds, cuesSnapshot)`. `reps`/`loadKg` (target `load`) thêm ở CON-006 (§3.2).
 - `WorkoutSession(id, planRevisionId?, plannedWorkoutId?, localDay, startedAtUtc, finishedAtUtc?, status, currentExecutionId?, phase, phaseDeadlineUtc?, revision)`. The final confirmed set leads to `REVIEWING_SUMMARY` while `status=active`; only explicit FinishSession sets completed status.
 - `ExerciseExecution(id, sessionId, plannedExerciseId?, exerciseCatalogId, sequence, setCount)`.
-- `SetResult(id, executionId, setIndex, prescribedSnapshot, actualReps?, actualHoldMs?, actualWorkMs?, actualRestMs?, distanceMeters?, durationSeconds?, source, rpe?, status, confirmedAtUtc, revision)`. `distanceMeters`, `durationSeconds`, `source` thêm ở CON-004 (§3.1).
+- `SetResult(id, executionId, setIndex, prescribedSnapshot, actualReps?, actualHoldMs?, actualWorkMs?, actualRestMs?, distanceMeters?, durationSeconds?, source, actualLoadKg?, rpe?, status, confirmedAtUtc, revision)`. `distanceMeters`, `durationSeconds`, `source` thêm ở CON-004 (§3.1); `actualLoadKg` thêm ở CON-006 (§3.2).
 - `WorkoutNote(id, sessionId, text, createdAt, revision)`.
 
 ### 2.2 Giáo án: lineage, phiên bản và activation (CON-003, docs/19 §4)
@@ -54,6 +54,7 @@ This section describes the conceptual model. **Wire names are canonical**: OpenA
 | SKILL_ATTEMPT | number of attempts | success/fail + optional hold | quality subjective |
 | DISTANCE (CON-004) | distanceMeters 1..500000, durationSeconds 1..86400 tuỳ chọn (thời gian mục tiêu) | completed: distanceMeters >0 **và** durationSeconds >0 | pace chỉ tính ra, không lưu |
 | DURATION (CON-004) | durationSeconds 1..86400 | completed: durationSeconds >0; distanceMeters tuỳ chọn | nhập tay (`source=manual`) |
+| LOAD (CON-006) | reps 1..500, loadKg 0..1000 (kg, tối đa 2 chữ số thập phân) | completed: actualReps **và** actualLoadKg (kg, ≥0, tối đa 2 chữ số thập phân) | volume chỉ tính ra, không lưu; chỉ kg (ADR-046) |
 
 `target.kind` must equal the catalog exercise type. JSON Schema cannot express this check or `repMin ≤ repMax`, so the backend and CaliDomain enforce both. Shared test vectors live in `fixtures/validation/business_rules.json` (ADR-020).
 
@@ -65,6 +66,15 @@ This section describes the conceptual model. **Wire names are canonical**: OpenA
 - `source` chỉ nhận `manual`. `healthkit` được giữ chỗ cho slice Apple Health sau pilot (ADR-043) và hiện bị từ chối ở cả JSON Schema lẫn CHECK SQL. Trường này không bắt buộc trên wire nên payload v1 vẫn hợp lệ; server ghi mặc định `manual`.
 - Quy tắc chéo trường (backend + CaliDomain, ADR-020; vector ở `fixtures/validation/business_rules.json`): `distanceMeters`/`durationSeconds` chỉ được có khi `prescribedSnapshot.target.kind` là `distance` hoặc `duration`; set `completed` loại distance cần cả hai giá trị >0 để tính được pace; set `completed` loại duration cần `durationSeconds` >0.
 - Logic CaliDomain cho các loại này thuộc IOS-011, không nằm trong slice contract này.
+
+### 3.2 Môn tập và bài tạ (CON-006, docs/18 §4, §8)
+- Mỗi bài trong catalog có `discipline` (bắt buộc, `calisthenics|gym|running`, dùng lại enum `Discipline`), `measurementType` và `focusTags`. `mixed` chỉ dùng cho giáo án (`PrimaryDiscipline`), không hợp lệ cho bài tập (ADR-061).
+- **`measurementType` luôn tính ra từ `type`, không lưu** (ADR-060): `static_hold`→`hold`; `reps`, `timed_reps`, `skill_attempt`→`reps`; `interval`, `duration`→`duration`; `distance`→`distance`; `load`→`load`. Catalog bundle kiểm tra cặp này bằng `if/then`; OpenAPI đánh dấu `readOnly`. Không có cột SQL `measurement_type`.
+- `discipline` độc lập với `type`: bài kéo xà đeo tạ là `calisthenics` + `load`. Khi nhập catalog không ghi `discipline`, SQL gán mặc định theo `type` (`distance`/`duration`→`running`, `load`→`gym`, còn lại→`calisthenics`), giống quy tắc backfill `primary_discipline` của db/004.
+- `focusTags`: slug tự do (ví dụ `push`, `core`), tối đa 10, không trùng, mặc định `[]`. Chưa có bộ từ vựng cố định; bộ lọc theo tag thuộc CON-008.
+- **Bài tạ `load`**: một set = `reps` lần với `loadKg` kg, ví dụ `3 × 5 lần @ 60 kg` = `setCount=3`, `target={kind:load, reps:5, loadKg:60}`. Mỗi set một mức tạ; không có khoảng tạ, %1RM hay pyramid trong slice này (ADR-062). Set kết thúc bằng thao tác dừng, không có deadline.
+- `loadKg` và `actualLoadKg` là kg, 0..1000, **tối đa 2 chữ số thập phân**. Giá trị nhiều chữ số hơn bị **từ chối**, không làm tròn. 0 kg hợp lệ (thanh rỗng hoặc chỉ khung). Bước 2,5 kg chỉ là gợi ý UI; lb chỉ là quy đổi hiển thị (ADR-046). Volume = reps × kg luôn tính ra, không nằm trong payload hay cột SQL.
+- Quy tắc chéo trường (backend + CaliDomain, ADR-020; vector ở `fixtures/validation/business_rules.json`): `actualLoadKg` chỉ được có khi `prescribedSnapshot.target.kind = load`; set `completed` loại load cần cả `actualReps` và `actualLoadKg`; `target.kind = load` phải khớp bài loại `load`. CaliDomain đã có prescription `load` và kiểm tra trên (fixture `fixtures/reducer/load_reps.json`); giao diện app chưa hỗ trợ (ios-agent).
 
 Superset design can reuse grouped planned exercises later; MVP executes linear sequence.
 

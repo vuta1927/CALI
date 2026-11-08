@@ -160,6 +160,106 @@ public sealed class PayloadContractTests : IClassFixture<OpenApiContractTests.Sp
         codes.ShouldContain("plan_count_limit");
     }
 
+    // ---- CON-006 discipline + load ----
+
+    [Fact]
+    public void Load_is_an_exercise_type_and_a_measurement_type()
+    {
+        Enum("ExerciseType").ShouldContain("load");
+        Enum("MeasurementType").ShouldBe(["hold", "reps", "load", "distance", "duration"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Bundle_derives_measurement_type_from_exercise_type_for_every_type()
+    {
+        // ADR-060: measurementType is a total function of exercise type, enforced in the bundle via if/then.
+        var map = new Dictionary<string, string>();
+        foreach (var rule in _bundle.GetProperty("$defs").GetProperty("item").GetProperty("allOf").EnumerateArray())
+        {
+            var type = rule.GetProperty("if").GetProperty("properties").GetProperty("type").GetProperty("const").GetString()!;
+            var measurement = rule.GetProperty("then").GetProperty("properties").GetProperty("measurementType").GetProperty("const").GetString()!;
+            map.Add(type, measurement);
+        }
+
+        map.Keys.ShouldBe(Enum("ExerciseType"), ignoreOrder: true);
+        map.Values.ToHashSet().ShouldBe(Enum("MeasurementType"), ignoreOrder: true);
+        map["load"].ShouldBe("load");
+        map["static_hold"].ShouldBe("hold");
+        map["interval"].ShouldBe("duration");
+    }
+
+    [Fact]
+    public void Exercise_discipline_reuses_the_discipline_vocabulary_without_mixed()
+    {
+        var item = _bundle.GetProperty("$defs").GetProperty("item");
+        var bundleDisciplines = item.GetProperty("properties").GetProperty("discipline").GetProperty("enum")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+
+        bundleDisciplines.ShouldBe(Enum("Discipline"), ignoreOrder: true);
+        bundleDisciplines.ShouldNotContain("mixed");
+        Enum("PrimaryDiscipline").IsSupersetOf(Enum("Discipline")).ShouldBeTrue();
+        item.GetProperty("required").EnumerateArray().Select(e => e.GetString())
+            .ShouldContain(name => name == "discipline");
+    }
+
+    [Fact]
+    public void Exercise_exposes_discipline_derived_measurement_type_and_focus_tags()
+    {
+        var exercise = Schema("Exercise");
+
+        var properties = exercise.Properties!;
+        var required = exercise.Required!;
+
+        properties.Keys.ShouldContain("discipline");
+        properties.Keys.ShouldContain("measurementType");
+        properties.Keys.ShouldContain("focusTags");
+        required.ShouldContain("discipline");
+        required.ShouldContain("measurementType");
+        required.ShouldNotContain("focusTags");
+        properties["measurementType"].ReadOnly.ShouldBeTrue();
+        properties["focusTags"].MaxItems.ShouldBe(10);
+    }
+
+    [Fact]
+    public void Load_target_requires_reps_and_kilograms_in_both_contracts()
+    {
+        var openApi = Schema("PlannedTarget").OneOf!.Single(o => o.Properties!["kind"].Const == "load");
+        openApi.Required!.ShouldBe(["kind", "reps", "loadKg"], ignoreOrder: true);
+        openApi.Properties!.Keys.ShouldBe(["kind", "reps", "loadKg"], ignoreOrder: true);
+        openApi.Properties["loadKg"].Minimum.ShouldBe("0");
+        openApi.Properties["loadKg"].Maximum.ShouldBe("1000");
+
+        var entity = Def("target").GetProperty("oneOf").EnumerateArray()
+            .Single(o => o.GetProperty("properties").GetProperty("kind").GetProperty("const").GetString() == "load");
+        entity.GetProperty("required").EnumerateArray().Select(e => e.GetString()!)
+            .ShouldBe(["kind", "reps", "loadKg"], ignoreOrder: true);
+        entity.GetProperty("properties").GetProperty("loadKg").GetProperty("maximum").GetInt32().ShouldBe(1000);
+        entity.GetProperty("properties").GetProperty("reps").GetProperty("maximum").GetInt32().ShouldBe(500);
+    }
+
+    [Fact]
+    public void Set_result_actual_load_is_optional_non_negative_kilograms()
+    {
+        var actual = Def("set_result_payload").GetProperty("properties").GetProperty("actualLoadKg");
+
+        actual.GetProperty("minimum").GetInt32().ShouldBe(0);
+        actual.GetProperty("maximum").GetInt32().ShouldBe(1000);
+        // Backward compatible with v1 payloads.
+        Def("set_result_payload").GetProperty("required").EnumerateArray().Select(e => e.GetString())
+            .ShouldNotContain("actualLoadKg");
+    }
+
+    [Fact]
+    public void Volume_and_pounds_are_never_part_of_a_payload()
+    {
+        // ADR-062: volume is derived; ADR-046: kilograms only, lb is display conversion.
+        var names = new List<string>();
+        CollectPropertyNames(JsonNode.Parse(File.ReadAllText(RepoPaths.EntityPayloadsSchemaFile))!, names);
+
+        names.ShouldNotContain(name => name.Contains("volume", StringComparison.OrdinalIgnoreCase));
+        names.ShouldNotContain(name => name.EndsWith("Lb", StringComparison.Ordinal) || name.EndsWith("Lbs", StringComparison.Ordinal));
+    }
+
     private HashSet<string> Enum(string schema) => Values(Schema(schema));
 
     // Microsoft.OpenApi reads a YAML `null` enum member as a sentinel string; nullable enums keep only real values.

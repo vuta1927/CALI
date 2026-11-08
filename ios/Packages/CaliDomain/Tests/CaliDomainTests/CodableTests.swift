@@ -21,6 +21,16 @@ final class CodableTests: XCTestCase {
         XCTAssertEqual(try json(Prescription.skillAttempt(attempts: 3)), #"{"attempts":3,"kind":"skill_attempt"}"#)
     }
 
+    /// CON-006: `{ "kind": "load", "reps": 5, "loadKg": 57.5 }` keeps the exact decimal (kg, ADR-046/ADR-062).
+    func testLoadPrescriptionMatchesContractShape() throws {
+        let load = Prescription.load(reps: 5, loadKg: Decimal(string: "57.5")!)
+        XCTAssertEqual(try json(load), #"{"kind":"load","loadKg":57.5,"reps":5}"#)
+        try roundTrip(load)
+        let decoded = try DomainJSON.makeDecoder().decode(Prescription.self, from: Data(#"{"kind":"load","reps":5,"loadKg":60}"#.utf8))
+        XCTAssertEqual(decoded, .load(reps: 5, loadKg: 60))
+        XCTAssertEqual(decoded.type, .load)
+    }
+
     func testEnumsUseSnakeCase() throws {
         XCTAssertEqual(try json([Phase.preCountdown, .awaitingResult, .reviewingSummary]), #"["pre_countdown","awaiting_result","reviewing_summary"]"#)
         XCTAssertEqual(Set(SessionStatus.allCases.map(\.rawValue)), ["active", "completed", "abandoned"])

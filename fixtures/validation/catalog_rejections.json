@@ -1,0 +1,113 @@
+{
+  "_comment": "CON-006 (ADR-060, ADR-061): catalog items that MUST fail contracts/catalog-bundle.schema.json. tools/validate_handoff.py wraps each item in a one-item development bundle and asserts it is schema-INVALID.",
+  "cases": [
+    {
+      "name": "measurement_type_mismatch",
+      "reason": "ADR-060: measurementType is derived from type (reps -> reps), never chosen separately",
+      "item": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+        "slug": "squat",
+        "name": "Bodyweight Squat",
+        "type": "reps",
+        "discipline": "calisthenics",
+        "measurementType": "load",
+        "focusTags": [
+          "legs"
+        ],
+        "equipment": [],
+        "cues": [
+          "Giữ gót chân ổn định"
+        ],
+        "media": {
+          "poster": "assets/placeholder/squat.webp"
+        }
+      }
+    },
+    {
+      "name": "discipline_mixed",
+      "reason": "ADR-061: 'mixed' is a plan-level value (PrimaryDiscipline), never an exercise discipline",
+      "item": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+        "slug": "barbell-back-squat",
+        "name": "Barbell Back Squat",
+        "type": "load",
+        "discipline": "mixed",
+        "measurementType": "load",
+        "focusTags": [
+          "legs"
+        ],
+        "equipment": [
+          "barbell"
+        ],
+        "cues": [
+          "Giữ lưng trung tính"
+        ],
+        "media": {
+          "poster": "assets/placeholder/barbell-back-squat.webp"
+        }
+      }
+    },
+    {
+      "name": "focus_tag_not_a_slug",
+      "reason": "ADR-061: focus tags are lowercase slugs",
+      "item": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3",
+        "slug": "dips",
+        "name": "Dips",
+        "type": "reps",
+        "discipline": "calisthenics",
+        "measurementType": "reps",
+        "focusTags": [
+          "Push Up"
+        ],
+        "equipment": [
+          "parallel bars"
+        ],
+        "cues": [
+          "Kiểm soát vai"
+        ],
+        "media": {
+          "poster": "assets/placeholder/dips.webp"
+        }
+      }
+    },
+    {
+      "name": "missing_discipline",
+      "reason": "ADR-061: every catalog item names its discipline",
+      "item": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4",
+        "slug": "pull-up",
+        "name": "Pull-up",
+        "type": "reps",
+        "measurementType": "reps",
+        "equipment": [
+          "pull-up bar"
+        ],
+        "cues": [
+          "Kiểm soát thân"
+        ],
+        "media": {
+          "poster": "assets/placeholder/pull-up.webp"
+        }
+      }
+    },
+    {
+      "name": "missing_measurement_type",
+      "reason": "ADR-060: the bundle always carries the derived measurementType",
+      "item": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5",
+        "slug": "easy-run",
+        "name": "Chạy nhẹ",
+        "type": "distance",
+        "discipline": "running",
+        "equipment": [],
+        "cues": [
+          "Giữ nhịp thở đều"
+        ],
+        "media": {
+          "poster": "assets/placeholder/easy-run.webp"
+        }
+      }
+    }
+  ]
+}

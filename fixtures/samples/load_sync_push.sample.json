@@ -1,0 +1,75 @@
+{
+  "_comment": "SAMPLE ONLY (CON-006) - not production data. A gym load entry (Barbell Back Squat 3 x 5 @ 60 kg, shown as '3 × 5 lần @ 60 kg') and two confirmed sets; the second was lighter (57.5 kg, displayed '57,5 kg' in vi). Kilograms only (ADR-046); at most 2 decimals (ADR-062). Volume (reps x kg) is derived by the client and never sent. Ids are illustrative; parents must be synced before children.",
+  "deviceId": "d0000000-0000-4000-8000-000000000006",
+  "mutations": [
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000001",
+      "entityType": "planned_exercise",
+      "entityId": "f2000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T07:00:00Z",
+      "payload": {
+        "id": "f2000000-0000-4000-8000-000000000001",
+        "plannedWorkoutId": "f3000000-0000-4000-8000-000000000001",
+        "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+        "orderIndex": 0,
+        "setCount": 3,
+        "target": {"kind": "load", "reps": 5, "loadKg": 60},
+        "restSeconds": 150
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000002",
+      "entityType": "set_result",
+      "entityId": "f4000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:05:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000001",
+        "executionId": "f5000000-0000-4000-8000-000000000001",
+        "setIndex": 1,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "load", "reps": 5, "loadKg": 60},
+          "setCount": 3,
+          "restSeconds": 150,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "plannedExerciseId": "f2000000-0000-4000-8000-000000000001"
+        },
+        "actualReps": 5,
+        "actualLoadKg": 60,
+        "rpe": 7,
+        "confirmedAt": "2026-11-08T08:05:00Z"
+      }
+    },
+    {
+      "mutationId": "f1000000-0000-4000-8000-000000000003",
+      "entityType": "set_result",
+      "entityId": "f4000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T08:09:00Z",
+      "payload": {
+        "id": "f4000000-0000-4000-8000-000000000002",
+        "executionId": "f5000000-0000-4000-8000-000000000001",
+        "setIndex": 2,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "load", "reps": 5, "loadKg": 60},
+          "setCount": 3,
+          "restSeconds": 150,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "plannedExerciseId": "f2000000-0000-4000-8000-000000000001"
+        },
+        "actualReps": 5,
+        "actualLoadKg": 57.5,
+        "rpe": 9,
+        "confirmedAt": "2026-11-08T08:09:00Z"
+      }
+    }
+  ]
+}

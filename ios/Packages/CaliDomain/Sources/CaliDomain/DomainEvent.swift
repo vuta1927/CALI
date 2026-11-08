@@ -28,14 +28,17 @@ public struct SetActuals: Codable, Equatable, Hashable, Sendable {
     public var restMs: Int64?
     public var rpe: Int?
     public var note: String?
+    /// CON-006: `set_results.actual_load_kg` (kg).
+    public var loadKg: Decimal?
 
-    public init(reps: Int? = nil, holdMs: Int64? = nil, workMs: Int64? = nil, restMs: Int64? = nil, rpe: Int? = nil, note: String? = nil) {
+    public init(reps: Int? = nil, holdMs: Int64? = nil, workMs: Int64? = nil, restMs: Int64? = nil, rpe: Int? = nil, note: String? = nil, loadKg: Decimal? = nil) {
         self.reps = reps
         self.holdMs = holdMs
         self.workMs = workMs
         self.restMs = restMs
         self.rpe = rpe
         self.note = note
+        self.loadKg = loadKg
     }
 
     public static let none = SetActuals()
