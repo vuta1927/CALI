@@ -3,6 +3,7 @@
 **Phiên bản:** v0.1 (2026-11-07) · **Trạng thái:** đề xuất, chờ chủ dự án duyệt
 **Phạm vi:** chi tiết hóa M0 → M2 trong [`13-delivery-backlog.md`](13-delivery-backlog.md) cho iOS app và backend. AI Coach (M3) chỉ nêu điểm nối.
 Tài liệu này **không thay thế** ADR/contract. Nếu mâu thuẫn, ưu tiên theo quy tắc trong README.
+Thứ tự triển khai toàn hệ thống (gồm docs/17–19, AI, media, phát hành) và hiện trạng sau các PR đã merge: xem [`20-system-implementation-plan.md`](20-system-implementation-plan.md).
 
 ---
 
