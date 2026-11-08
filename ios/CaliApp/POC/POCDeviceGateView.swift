@@ -203,8 +203,7 @@ final class POCDeviceGateModel {
     }
 
     func refreshEnvironment() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        notificationStatus = switch settings.authorizationStatus {
+        notificationStatus = switch await Self.notificationAuthorizationStatus() {
         case .authorized: "authorized"
         case .denied: "denied"
         case .notDetermined: "notDetermined"
@@ -214,6 +213,11 @@ final class POCDeviceGateModel {
         }
         activitiesEnabled = ActivityAuthorizationInfo().areActivitiesEnabled
         protectedDataAvailable = UIApplication.shared.isProtectedDataAvailable
+    }
+
+    /// `UNNotificationSettings` is not Sendable (Swift 6): read it off the main actor and return only the enum.
+    nonisolated private static func notificationAuthorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     func setGuard(_ on: Bool) {

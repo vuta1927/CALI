@@ -112,7 +112,7 @@ struct AppGroupStatus: Sendable {
     }
 
     var summary: String {
-        containerPath.map { "available(\(identifier))" } ?? "unavailable(\(identifier))"
+        containerPath == nil ? "unavailable(\(identifier))" : "available(\(identifier))"
     }
 }
 
