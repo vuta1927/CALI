@@ -73,7 +73,7 @@ struct ActivePhaseView: View {
             if let execution = model.currentExecution {
                 Text("Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
                     .font(.headline)
-                    .foregroundStyle(Color.caliAccent)
+                    .foregroundStyle(Color.caliAccentInk)
             }
             if isTimed {
                 ZStack {
@@ -186,7 +186,7 @@ struct RestPhaseView: View {
                             .foregroundStyle(Color.caliText)
                         Text("Set \(next.setIndex)/\(next.execution.setCount) · \(Fmt.target(next.execution.target))")
                             .font(.subheadline)
-                            .foregroundStyle(Color.caliAccent)
+                            .foregroundStyle(Color.caliAccentInk)
                     }
                     Spacer()
                 }

@@ -106,7 +106,7 @@ struct TodayView: View {
                                 if completed {
                                     Image(systemName: "checkmark")
                                         .font(.caption.bold())
-                                        .foregroundStyle(Color.coamiNavy)
+                                        .foregroundStyle(Color.caliOnAccent)
                                 }
                             }
                             .frame(width: 32, height: 32)
@@ -135,7 +135,7 @@ struct TodayView: View {
                 HStack(spacing: Spacing.m) {
                     Image(systemName: "bolt.fill")
                         .font(.title2)
-                        .foregroundStyle(Color.coamiNavy)
+                        .foregroundStyle(Color.caliOnAccent)
                         .frame(width: 52, height: 52)
                         .background(Color.caliWarning, in: RoundedRectangle(cornerRadius: Radius.chip))
                     VStack(alignment: .leading, spacing: 2) {
@@ -197,24 +197,24 @@ private struct ResumeCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Đang tập dở")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.coamiNavy.opacity(0.72))
+                        .foregroundStyle(Color.caliOnAccent)
                     Text(model.title)
                         .font(.headline)
-                        .foregroundStyle(Color.coamiNavy)
+                        .foregroundStyle(Color.caliOnAccent)
                     Text("\(model.state.phase.label) · \(model.state.resolvedSets.count)/\(model.state.totalPlannedSets) set")
                         .font(.subheadline)
-                        .foregroundStyle(Color.coamiNavy.opacity(0.72))
+                        .foregroundStyle(Color.caliOnAccent)
                 }
                 Spacer()
                 Text("Tiếp tục")
                     .font(.headline)
-                    .foregroundStyle(Color.coamiNavy)
+                    .foregroundStyle(Color.caliOnAccent)
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Color.coamiNavy)
+                    .foregroundStyle(Color.caliOnAccent)
             }
             .padding(Spacing.m)
             .background(COAMIGradient.brand, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-            .shadow(color: Color.coamiTeal.opacity(0.22), radius: 18, y: 8)
+            .shadow(color: Color.coamiOrange.opacity(0.22), radius: 18, y: 8)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Mở lại buổi tập đang dở")

@@ -29,14 +29,14 @@ struct CaliButtonStyle: ButtonStyle {
                         .strokeBorder(Color.caliBorder, lineWidth: 1)
                 }
             }
-            .shadow(color: kind == .primary ? Color.coamiTeal.opacity(0.18) : .clear, radius: 14, y: 7)
+            .shadow(color: kind == .primary ? Color.coamiOrange.opacity(0.22) : .clear, radius: 14, y: 7)
             .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
             .contentShape(Rectangle())
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary: .coamiNavy
+        case .primary: .caliOnAccent
         case .secondary: .caliText
         case .destructive: .caliCanvas
         case .quiet: .caliSecondary
@@ -106,7 +106,7 @@ struct GlassCardModifier: ViewModifier {
                     lineWidth: 1
                 )
             }
-            .shadow(color: Color.coamiNavy.opacity(0.12), radius: 18, y: 8)
+            .shadow(color: Color.black.opacity(0.10), radius: 18, y: 8)
     }
 }
 
@@ -145,7 +145,7 @@ struct TagChip: View {
         .font(.caption.weight(.semibold))
         .padding(.horizontal, Spacing.s)
         .padding(.vertical, Spacing.xs)
-        .foregroundStyle(filled ? Color.coamiNavy : tint)
+        .foregroundStyle(filled ? Color.caliOnAccent : tint)
         .background(
             filled ? tint : tint.opacity(0.15),
             in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
@@ -183,7 +183,7 @@ struct FilterChip: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, Spacing.m)
             .frame(minHeight: minTapTarget)
-            .foregroundStyle(isSelected ? Color.coamiNavy : Color.caliText)
+            .foregroundStyle(isSelected ? Color.caliOnAccent : Color.caliText)
             .background(isSelected ? Color.caliAccent : Color.caliSurfaceRaised, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.caliBorder.opacity(0.7), lineWidth: 1))
         }

@@ -78,7 +78,7 @@ private struct RecommendationCard: View {
                         Image(systemName: "arrow.right")
                             .foregroundStyle(Color.caliSecondary)
                         Text(recommendation.toLabel)
-                            .foregroundStyle(Color.caliAccent)
+                            .foregroundStyle(Color.caliAccentInk)
                     }
                     .font(.subheadline.weight(.semibold))
                 }
@@ -102,7 +102,7 @@ private struct RecommendationCard: View {
                 HStack {
                     TagChip(text: decision == .accepted ? "Đã chấp nhận" : "Đã từ chối",
                             systemImage: decision == .accepted ? "checkmark" : "xmark",
-                            tint: decision == .accepted ? .caliAccent : .caliSecondary,
+                            tint: decision == .accepted ? .caliAccentInk : .caliSecondary,
                             filled: decision == .accepted)
                     Spacer()
                     if let at = recommendation.decidedAt {

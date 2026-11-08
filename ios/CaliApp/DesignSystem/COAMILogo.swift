@@ -16,7 +16,7 @@ struct COAMISymbol: View {
             let stroke = side * 136 / 1024
             let routeStroke = side * 80 / 1024
             let pointSize = side * 104 / 1024
-            let routeColor = colorScheme == .dark ? Color.coamiIce : Color.coamiNavy
+            let routeColor = colorScheme == .dark ? Color.coamiCream : Color.coamiInk
 
             ZStack {
                 switch style {

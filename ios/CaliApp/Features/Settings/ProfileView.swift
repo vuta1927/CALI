@@ -19,7 +19,7 @@ struct ProfileView: View {
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, Spacing.s)
                                 .padding(.vertical, 2)
-                                .foregroundStyle(Color.coamiNavy)
+                                .foregroundStyle(Color.caliOnAccent)
                                 .background(Color.caliAccent, in: Capsule())
                         }
                     }

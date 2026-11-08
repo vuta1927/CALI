@@ -85,7 +85,8 @@ struct CompactCOAMIMark: View {
             ZStack {
                 Circle()
                     .trim(from: 0.12, to: 0.88)
-                    .stroke(.mint, style: StrokeStyle(lineWidth: side * 0.18, lineCap: .round))
+                    // COAMI orange (dark-mode accent #FF6A2B); the widget target does not link Theme.swift.
+                    .stroke(Color(red: 1.0, green: 0x6A / 255.0, blue: 0x2B / 255.0), style: StrokeStyle(lineWidth: side * 0.18, lineCap: .round))
                     .rotationEffect(.degrees(45))
                 Capsule()
                     .fill(.white)

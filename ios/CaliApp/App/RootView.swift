@@ -29,7 +29,7 @@ struct RootView: View {
             }
             .badge(store.pendingRecommendationCount)
         }
-        .tint(.caliAccent)
+        .tint(.caliAccentInk)
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {

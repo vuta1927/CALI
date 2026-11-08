@@ -129,7 +129,7 @@ struct ExerciseDetailView: View {
                 }
                 InfoBlock(title: "Nhóm cơ", systemImage: "figure.arms.open", lines: [exercise.muscles.joined(separator: ", ")])
                 InfoBlock(title: "Dụng cụ", systemImage: "dumbbell", lines: [exercise.equipmentLabel])
-                InfoBlock(title: "Điểm cần nhớ", systemImage: "checkmark.seal", lines: exercise.cues, numbered: true, tint: .caliAccent)
+                InfoBlock(title: "Điểm cần nhớ", systemImage: "checkmark.seal", lines: exercise.cues, numbered: true, tint: .caliAccentInk)
                 InfoBlock(title: "Lỗi thường gặp", systemImage: "exclamationmark.triangle", lines: exercise.mistakes, tint: .caliWarning)
                 Label("Hướng dẫn chỉ mang tính tham khảo, không thay thế tư vấn y tế. Dừng lại nếu thấy đau.", systemImage: "cross.case")
                     .font(.footnote)
@@ -174,7 +174,7 @@ private struct FlowTags: View {
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            TagChip(text: exercise.type.label, systemImage: exercise.type.systemImage, tint: .caliAccent)
+            TagChip(text: exercise.type.label, systemImage: exercise.type.systemImage, tint: .caliAccentInk)
             TagChip(text: exercise.level.label, systemImage: "chart.bar")
             TagChip(text: Fmt.target(exercise.type.defaultTarget), systemImage: "target")
         }

@@ -1,14 +1,17 @@
 import SwiftUI
 import UIKit
 
-/// Source-of-truth values from the COAMI brand handoff. Keeping the raw values testable
-/// prevents visual drift when semantic light/dark colors are adjusted later.
+/// Source-of-truth brand values (orange palette, see docs/design/mockups/plan-module.html).
+/// Keeping the raw values testable prevents visual drift when semantic light/dark colors change.
+/// Contrast rules: `orange` is for fills and graphics only (white on it is ~3.4:1); orange text
+/// uses `caliAccentInk`; text on orange fills uses `ink` (~5.4:1).
 enum COAMIColorToken: UInt32 {
-    case mint = 0x2FF6C4
-    case teal = 0x00D4C6
-    case aqua = 0x00A7E1
-    case navy = 0x0B2742
-    case ice = 0xEAF7FF
+    case flame = 0xFF7A2F
+    case orange = 0xFC4C02
+    case ember = 0xE83F00
+    case blue = 0x0077C8
+    case ink = 0x1A1206
+    case cream = 0xFFF3EC
     case white = 0xFFFFFF
 }
 
@@ -23,26 +26,33 @@ struct COAMIThemePalette: Equatable {
     let text: UInt32
     let secondary: UInt32
     let accent: UInt32
+    /// Orange used for text/links on canvas or surface (>= 4.5:1).
+    let accentInk: UInt32
+    let border: UInt32
 
     static func palette(for appearance: COAMIAppearance) -> Self {
         switch appearance {
         case .light:
             Self(
-                canvas: 0xF4FAFD,
+                canvas: 0xF5F5F7,
                 surface: COAMIColorToken.white.rawValue,
-                surfaceRaised: 0xDCEEF5,
-                text: COAMIColorToken.navy.rawValue,
-                secondary: 0x496B7F,
-                accent: COAMIColorToken.teal.rawValue
+                surfaceRaised: 0xECECF0,
+                text: 0x242428,
+                secondary: 0x5E5E6A,
+                accent: COAMIColorToken.orange.rawValue,
+                accentInk: 0xC43C00,
+                border: 0xD2D2D9
             )
         case .dark:
             Self(
-                canvas: 0x071927,
-                surface: 0x102B3E,
-                surfaceRaised: 0x193B50,
-                text: COAMIColorToken.ice.rawValue,
-                secondary: 0x8CB2C8,
-                accent: COAMIColorToken.mint.rawValue
+                canvas: 0x121214,
+                surface: 0x1E1E22,
+                surfaceRaised: 0x2A2A30,
+                text: 0xF2F2F5,
+                secondary: 0xA8A8B3,
+                accent: 0xFF6A2B,
+                accentInk: 0xFF6A2B,
+                border: 0x3A3A42
             )
         }
     }
@@ -56,13 +66,13 @@ enum COAMIEffectPolicy {
 
 enum COAMIGradient {
     static let brand = LinearGradient(
-        colors: [Color(hex: COAMIColorToken.mint.rawValue), Color(hex: COAMIColorToken.teal.rawValue), Color(hex: COAMIColorToken.aqua.rawValue)],
+        colors: [Color(hex: COAMIColorToken.flame.rawValue), Color(hex: COAMIColorToken.orange.rawValue), Color(hex: COAMIColorToken.ember.rawValue)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
     static let canvasGlow = RadialGradient(
-        colors: [Color(hex: COAMIColorToken.teal.rawValue, opacity: 0.14), .clear],
+        colors: [Color(hex: COAMIColorToken.orange.rawValue, opacity: 0.08), .clear],
         center: .topLeading,
         startRadius: 0,
         endRadius: 420
@@ -70,19 +80,27 @@ enum COAMIGradient {
 }
 
 extension Color {
-    static let coamiMint = Color(hex: COAMIColorToken.mint.rawValue)
-    static let coamiTeal = Color(hex: COAMIColorToken.teal.rawValue)
-    static let coamiAqua = Color(hex: COAMIColorToken.aqua.rawValue)
-    static let coamiNavy = Color(hex: COAMIColorToken.navy.rawValue)
-    static let coamiIce = Color(hex: COAMIColorToken.ice.rawValue)
+    static let coamiFlame = Color(hex: COAMIColorToken.flame.rawValue)
+    static let coamiOrange = Color(hex: COAMIColorToken.orange.rawValue)
+    static let coamiBlue = Color(hex: COAMIColorToken.blue.rawValue)
+    static let coamiInk = Color(hex: COAMIColorToken.ink.rawValue)
+    static let coamiCream = Color(hex: COAMIColorToken.cream.rawValue)
 
-    static let caliCanvas = adaptive(light: 0xF4FAFD, dark: 0x071927)
-    static let caliSurface = adaptive(light: COAMIColorToken.white.rawValue, dark: 0x102B3E)
-    static let caliSurfaceRaised = adaptive(light: 0xDCEEF5, dark: 0x193B50)
-    static let caliAccent = adaptive(light: COAMIColorToken.teal.rawValue, dark: COAMIColorToken.mint.rawValue)
-    static let caliText = adaptive(light: COAMIColorToken.navy.rawValue, dark: COAMIColorToken.ice.rawValue)
-    static let caliSecondary = adaptive(light: 0x496B7F, dark: 0x8CB2C8)
-    static let caliBorder = adaptive(light: 0xB8D6E4, dark: 0x31566D)
+    private static let lightPalette = COAMIThemePalette.palette(for: .light)
+    private static let darkPalette = COAMIThemePalette.palette(for: .dark)
+
+    static let caliCanvas = adaptive(light: lightPalette.canvas, dark: darkPalette.canvas)
+    static let caliSurface = adaptive(light: lightPalette.surface, dark: darkPalette.surface)
+    static let caliSurfaceRaised = adaptive(light: lightPalette.surfaceRaised, dark: darkPalette.surfaceRaised)
+    /// Fills, strokes, icons and large numerals. Not for body-size text in light mode.
+    static let caliAccent = adaptive(light: lightPalette.accent, dark: darkPalette.accent)
+    /// Orange text and links (>= 4.5:1 on canvas/surface).
+    static let caliAccentInk = adaptive(light: lightPalette.accentInk, dark: darkPalette.accentInk)
+    /// Text and icons placed on an accent fill or the brand gradient.
+    static let caliOnAccent = Color.coamiInk
+    static let caliText = adaptive(light: lightPalette.text, dark: darkPalette.text)
+    static let caliSecondary = adaptive(light: lightPalette.secondary, dark: darkPalette.secondary)
+    static let caliBorder = adaptive(light: lightPalette.border, dark: darkPalette.border)
     static let caliWarning = adaptive(light: 0xA75B00, dark: 0xFFD166)
     static let caliError = adaptive(light: 0xB93848, dark: 0xFF8795)
 
@@ -133,7 +151,7 @@ enum Radius {
 let minTapTarget: CGFloat = 44
 
 /// Palettes for placeholder posters. Exercise identity stays distinct while the overall
-/// temperature remains compatible with the COAMI navy/teal system.
+/// temperature stays compatible with the neutral-grey + orange COAMI system.
 enum PosterPalette {
     static let all: [[Color]] = [
         [Color(hex: 0x063F43), Color(hex: 0x00BFAE)],

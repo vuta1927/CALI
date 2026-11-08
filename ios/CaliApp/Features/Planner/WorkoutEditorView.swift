@@ -97,7 +97,7 @@ private struct PlannedExerciseEditor: View {
                         .foregroundStyle(Color.caliText)
                     Text(Fmt.prescription(item))
                         .font(.caption)
-                        .foregroundStyle(Color.caliAccent)
+                        .foregroundStyle(Color.caliAccentInk)
                 }
             }
             Stepper("Số set: \(item.setCount)", value: $item.setCount, in: 1...10)

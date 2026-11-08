@@ -109,7 +109,7 @@ private struct PlanDayRow: View {
             VStack(spacing: 2) {
                 Text(Fmt.weekdayShort(day))
                     .font(.headline)
-                    .foregroundStyle(isToday ? Color.caliCanvas : Color.caliText)
+                    .foregroundStyle(isToday ? Color.caliOnAccent : Color.caliText)
             }
             .frame(width: 48, height: 48)
             .background(isToday ? Color.caliAccent : Color.caliSurfaceRaised, in: RoundedRectangle(cornerRadius: Radius.chip))
@@ -162,7 +162,7 @@ struct WorkoutDetailView: View {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text(workout.weekday == 0 ? "Bất kỳ ngày nào" : Fmt.weekdayLong(workout.weekday))
                             .font(.subheadline)
-                            .foregroundStyle(Color.caliAccent)
+                            .foregroundStyle(Color.caliAccentInk)
                         Text(workout.focus)
                             .font(.subheadline)
                             .foregroundStyle(Color.caliSecondary)
@@ -233,7 +233,7 @@ struct PlannedExerciseRow: View {
                     .foregroundStyle(Color.caliText)
                 Text(Fmt.prescription(item))
                     .font(.subheadline)
-                    .foregroundStyle(Color.caliAccent)
+                    .foregroundStyle(Color.caliAccentInk)
                 Text("Nghỉ \(Fmt.seconds(item.restSeconds)) · \(exercise.type.label)")
                     .font(.caption)
                     .foregroundStyle(Color.caliSecondary)

@@ -71,7 +71,7 @@ struct ResultFormView: View {
                     if let execution = model.currentExecution {
                         Text("Set \(draft?.key.setIndex ?? model.state.currentSetIndex)/\(execution.setCount) · Mục tiêu \(Fmt.target(execution.target))")
                             .font(.subheadline)
-                            .foregroundStyle(Color.caliAccent)
+                            .foregroundStyle(Color.caliAccentInk)
                     }
                     if let draft, draft.measuredElapsedMs > 0 {
                         Text("Đo được: \(Fmt.holdSeconds(ms: draft.measuredElapsedMs))")
@@ -148,7 +148,7 @@ struct ResultFormView: View {
                         Text("\(value)")
                             .font(.headline.monospacedDigit())
                             .frame(maxWidth: .infinity, minHeight: minTapTarget)
-                            .foregroundStyle(rpe == value ? Color.caliCanvas : Color.caliText)
+                            .foregroundStyle(rpe == value ? Color.caliOnAccent : Color.caliText)
                             .background(rpe == value ? Color.caliAccent : Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.chip))
                     }
                     .buttonStyle(.plain)

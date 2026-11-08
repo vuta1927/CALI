@@ -204,7 +204,7 @@ struct PlayerExerciseHeader: View {
                         .multilineTextAlignment(.center)
                     Text("Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
                         .font(.headline)
-                        .foregroundStyle(Color.caliAccent)
+                        .foregroundStyle(Color.caliAccentInk)
                 }
             }
         }
