@@ -323,8 +323,9 @@ public sealed class PlanLineageActivationMigrationTests(PostgresFixture postgres
             .Run(cs, RepoPaths.DbDirectory, includeDevelopmentScripts: true);
 
         result.Successful.ShouldBeTrue(result.Error?.ToString());
-        // 004 runs first; later numbered migrations (005+) follow on the same upgrade path.
+        // CON-006: later scripts (db/006+) may follow 004 in the same run; 004 must be first and 003 not re-applied.
         result.AppliedScripts.First().ShouldBe("004_plan_lineage_activation.sql");
+        result.AppliedScripts.ShouldNotContain("003_running_measurement.sql");
 
         var plans = await RowsAsync(cs, $"""
             SELECT id::text, lineage_id::text, status, kind, primary_discipline, archived_at IS NOT NULL

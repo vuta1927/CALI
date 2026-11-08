@@ -38,10 +38,17 @@ enum Fmt {
         case .timedReps(let s): "\(s)s tối đa lần"
         case .interval(let work, let rest): "\(work)s tập / \(rest)s nghỉ"
         case .skillAttempt(let n): "\(n) lần thử"
+        case .load(let reps, let kg): "\(reps) lần @ \(loadKg(kg))"
         }
     }
 
-    /// "4 × giữ 12s · nghỉ 90s"
+    /// Kilograms with the `vi` decimal comma: "60 kg", "57,5 kg" (docs/18 §4). Display only, always kg
+    /// (ADR-046); shows up to the 2 decimals the domain allows (ADR-062), so nothing is hidden.
+    static func loadKg(_ kg: Decimal) -> String {
+        "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+    }
+
+    /// "4 × giữ 12s · nghỉ 90s", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
     static func prescription(_ item: PlannedExercise) -> String {
         "\(item.setCount) × \(target(item.target)) · nghỉ \(seconds(item.restSeconds))"
     }
@@ -114,6 +121,9 @@ enum Fmt {
             if let ms = set.workMs { parts.append(holdSeconds(ms: ms)) }
         case .skillAttempt:
             parts.append(set.status == .completed ? "Thành công" : "Chưa đạt")
+        case .load:
+            if let r = set.reps { parts.append("\(r) lần") }
+            if let kg = set.loadKg { parts.append("@ \(loadKg(kg))") }
         }
         if set.status == .failed, set.target.type != .skillAttempt {
             parts.append("(chưa đạt)")
@@ -130,6 +140,7 @@ extension ExerciseType {
         case .timedReps: "Theo thời gian"
         case .interval: "Interval"
         case .skillAttempt: "Kỹ năng"
+        case .load: "Tạ"
         }
     }
 
@@ -140,6 +151,7 @@ extension ExerciseType {
         case .timedReps: "timer"
         case .interval: "repeat.circle"
         case .skillAttempt: "star.circle"
+        case .load: "dumbbell"
         }
     }
 
@@ -151,6 +163,8 @@ extension ExerciseType {
         case .timedReps: .timedReps(timeSeconds: 30)
         case .interval: .interval(workSeconds: 30, restSeconds: 15)
         case .skillAttempt: .skillAttempt(attempts: 3)
+        // Conservative starting point; the plan editor steps kg by 2.5 (docs/18 §4).
+        case .load: .load(reps: 5, loadKg: 20)
         }
     }
 }

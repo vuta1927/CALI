@@ -127,6 +127,9 @@ final class Harness {
             c.actualWorkMs = holdMs
         case .interval: c.actualWorkMs = holdMs
         case .skillAttempt: break
+        case .load:
+            c.actualReps = reps
+            c.actualLoadKg = Decimal(string: "57.5")
         }
         return .confirmSet(c)
     }

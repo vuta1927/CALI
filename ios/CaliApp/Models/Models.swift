@@ -90,6 +90,8 @@ struct LoggedSet: Identifiable, Codable, Hashable, Sendable {
     var rpe: Int?
     var note: String?
     var skipReason: String?
+    /// CON-006 (ADR-046/062): kilograms lifted for a load set; nil otherwise and for older snapshots.
+    var loadKg: Decimal? = nil
 }
 
 extension LoggedSet {
@@ -105,7 +107,8 @@ extension LoggedSet {
             workMs: record.actual.workMs,
             rpe: record.actual.rpe,
             note: record.actual.note,
-            skipReason: record.skipReason
+            skipReason: record.skipReason,
+            loadKg: record.actual.loadKg
         )
     }
 }

@@ -1,0 +1,186 @@
+{
+  "name": "load_reps",
+  "description": "CON-006 (ADR-062): a gym load target (5 reps @ 60 kg, 2 sets, 90 s rest) has no phase deadline and ends by explicit stop; ConfirmSet requires actualReps + actualLoadKg (kg, at most 2 decimals; 57.555 is rejected, not rounded); a lighter set (57.5 kg) and fewer reps than prescribed (4 of 5) are recorded as given, never inferred; rejected confirms do not change state or revision.",
+  "steps": [
+    {
+      "now": "2026-11-08T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 1,
+            "setCount": 2,
+            "target": {
+              "kind": "load",
+              "reps": 5,
+              "loadKg": 60
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-08T08:00:05Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-08T08:00:25Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000003"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3,
+        "pendingMeasuredElapsedMs": 20000
+      }
+    },
+    {
+      "now": "2026-11-08T08:00:30Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "setResultId": "00000000-0000-4000-8000-000000004001",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 5
+      },
+      "expect": {
+        "error": "validation_failed",
+        "phase": "awaiting_result",
+        "revision": 3,
+        "confirmedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-08T08:00:31Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "setResultId": "00000000-0000-4000-8000-000000004002",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 5,
+        "actualLoadKg": 57.555
+      },
+      "expect": {
+        "error": "validation_failed",
+        "phase": "awaiting_result",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-08T08:00:35Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "setResultId": "00000000-0000-4000-8000-000000004003",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 5,
+        "actualLoadKg": 57.5,
+        "rpe": 8
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "currentSetIndex": 2,
+        "confirmedSetCount": 1,
+        "phaseDeadlineAt": "2026-11-08T08:02:05Z"
+      }
+    },
+    {
+      "now": "2026-11-08T08:01:00Z",
+      "command": {
+        "type": "ready_next",
+        "commandId": "00000000-0000-4000-8000-000000000007"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 5
+      }
+    },
+    {
+      "now": "2026-11-08T08:01:05Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 6,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-08T08:01:25Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000009"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 7
+      }
+    },
+    {
+      "now": "2026-11-08T08:01:30Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000010",
+        "setResultId": "00000000-0000-4000-8000-000000004004",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2,
+        "status": "completed",
+        "actualReps": 4,
+        "actualLoadKg": 60,
+        "rpe": 9
+      },
+      "expect": {
+        "phase": "reviewing_summary",
+        "status": "active",
+        "revision": 8,
+        "confirmedSetCount": 2,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-08T08:01:40Z",
+      "command": {
+        "type": "finish_session",
+        "commandId": "00000000-0000-4000-8000-000000000011"
+      },
+      "expect": {
+        "phase": "completed",
+        "status": "completed",
+        "revision": 9,
+        "confirmedSetCount": 2,
+        "skippedSetCount": 0
+      }
+    }
+  ]
+}

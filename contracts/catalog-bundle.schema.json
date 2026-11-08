@@ -20,12 +20,15 @@
   "$defs": {
     "item": {
       "type": "object",
-      "required": ["id", "slug", "name", "type", "equipment", "cues", "media"],
+      "required": ["id", "slug", "name", "type", "discipline", "measurementType", "equipment", "cues", "media"],
       "properties": {
         "id": {"type": "string", "format": "uuid"},
         "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 80},
         "name": {"type": "string", "minLength": 1, "maxLength": 120},
-        "type": {"enum": ["static_hold", "reps", "timed_reps", "interval", "skill_attempt", "distance", "duration"]},
+        "type": {"enum": ["static_hold", "reps", "timed_reps", "interval", "skill_attempt", "distance", "duration", "load"]},
+        "discipline": {"enum": ["calisthenics", "gym", "running"], "description": "CON-006 (ADR-061): OpenAPI Discipline; 'mixed' is plan-only."},
+        "measurementType": {"enum": ["hold", "reps", "load", "distance", "duration"], "description": "CON-006 (ADR-060): derived from type, never chosen independently; the allOf below pins the pair."},
+        "focusTags": {"type": "array", "maxItems": 10, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 40}, "description": "CON-006 (ADR-061): free slugs, no fixed vocabulary yet."},
         "equipment": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "cues": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "media": {
@@ -39,7 +42,18 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {"$comment": "CON-006 (ADR-060): measurementType is a total function of type.",
+         "if": {"properties": {"type": {"const": "static_hold"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "hold"}}}},
+        {"if": {"properties": {"type": {"const": "reps"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "timed_reps"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "interval"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "duration"}}}},
+        {"if": {"properties": {"type": {"const": "skill_attempt"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "distance"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "distance"}}}},
+        {"if": {"properties": {"type": {"const": "duration"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "duration"}}}},
+        {"if": {"properties": {"type": {"const": "load"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "load"}}}}
+      ]
     },
     "relative_path": {"type": "string", "pattern": "^(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!/)[^\\\\]+$", "description": "Bundle-relative path; no URL scheme, no leading slash."},
     "media_ref": {

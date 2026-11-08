@@ -428,6 +428,114 @@
           "pinned": false
         }
       }
+    },
+    {
+      "name": "load_fields_on_non_load_set",
+      "rule": "CON-006 / ADR-062: actualLoadKg is only allowed when prescribedSnapshot.target.kind is load",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "actualLoadKg"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000021",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000021",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000021",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "reps", "repMin": 5, "repMax": 8},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 6,
+          "actualLoadKg": 10
+        }
+      }
+    },
+    {
+      "name": "completed_load_set_without_load",
+      "rule": "CON-006 / ADR-062: a completed set with target.kind load needs actualReps and actualLoadKg (0 kg is allowed, null is not)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "actualLoadKg"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000022",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000022",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000022",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5
+        }
+      }
+    },
+    {
+      "name": "load_with_three_decimals",
+      "rule": "CON-006 / ADR-062: actualLoadKg has at most 2 decimals; extra precision is rejected, never rounded (db/006 ck_set_results_actual_load_kg)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "actualLoadKg"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000023",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000023",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000023",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5,
+          "actualLoadKg": 57.555
+        }
+      }
+    },
+    {
+      "name": "load_target_on_reps_exercise",
+      "rule": "target.kind == exercise_catalog.exercise_type (Pull-up is reps; a weighted pull-up needs its own load catalog row, ADR-061)",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "target.kind"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000024",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000024",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000024",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 5, "loadKg": 10},
+          "restSeconds": 120
+        }
+      }
     }
   ]
 }

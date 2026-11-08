@@ -27,7 +27,8 @@
         {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 100}}, "additionalProperties": false},
         {"$comment": "CON-004 running: one set = one segment. Optional durationSeconds is the target time; pace is derived, never stored.", "type": "object", "required": ["kind", "distanceMeters"], "properties": {"kind": {"const": "distance"}, "distanceMeters": {"type": "integer", "minimum": 1, "maximum": 500000}, "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "durationSeconds"], "properties": {"kind": {"const": "duration"}, "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}}, "additionalProperties": false}
+        {"type": "object", "required": ["kind", "durationSeconds"], "properties": {"kind": {"const": "duration"}, "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}}, "additionalProperties": false},
+        {"$comment": "CON-006 load (ADR-062): one set = reps at loadKg. Kilograms only (ADR-046), at most 2 decimals (enforced by backend/CaliDomain, ADR-020); volume is derived, never stored.", "type": "object", "required": ["kind", "reps", "loadKg"], "properties": {"kind": {"const": "load"}, "reps": {"type": "integer", "minimum": 1, "maximum": 500}, "loadKg": {"type": "number", "minimum": 0, "maximum": 1000}}, "additionalProperties": false}
       ]
     },
     "delete_payload": {
@@ -197,7 +198,8 @@
         "distanceMeters": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
         "durationSeconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 86400},
         "source": {"enum": ["manual"], "description": "CON-004. Omitted = manual. 'healthkit' is reserved for Apple Health (ADR-043) and not accepted yet."},
-        "rpe": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
+        "actualLoadKg": {"type": ["number", "null"], "minimum": 0, "maximum": 1000, "description": "CON-006 (ADR-062). Load actually lifted in kg (ADR-046: never lb). Only for a load target; at most 2 decimals (backend/CaliDomain rule, ADR-020)."},
+        "rpe":{"type": ["integer", "null"], "minimum": 1, "maximum": 10},
         "note": {"type": ["string", "null"], "maxLength": 1000},
         "skipReason": {"type": ["string", "null"], "maxLength": 500},
         "painReported": {"type": "boolean"},

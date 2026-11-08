@@ -122,6 +122,12 @@ try:
     bundle = jsonschema.Draft202012Validator(bundle_schema, format_checker=jsonschema.FormatChecker())
     for error in bundle.iter_errors(catalog):
         errors.append(f'fixtures/exercise_catalog.json does not match catalog-bundle schema: {error.message}')
+    # CON-006: catalog-level rejections (measurementType mismatch, 'mixed' discipline, ...) must stay INVALID.
+    catalog_rejections = json.loads((ROOT / 'fixtures/validation/catalog_rejections.json').read_text(encoding='utf-8'))
+    for case in catalog_rejections['cases']:
+        wrapped = {'catalogVersion': 1, 'status': 'development_fixture_only', 'items': [case['item']]}
+        if bundle.is_valid(wrapped):
+            errors.append(f"fixtures/validation/catalog_rejections case {case['name']} is unexpectedly schema-valid")
     # Fixtures must also conform to the OpenAPI wire schemas (OpenAPI 3.1
     # schemas are JSON Schema 2020-12, resolved in-document via referencing).
     if spec is not None:
@@ -233,6 +239,33 @@ try:
             indicator_id = mutation['payload'].get('indicatorId') if mutation['entityType'] == 'plan_goal' else None
             if indicator_id and indicator_id not in seeded_indicators and not label.endswith('goal_unknown_indicator'):
                 errors.append(f'{label} references indicator {indicator_id} not seeded in db/005')
+
+        # CON-006: one discipline vocabulary (OpenAPI, bundle, db/006) and a derived measurementType (ADR-060, ADR-061).
+        disciplines = set(schemas['Discipline']['enum'])
+        bundle_item = bundle_schema['$defs']['item']
+        if set(bundle_item['properties']['discipline']['enum']) != disciplines:
+            errors.append(f"catalog-bundle item.discipline drifts from OpenAPI Discipline {sorted(disciplines)}")
+        if not disciplines <= set(schemas['PrimaryDiscipline']['enum']):
+            errors.append('OpenAPI Discipline must be a subset of PrimaryDiscipline')
+        migration = (ROOT / 'db/006_exercise_discipline_load.sql').read_text(encoding='utf-8')
+        match = re.search(r"ck_exercise_catalog_discipline CHECK \(discipline IN \(([^)]*)\)\)", migration)
+        db_disciplines = set(re.findall(r"'([a-z_]+)'", match.group(1))) if match else set()
+        if db_disciplines != disciplines:
+            errors.append(f'db/006 ck_exercise_catalog_discipline {sorted(db_disciplines)} != OpenAPI Discipline {sorted(disciplines)}')
+        measurement_map = {rule['if']['properties']['type']['const']: rule['then']['properties']['measurementType']['const']
+                           for rule in bundle_item.get('allOf', [])}
+        if set(measurement_map) != set(schemas['ExerciseType']['enum']):
+            errors.append(f'catalog-bundle measurementType map does not cover ExerciseType: {sorted(measurement_map)}')
+        if set(measurement_map.values()) != set(schemas['MeasurementType']['enum']):
+            errors.append(f"measurementType map values {sorted(set(measurement_map.values()))} != OpenAPI MeasurementType")
+        for item in catalog['items']:
+            if measurement_map.get(item.get('type')) != item.get('measurementType'):
+                errors.append(f"fixtures/exercise_catalog.json {item.get('slug')} measurementType differs from its type")
+        for field in ('discipline', 'measurementType', 'focusTags'):
+            if field not in schemas['Exercise']['properties']:
+                errors.append(f'OpenAPI Exercise is missing {field} (CON-006)')
+        if 'actualLoadKg' not in schema['$defs']['set_result_payload']['properties']:
+            errors.append('entity-payloads set_result_payload is missing actualLoadKg (CON-006)')
 except ImportError:
     print('INFO: jsonschema unavailable; skipping JSON Schema semantic checks')
 except Exception as exc:

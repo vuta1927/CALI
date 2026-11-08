@@ -29,6 +29,7 @@ disagreement between the vectors, the reducer and docs/03 was found, so no reduc
 | `illegal_transitions.json` | Representative rejections; a rejected command never changes state or revision. |
 | `clock_jump_during_rest.json` | Edge #4: wall clock changed during rest; transitions withheld with `clock_jump_detected` until acknowledged. |
 | `stale_session_recovery.json` | Edge #7: app killed mid-set, reopened 7 h later; recovery prompt, nothing auto-completed. |
+| `load_reps.json` | CON-006 / ADR-062: load target 5 x 60 kg, no deadline, confirm requires `actualReps` + `actualLoadKg` (max 2 decimals, rejected not rounded), lighter set recorded as given. |
 
 ## Format
 

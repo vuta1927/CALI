@@ -249,6 +249,10 @@ enum MockData {
                     set.workMs = Int64(work) * 1000
                 case .skillAttempt:
                     set.status = seed % 3 == 0 ? .failed : .completed
+                case .load(let r, let kg):
+                    // Exhaustiveness only: the sample plan has no load exercise, so no load history is generated.
+                    set.reps = r
+                    set.loadKg = kg
                 }
                 if variant == 1, exerciseIndex == 0, setIndex == item.setCount {
                     set.status = .skipped
