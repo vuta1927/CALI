@@ -17,7 +17,7 @@ for line in source.read_text(encoding='utf-8').splitlines():
     cols=[x.strip() for x in line.strip().strip('|').split('|')]
     if len(cols)!=4: continue
     task,owner,dependencies,dod=cols
-    if not re.fullmatch(r'[A-Z]{2,4}-\d{3}',task):continue
+    if not re.fullmatch(r'[A-Z][A-Z0-9]{1,3}-\d{3}',task):continue
     rows.append({'task_id':task,'milestone':milestone,'owner':owner,'depends_on':dependencies if dependencies not in ('none','-') else '', 'definition_of_done':dod})
 with target.open('w',encoding='utf-8',newline='') as f:
     w=csv.DictWriter(f,fieldnames=['task_id','milestone','owner','depends_on','definition_of_done'])

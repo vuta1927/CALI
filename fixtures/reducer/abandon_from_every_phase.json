@@ -1,0 +1,587 @@
+{
+  "name": "abandon_from_every_phase",
+  "description": "AbandonSession is accepted from every non-terminal phase (docs/03 §4 table, ADR-029): READY, PRE_COUNTDOWN, EXERCISING, PAUSED, AWAITING_RESULT, RESTING and REVIEWING_SUMMARY, each in a fresh session. Any deadline is cleared; an unconfirmed draft or partial set is never recorded; confirmed sets are kept. It is rejected for an abandoned or completed session and for an over-long reason.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005001",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expect": {
+        "error": "validation_failed",
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 2,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:03Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "reason": "again"
+      },
+      "expect": {
+        "error": "session_not_active",
+        "phase": "abandoned",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "sessionId": "00000000-0000-4000-8000-000000005002",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009002",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008002",
+            "exerciseId": "00000000-0000-4000-8000-000000007002",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "phase": "pre_countdown",
+        "revision": 2,
+        "phaseDeadlineAt": "2026-11-07T08:00:13Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:11Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000007",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 3,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:20Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "sessionId": "00000000-0000-4000-8000-000000005003",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009003",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008003",
+            "exerciseId": "00000000-0000-4000-8000-000000007003",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:20Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000009",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": "2026-11-07T08:00:30Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:25Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000010",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 3,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed",
+          "deadline_changed"
+        ],
+        "confirmedSetCount": 0,
+        "skippedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:40Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000011",
+        "sessionId": "00000000-0000-4000-8000-000000005004",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009004",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008004",
+            "exerciseId": "00000000-0000-4000-8000-000000007004",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:40Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000012",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:45Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000013"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 3,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:50Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000014",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 4,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed"
+        ],
+        "confirmedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000015",
+        "sessionId": "00000000-0000-4000-8000-000000005005",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009005",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008005",
+            "exerciseId": "00000000-0000-4000-8000-000000007005",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000016",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:05Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000017"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3,
+        "pendingMeasuredElapsedMs": 5000
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:06Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000018",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 4,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed"
+        ],
+        "confirmedSetCount": 0,
+        "skippedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:20Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000019",
+        "sessionId": "00000000-0000-4000-8000-000000005006",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009006",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008006",
+            "exerciseId": "00000000-0000-4000-8000-000000007006",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:20Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000020",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:30Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000021"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:31Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000022",
+        "setResultId": "00000000-0000-4000-8000-000000004001",
+        "executionId": "00000000-0000-4000-8000-000000009006",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 10000
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 4,
+        "phaseDeadlineAt": "2026-11-07T08:02:31Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:40Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000023",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 5,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed",
+          "deadline_changed"
+        ],
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:20Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000024",
+        "sessionId": "00000000-0000-4000-8000-000000005007",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009007",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008007",
+            "exerciseId": "00000000-0000-4000-8000-000000007007",
+            "catalogVersion": 3,
+            "setCount": 1,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:20Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000025",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:30Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000026"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:31Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000027",
+        "setResultId": "00000000-0000-4000-8000-000000004002",
+        "executionId": "00000000-0000-4000-8000-000000009007",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 10000
+      },
+      "expect": {
+        "phase": "reviewing_summary",
+        "revision": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:32Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000028",
+        "reason": "stopping early"
+      },
+      "expect": {
+        "phase": "abandoned",
+        "status": "abandoned",
+        "revision": 5,
+        "phaseDeadlineAt": null,
+        "events": [
+          "session_abandoned",
+          "phase_changed"
+        ],
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000029",
+        "sessionId": "00000000-0000-4000-8000-000000005008",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009008",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008008",
+            "exerciseId": "00000000-0000-4000-8000-000000007008",
+            "catalogVersion": 3,
+            "setCount": 1,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 10
+            },
+            "restSeconds": 60
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "status": "active",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:01Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000030",
+        "setResultId": "00000000-0000-4000-8000-000000004003",
+        "executionId": "00000000-0000-4000-8000-000000009008",
+        "setIndex": 1
+      },
+      "expect": {
+        "phase": "reviewing_summary",
+        "revision": 2,
+        "skippedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:02Z",
+      "command": {
+        "type": "finish_session",
+        "commandId": "00000000-0000-4000-8000-000000000031"
+      },
+      "expect": {
+        "phase": "completed",
+        "status": "completed",
+        "revision": 3
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:03Z",
+      "command": {
+        "type": "abandon_session",
+        "commandId": "00000000-0000-4000-8000-000000000032",
+        "reason": "late"
+      },
+      "expect": {
+        "error": "session_not_active",
+        "phase": "completed",
+        "status": "completed",
+        "revision": 3
+      }
+    }
+  ]
+}

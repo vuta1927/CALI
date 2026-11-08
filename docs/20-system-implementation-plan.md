@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Contract | OpenAPI 3.1, `entity-payloads.schema.json`, `catalog-bundle.schema.json`, `db/001`, `db/002` seed dev, `fixtures/`; CON-001 đã chốt (ADR-016..033) | Chưa có thực thể cho docs/18 và docs/19: goal, phase, activation, running, load, criteria config | `docs/reviews/CON-001-contract-review.md`, `handoff.yml` |
 | Backend | B0: 5 project + DevToken; DbUp; JWT dev; ProblemDetails; health; rate limit; `GET /v1/me`; CI | B1–B4: catalog, plans, sync push/pull, auth Apple. Worker mới có heartbeat | `backend/`, 69 test (CHANGELOG B0) |
-| CaliDomain | Reducer thuần, reconcile (clock jump, session cũ), FakeClock; fixture CON-002 **bản nháp** | CON-002 chưa duyệt; chưa có prescription `load` / running; chưa có logic vòng đời giáo án | `swift-domain.yml`, 72 test |
+| CaliDomain | Reducer thuần, reconcile (clock jump, session cũ), FakeClock; fixture CON-002 **bản nháp** | CON-002 chưa duyệt; chưa có prescription `load` / running; chưa có logic vòng đời giáo án | `swift-domain.yml`, 73 test (sau CON-002 prep) |
 | iOS app | POC UI đủ 5 tab, Player dùng reducer, recovery, sửa nội dung (IOS-009/MED-002), theme cam, 19 XCTest | Lưu bằng **một file JSON** (`LocalStore.swift`, `TODO(POC-003)`); không GRDB, không `processed_commands` / `sync_outbox` dạng bảng, không Diagnostics screen, không `LiveActivityIntent`; chỉ có **một** `plan` | run 42476165899 (commit `4a9ab4c`) |
 | Widget / Live Activity | Extension render `ContentState` read-only, mang brand cam | Chưa có evidence thiết bị (POC-001); chưa có nút intent (POC-002) | `ios/CaliActivityWidget/` |
 | Brand / UI | Token cam, `caliAccentInk` đạt 4.5:1, icon + brand assets cam, mockup toàn app | Chưa có duyệt logo cuối, kiểm tra nhãn hiệu, QA trên iPhone thật (light/dark, icon) | `validate_brand_assets.py`, `validate_coami_*` |
@@ -29,6 +29,7 @@
 **Lệch thứ tự so với docs/16 §4:** UI POC chạy trên dữ liệu local (`606030e`) được làm trước POC-001/002. Vì vậy kiến trúc lưu trữ (ADR-002 / ADR-013) vẫn **chưa có bằng chứng thiết bị**. Đây là cổng chặn đầu tiên (§4, Giai đoạn 0).
 
 **Trùng ID backlog:** `IOS-009` đang dùng cho hai task: sửa nội dung (M1) và UI duyệt AI (M3). Đề xuất đổi task M3 thành **IOS-010** (§11).
+> **Trạng thái (2026-11-08):** BL-001 đã áp dụng trong `contracts/backlog.csv` và docs/13.
 
 ---
 
@@ -148,6 +149,10 @@ flowchart TB
 | CON-002 | Duyệt `fixtures/reducer/*.json` bản nháp; bổ sung vector cho pause/resume, skip, abandon từ mọi phase | integrator + ios | S | Fixture được duyệt; CaliDomain đọc fixture và test pass trên Linux |
 | BL-001 | Vệ sinh backlog: đổi `IOS-009` (M3) thành `IOS-010`; thêm ID mới của tài liệu này vào `contracts/backlog.csv` và `docs/13` | integrator | S | `validate_handoff.py` pass |
 
+> **Trạng thái PO-002 (2026-11-08):** đã có bản nháp ADR-034..049 trong docs/15, tất cả ở trạng thái **Proposed** và chờ PO duyệt. Gồm docs/19 D2–D9 (ADR-034..041), docs/19 §11.1–11.3 (ADR-042..044), docs/18 §9.1, 9.2, 9.5, 9.6 (ADR-045..048) và quy ước migration (ADR-049). Sáu câu hỏi chưa có đề xuất được liệt kê ở docs/15 cho PO: docs/18 §9.3, 9.4, 9.7 và docs/19 §11.4–11.6. Việc duyệt ADR-011..015 vẫn để PO; trạng thái các ADR này không đổi. docs/18 và docs/19 chỉ được đánh dấu "đã chốt" sau khi PO duyệt.
+
+> **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. Việc còn lại: integrator + iOS duyệt (cùng POC-002 theo docs/13).
+
 **Nhánh NO-GO của POC-002:**
 - Nếu intent không chạy được khi app bị kill (P-06), nút trên Activity chỉ còn là deep link mở app. Bỏ `LiveActivityIntent` khỏi IOS-005.
 - Nếu extension buộc phải đọc DB, cần App Group, tức là cần tài khoản trả phí (docs/16 §9). Khi đó IOS-001 dời DB vào App Group container và thêm test Data Protection (R-08).
@@ -156,7 +161,7 @@ flowchart TB
 
 Mỗi slice gồm: ADR, `contracts/openapi.yaml`, `contracts/entity-payloads.schema.json`, SQL migration, `fixtures/validation/business_rules.json` và fixture mẫu, docs 03/07/08 (và 09/11 nếu liên quan), test validator, contract test backend.
 
-**Quy ước migration (đề xuất, cần ADR):** từ CON-003 trở đi, viết file **mới** `db/003_*.sql`, `db/004_*.sql`, không sửa `db/001` nữa. Lý do: kiểm thử đường nâng cấp bằng DbUp trước khi có DB thật được triển khai.
+**Quy ước migration (đề xuất, cần ADR):** từ CON-003 trở đi, viết file **mới** `db/003_*.sql`, `db/004_*.sql`, không sửa `db/001` nữa. Lý do: kiểm thử đường nâng cấp bằng DbUp trước khi có DB thật được triển khai. *Trạng thái: bản nháp ADR-049 (Proposed) trong docs/15.*
 
 | ID | Nội dung | Phụ thuộc | Cỡ | Ghi chú |
 |---|---|---|---|---|
@@ -344,6 +349,8 @@ Bổ sung cho docs/15 và docs/16 §10.
 ## 11. Thay đổi đề xuất cho backlog (`contracts/backlog.csv`, docs/13)
 
 Áp dụng trong BL-001 sau khi tài liệu này được duyệt.
+
+> **Trạng thái (2026-11-08):** đã áp dụng bảng này vào `contracts/backlog.csv` và docs/13 (tổng 53 task, không trùng ID, không có phụ thuộc trỏ tới ID không tồn tại). Phụ thuộc `IOS-013..017` của A11Y-001 được viết đầy đủ thành 5 ID. Regex ID của `tools/export_backlog.py` đã sửa thành `[A-Z][A-Z0-9]{1,3}-\d{3}` để nhận `A11Y-001`; CSV xuất lại từ docs/13 trùng khớp bản đã sửa.
 
 | ID | Milestone | Owner | Depends on | DoD tóm tắt |
 |---|---|---|---|---|

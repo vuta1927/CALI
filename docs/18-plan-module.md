@@ -3,6 +3,7 @@
 > **Trạng thái:** Đề xuất thiết kế (UX + domain). Mockup tương tác: [`docs/design/mockups/plan-module.html`](design/mockups/plan-module.html).
 > **Phạm vi lần này:** chỉ tài liệu và mockup. Chưa đổi OpenAPI, SQL hay payload sync. Khi triển khai, xem mục 8 để biết phần contract cần làm trước (AGENTS rule 7).
 > **Ngày:** 2026-11-08 · Dữ liệu trong mockup là **dữ liệu mẫu**.
+> **PO-002:** câu hỏi §9.1, 9.2, 9.5, 9.6 đã có ADR-045..048 ở trạng thái **Proposed** trong [docs/15](15-decisions-risks.md), chờ PO duyệt. §9.3, 9.4, 9.7 chưa có đề xuất.
 > **Nhiều giáo án:** xem [docs/19](19-multi-plan.md). Người dùng có thể theo song song nhiều giáo án (Calisthenics, chạy giải, Gym). Khi được chốt: "giáo án hiện tại" trong tài liệu này đổi thành "giáo án đang xem", tuần hiện tại tính theo docs/19 D7 (§6.5, §6.6), và §4 thêm môn `running` với kiểu đo `distance` / `duration`.
 
 ## 1. Mục tiêu sản phẩm
@@ -182,10 +183,10 @@ Hiện trạng: `set_result` đã có `actualReps`, `actualHoldMs`, `rpe`, `pain
 Đề xuất tách thành các slice: **CON-0xx Plan goals (goal + indicator + phases)** → **CON-0xx Body measurement** → **CON-0xx Discipline + load** → **CON-0xx Criteria config**. Mỗi slice gồm ADR, contract, fixtures và test.
 
 ## 9. Câu hỏi mở
-1. `rpe` hiện là cột riêng (1–10). Có chuyển thành một tiêu chí cấu hình hay giữ cột riêng vì AI và analytics dùng nhiều? *Đề xuất: giữ cột riêng; trong cấu hình chỉ điều khiển việc hiển thị.*
-2. Đơn vị tạ: chỉ kg, hay cho phép lb theo cài đặt người dùng? *Đề xuất: lưu kg, hiển thị theo cài đặt.*
-3. Tiêu chí có nên áp theo từng bài (`exerciseIds`) ngay từ phiên bản đầu không?
-4. Phạm vi của portal: chỉ tiêu chí, hay cả danh mục bài tập và media?
-5. Đổi bài hoặc chỉ số của một mục tiêu đã có tiến độ: sửa tại chỗ hay lưu trữ mục tiêu cũ và tạo mới? *Đề xuất: chỉ cho sửa tên và mức đích; đổi bài / chỉ số thì tạo mục tiêu mới để giữ lịch sử.*
-6. Ngưỡng 3 mục tiêu ghim và cách lấy "hiện tại" cho chỉ số tổng (tuần gần nhất) cần kiểm chứng bằng usability test.
-7. Mục tiêu `adherence` tính theo lịch đã lên tại thời điểm nào khi người dùng dời buổi tập?
+1. `rpe` hiện là cột riêng (1–10). Có chuyển thành một tiêu chí cấu hình hay giữ cột riêng vì AI và analytics dùng nhiều? *Đề xuất: giữ cột riêng; trong cấu hình chỉ điều khiển việc hiển thị.* → [ADR-045](15-decisions-risks.md) (Proposed)
+2. Đơn vị tạ: chỉ kg, hay cho phép lb theo cài đặt người dùng? *Đề xuất: lưu kg, hiển thị theo cài đặt.* → [ADR-046](15-decisions-risks.md) (Proposed)
+3. Tiêu chí có nên áp theo từng bài (`exerciseIds`) ngay từ phiên bản đầu không? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md), "Câu hỏi mở chưa có đề xuất").
+4. Phạm vi của portal: chỉ tiêu chí, hay cả danh mục bài tập và media? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)).
+5. Đổi bài hoặc chỉ số của một mục tiêu đã có tiến độ: sửa tại chỗ hay lưu trữ mục tiêu cũ và tạo mới? *Đề xuất: chỉ cho sửa tên và mức đích; đổi bài / chỉ số thì tạo mục tiêu mới để giữ lịch sử.* → [ADR-047](15-decisions-risks.md) (Proposed)
+6. Ngưỡng 3 mục tiêu ghim và cách lấy "hiện tại" cho chỉ số tổng (tuần gần nhất) cần kiểm chứng bằng usability test. → [ADR-048](15-decisions-risks.md) (Proposed): giữ giá trị hiện tại làm mặc định tạm.
+7. Mục tiêu `adherence` tính theo lịch đã lên tại thời điểm nào khi người dùng dời buổi tập? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)).

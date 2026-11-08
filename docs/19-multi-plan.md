@@ -1,6 +1,6 @@
 # 19. Nhiều giáo án (Multi-plan): phân tích yêu cầu và đặc tả
 
-> **Trạng thái:** Đề xuất của BA, PO đã chốt các quyết định chính ở §3; mockup đã dựng (§7). Chỉ có tài liệu: chưa đổi OpenAPI, SQL, payload sync hay code (AGENTS rule 7, xem §10).
+> **Trạng thái:** Đề xuất của BA, PO đã chốt các quyết định chính ở §3; mockup đã dựng (§7). D2–D9 và các câu hỏi §11.1–11.3 đã có ADR-034..044 ở trạng thái **Proposed** trong [docs/15](15-decisions-risks.md) (PO-002, chờ PO duyệt); §11.4–11.6 chưa có đề xuất. Chỉ có tài liệu: chưa đổi OpenAPI, SQL, payload sync hay code (AGENTS rule 7, xem §10).
 > **Yêu cầu gốc (2026-11-08):** "Cho phép tạo nhiều giáo án", PO làm rõ bằng ví dụ: **giáo án tập Calisthenics, giáo án chạy giải, giáo án tập Gym**. Người dùng theo **song song** nhiều giáo án, mỗi giáo án phục vụ một mục đích riêng. Lịch sử **giữ nguyên là tab riêng** (đã chốt cùng ngày, docs/02 §3.1).
 > **Liên quan:** [docs/18](18-plan-module.md) (mục tiêu, lộ trình, tiến bộ, đa môn §4), [docs/02 §3.1](02-ux-spec.md) (Lịch sử), [docs/07 §4](07-data-model.md) (chính sách phiên bản giáo án), [docs/08](08-sync-protocol.md) (xung đột).
 
@@ -42,14 +42,14 @@
 | # | Câu hỏi | Đề xuất | Lý do |
 |---|---------|---------|-------|
 | D1 | Bao nhiêu giáo án **đang theo** cùng lúc? | ✅ **Đã chốt 2026-11-08: tối đa 3** (cấu hình được ở server). Thực tế ít người theo nhiều hơn. | Đủ cho ví dụ Calisthenics + chạy + Gym. Giới hạn giữ Hôm nay gọn và nằm trong giới hạn 64 thông báo chờ của iOS. |
-| D2 | Một giáo án có **môn chính** không? | **Có:** `primaryDiscipline` (calisthenics / running / gym / mixed) để chọn icon, màu nhấn, mẫu và bộ lọc. Bài trong giáo án vẫn mang `discipline` riêng (docs/18 §4 giữ nguyên). | Người dùng nhận ra giáo án ngay. Không cấm giáo án hỗn hợp. |
-| D3 | Có loại giáo án **hướng tới sự kiện** không? | **Có hai loại:** *Theo tuần* (mặc định, chọn ngày bắt đầu) và *Hướng tới sự kiện* (nhập ngày sự kiện, ngày bắt đầu = ngày sự kiện − số tuần lộ trình, hiện "Còn x tuần"). | Đáp ứng US-3. Giai đoạn giảm tải trước giải chỉ là một giai đoạn bình thường (docs/18 §6.5). |
-| D4 | Người dùng có thấy "phiên bản" không? | **Không.** Chỉ thấy *giáo án*. Phiên bản xem được ở Nhật ký thay đổi. | Tránh danh sách bị lặp. |
-| D5 | Trùng ngày giữa các giáo án? | **Cho phép.** Màn "Tuần của tôi" đánh dấu ngày có ≥ 2 buổi, chỉ để thông tin, không chặn và không tự dời lịch. | Không đưa lời khuyên tập luyện. Người dùng tự xếp. |
-| D6 | Hết lộ trình / qua ngày sự kiện thì sao? | **Không tự kết thúc.** Hiện thẻ "Đã hết lộ trình" (hoặc "Đã qua ngày thi") với Kết thúc / Kéo dài / Lặp lại. Giáo án sự kiện có thêm "Ghi kết quả thi". | Không im lặng đổi trạng thái (AGENTS rule 3, 5). |
-| D7 | Tuần hiện tại khi có tạm dừng? | Giáo án *Theo tuần*: tính theo **số ngày đã thực sự theo** (quay lại tiếp đúng tuần đang dở). Giáo án *Sự kiện*: tính theo **lịch tới ngày sự kiện** (tạm dừng không lùi ngày thi, các tuần bị nghỉ coi như đã qua). | Ngày thi cố định, còn giáo án theo tuần thì linh hoạt. |
-| D8 | Xoá hay lưu trữ? | Ưu tiên **Lưu trữ**. **Xoá** là xoá mềm và **không bao giờ** xoá buổi tập hay set. | Người dùng sở hữu nhật ký tập (AGENTS rule 6). |
-| D9 | Giới hạn tổng số giáo án? Ngày bắt đầu ở quá khứ? | Tối đa **50** giáo án chưa xoá. Ngày bắt đầu **không** ở quá khứ. | Ngày quá khứ sinh buổi "bỏ lỡ" giả. |
+| D2 | Một giáo án có **môn chính** không? | **Có:** `primaryDiscipline` (calisthenics / running / gym / mixed) để chọn icon, màu nhấn, mẫu và bộ lọc. Bài trong giáo án vẫn mang `discipline` riêng (docs/18 §4 giữ nguyên). | Người dùng nhận ra giáo án ngay. Không cấm giáo án hỗn hợp. [ADR-034](15-decisions-risks.md) (Proposed) |
+| D3 | Có loại giáo án **hướng tới sự kiện** không? | **Có hai loại:** *Theo tuần* (mặc định, chọn ngày bắt đầu) và *Hướng tới sự kiện* (nhập ngày sự kiện, ngày bắt đầu = ngày sự kiện − số tuần lộ trình, hiện "Còn x tuần"). [ADR-035](15-decisions-risks.md) (Proposed) | Đáp ứng US-3. Giai đoạn giảm tải trước giải chỉ là một giai đoạn bình thường (docs/18 §6.5). |
+| D4 | Người dùng có thấy "phiên bản" không? | **Không.** Chỉ thấy *giáo án*. Phiên bản xem được ở Nhật ký thay đổi. [ADR-036](15-decisions-risks.md) (Proposed) | Tránh danh sách bị lặp. |
+| D5 | Trùng ngày giữa các giáo án? | **Cho phép.** Màn "Tuần của tôi" đánh dấu ngày có ≥ 2 buổi, chỉ để thông tin, không chặn và không tự dời lịch. [ADR-037](15-decisions-risks.md) (Proposed) | Không đưa lời khuyên tập luyện. Người dùng tự xếp. |
+| D6 | Hết lộ trình / qua ngày sự kiện thì sao? | **Không tự kết thúc.** Hiện thẻ "Đã hết lộ trình" (hoặc "Đã qua ngày thi") với Kết thúc / Kéo dài / Lặp lại. Giáo án sự kiện có thêm "Ghi kết quả thi". [ADR-038](15-decisions-risks.md) (Proposed) | Không im lặng đổi trạng thái (AGENTS rule 3, 5). |
+| D7 | Tuần hiện tại khi có tạm dừng? | Giáo án *Theo tuần*: tính theo **số ngày đã thực sự theo** (quay lại tiếp đúng tuần đang dở). Giáo án *Sự kiện*: tính theo **lịch tới ngày sự kiện** (tạm dừng không lùi ngày thi, các tuần bị nghỉ coi như đã qua). [ADR-039](15-decisions-risks.md) (Proposed) | Ngày thi cố định, còn giáo án theo tuần thì linh hoạt. |
+| D8 | Xoá hay lưu trữ? | Ưu tiên **Lưu trữ**. **Xoá** là xoá mềm và **không bao giờ** xoá buổi tập hay set. [ADR-040](15-decisions-risks.md) (Proposed) | Người dùng sở hữu nhật ký tập (AGENTS rule 6). |
+| D9 | Giới hạn tổng số giáo án? Ngày bắt đầu ở quá khứ? | Tối đa **50** giáo án chưa xoá. Ngày bắt đầu **không** ở quá khứ. [ADR-041](15-decisions-risks.md) (Proposed) | Ngày quá khứ sinh buổi "bỏ lỡ" giả. |
 
 ## 4. Mô hình khái niệm
 ```text
@@ -238,9 +238,9 @@ Feature: Nhiều giáo án song song
 ## 11. Câu hỏi mở
 **Đã trả lời (2026-11-08):** giới hạn 3 giáo án đang theo là đủ (D1); ghi chạy nhập tay ở MVP, Apple Health làm sau (§2); có tổng hợp qua mọi giáo án (MP-15).
 
-1. Có cho 2 giáo án đang theo **cùng môn** (ví dụ 2 giáo án Gym) không? Đề xuất: cho phép, không chặn.
-2. Khi tích hợp Apple Health: buổi chạy nhập từ Health tự gắn vào buổi theo lịch cùng ngày, hay người dùng xác nhận từng buổi? (Đề xuất: người dùng xác nhận, theo tinh thần không im lặng ghi kết quả.)
-3. Khi nhân bản, mốc ban đầu của mục tiêu lấy từ thành tích tốt nhất của giáo án trước hay đo lại?
-4. Kết thúc giáo án có cho chuyển mục tiêu chưa đạt sang giáo án khác không?
-5. Có cần nhập bù buổi tập trong quá khứ (liên quan D9)?
-6. Đơn vị: chỉ km, hay cho chọn dặm?
+1. Có cho 2 giáo án đang theo **cùng môn** (ví dụ 2 giáo án Gym) không? Đề xuất: cho phép, không chặn. → [ADR-042](15-decisions-risks.md) (Proposed)
+2. Khi tích hợp Apple Health: buổi chạy nhập từ Health tự gắn vào buổi theo lịch cùng ngày, hay người dùng xác nhận từng buổi? (Đề xuất: người dùng xác nhận, theo tinh thần không im lặng ghi kết quả.) → [ADR-043](15-decisions-risks.md) (Proposed)
+3. Khi nhân bản, mốc ban đầu của mục tiêu lấy từ thành tích tốt nhất của giáo án trước hay đo lại? → [ADR-044](15-decisions-risks.md) (Proposed), lấy theo MP-03 ("mốc ban đầu tính lại"); cần PO xác nhận.
+4. Kết thúc giáo án có cho chuyển mục tiêu chưa đạt sang giáo án khác không? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md), "Câu hỏi mở chưa có đề xuất").
+5. Có cần nhập bù buổi tập trong quá khứ (liên quan D9)? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)).
+6. Đơn vị: chỉ km, hay cho chọn dặm? Chưa có đề xuất, chờ PO ([docs/15](15-decisions-risks.md)); lưu trữ đã là mét (`distanceMeters`, §10).

@@ -1,6 +1,6 @@
-# Reducer conformance vectors (CON-002) — DRAFT
+# Reducer conformance vectors (CON-002) — READY FOR REVIEW
 
-> **Status: DRAFT, pending POC-002 review.** These vectors encode the `CaliDomain` reducer's
+> **Status: ready for review (2026-11-08); CON-002 is NOT approved yet.** These vectors encode the `CaliDomain` reducer's
 > current interpretation of `docs/03-workout-domain.md`. Where docs/03 was ambiguous the
 > chosen behavior is listed as an open CON-002 question in the I1a PR. Do not treat these files as
 > a frozen contract until CON-002 is approved; changes to them require the same review as a
@@ -9,6 +9,26 @@
 Each `*.json` file is one scenario, replayed step by step against a fresh (nil) session by
 `ios/Packages/CaliDomain/Tests/CaliDomainTests/ReducerFixtureTests.swift`. They are deliberately
 language-neutral so a future backend or tooling implementation can run the same vectors.
+
+## Coverage (ready-for-review set, 2026-11-08)
+
+All files were re-read against `docs/03-workout-domain.md` §4 and ADR-016..033 (docs/15); no
+disagreement between the vectors, the reducer and docs/03 was found, so no reducer change was made.
+
+| File | Covers |
+|---|---|
+| `happy_path_static_hold.json` | Static hold 12 s x2, 90 s rest: countdown, deadline reconcile, confirm, rest expiry, manual stop, summary, explicit finish. |
+| `deadline_while_suspended.json` | Edge #3 / ADR-009: hold deadline passes while locked; no suggested actual and no set result until the user confirms. |
+| `rest_extend_never_autostarts.json` | Edge #5: repeated +30 s extensions; rest expiring while locked leads to READY, never EXERCISING. |
+| `pause_resume.json` | PAUSED has no moving deadline; resume recomputes from frozen remainder. |
+| `pause_resume_edge_cases.json` | Pause/resume rejected in every other phase; reps target without deadline; multi-cycle measured time; 0.5 s remainder; no SkipSet while PAUSED. |
+| `skip_set.json` | SkipSet from READY/EXERCISING/AWAITING_RESULT, no rest after a skip, next exercise and summary, rejected in PAUSED/RESTING, duplicate/mismatch/over-long reason, finish with skipped sets. |
+| `abandon_and_terminal.json` | Abandon from PRE_COUNTDOWN; a terminal session rejects commands, reconcile is a no-op, a new session may follow. |
+| `abandon_from_every_phase.json` | Abandon from READY, PRE_COUNTDOWN, EXERCISING, PAUSED, AWAITING_RESULT, RESTING, REVIEWING_SUMMARY (ADR-029); rejected when abandoned/completed or reason too long. |
+| `duplicate_confirm.json` | Edge #1: double tap / widget race; a second resolution of the same set is rejected and never double-counts. |
+| `illegal_transitions.json` | Representative rejections; a rejected command never changes state or revision. |
+| `clock_jump_during_rest.json` | Edge #4: wall clock changed during rest; transitions withheld with `clock_jump_detected` until acknowledged. |
+| `stale_session_recovery.json` | Edge #7: app killed mid-set, reopened 7 h later; recovery prompt, nothing auto-completed. |
 
 ## Format
 
