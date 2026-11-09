@@ -1,0 +1,486 @@
+{
+  "_comment": "CON-004/CON-003/CON-006: mutations that MUST fail contracts/entity-payloads.schema.json itself (validation_failed at schema level, ADR-020). tools/validate_handoff.py asserts each one is schema-INVALID, so a later schema change cannot silently start accepting them. Exercise ids refer to fixtures/exercise_catalog.json.",
+  "cases": [
+    {
+      "name": "source_healthkit_not_accepted_yet",
+      "reason": "ADR-043: 'healthkit' is reserved; only 'manual' is accepted until the Apple Health slice",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000007",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000007",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000007",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "distanceMeters": 5000,
+          "durationSeconds": 1750,
+          "source": "healthkit"
+        }
+      }
+    },
+    {
+      "name": "duration_over_24h",
+      "reason": "IOS-014: durations above 24h (86400 s) are rejected",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000008",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000008",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000008",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "duration", "durationSeconds": 1200},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "durationSeconds": 90000
+        }
+      }
+    },
+    {
+      "name": "distance_over_1000km",
+      "reason": "distanceMeters upper bound is 1000000",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000009",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000009",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000009",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "distanceMeters": 1000001,
+          "durationSeconds": 1750
+        }
+      }
+    },
+    {
+      "name": "distance_target_without_distance",
+      "reason": "target kind distance requires distanceMeters",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000010",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000010",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000010",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
+          "orderIndex": 0,
+          "setCount": 1,
+          "target": {"kind": "distance", "durationSeconds": 1800},
+          "restSeconds": 0
+        }
+      }
+    },
+    {
+      "name": "pace_is_never_stored",
+      "reason": "pace is derived from durationSeconds / distanceMeters; a stored pace field is rejected",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000011",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000011",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000011",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800},
+            "setCount": 1,
+            "restSeconds": 0,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "distanceMeters": 5000,
+          "durationSeconds": 1750,
+          "paceSecondsPerKm": 350
+        }
+      }
+    },
+    {
+      "name": "plan_status_v1_active_not_accepted",
+      "reason": "CON-003 / ADR-056: training_plan.status is the revision status current|superseded; the v1 value 'active' is rejected",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000016",
+        "entityType": "training_plan",
+        "entityId": "c7000000-0000-4000-8000-000000000016",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c7000000-0000-4000-8000-000000000016",
+          "title": "Giáo án mẫu",
+          "revision": 1,
+          "status": "active"
+        }
+      }
+    },
+    {
+      "name": "event_plan_without_event_date",
+      "reason": "ADR-035: kind 'event' requires eventDate",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000017",
+        "entityType": "training_plan",
+        "entityId": "c7000000-0000-4000-8000-000000000017",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c7000000-0000-4000-8000-000000000017",
+          "title": "Giáo án mẫu",
+          "revision": 1,
+          "status": "current",
+          "kind": "event",
+          "eventName": "Giải chạy 10K"
+        }
+      }
+    },
+    {
+      "name": "activation_unknown_end_reason",
+      "reason": "plan_activation.endReason is one of paused|completed|stopped|deleted (archive never closes an activation)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000018",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000018",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000018",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "fromDate": "2026-11-10",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "toDate": "2026-11-20",
+          "endReason": "archived"
+        }
+      }
+    },
+    {
+      "name": "activation_end_reason_without_to_date",
+      "reason": "an activation closed by a lifecycle command must carry toDate",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000019",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000019",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000019",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "fromDate": "2026-11-10",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "endReason": "paused"
+        }
+      }
+    },
+    {
+      "name": "activation_with_unknown_field",
+      "reason": "ADR-030: payloads are closed; the plan status is computed, never sent (docs/19 section 4.2)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000020",
+        "entityType": "plan_activation",
+        "entityId": "c6000000-0000-4000-8000-000000000020",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c6000000-0000-4000-8000-000000000020",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "fromDate": "2026-11-10",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "isActive": true
+        }
+      }
+    },
+    {
+      "name": "goal_achieved_without_achieved_at",
+      "reason": "CON-005 docs/18 §6.2: 'achieved' is a user confirmation and must carry achievedAt (AGENTS rules 3 and 5)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000029",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000029",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000029",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "achieved",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_active_with_achieved_at",
+      "reason": "CON-005: only an achieved (or archived after achieved) goal carries achievedAt",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000030",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000030",
+        "action": "upsert",
+        "baseVersion": 1,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000030",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "active",
+          "achievedAt": "2026-11-08T09:00:00Z",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_target_value_and_range",
+      "reason": "CON-005: a goal target is either {value} or {min,max}, never both",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000031",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000031",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000031",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8, "min": 6, "max": 10},
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_current_is_never_sent",
+      "reason": "CON-005 docs/18 §6.1: current is computed on the device from saved set results; payloads are closed (ADR-030)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000032",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000032",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000032",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "current": 6,
+          "status": "active",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "goal_unknown_status",
+      "reason": "CON-005 docs/18 §6.2: status is one of active|reached|achieved|missed|archived",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000033",
+        "entityType": "plan_goal",
+        "entityId": "c8000000-0000-4000-8000-000000000033",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c8000000-0000-4000-8000-000000000033",
+          "planLineageId": "c7000000-0000-4000-8000-000000000001",
+          "title": "Pull-up 8 lần",
+          "indicatorId": "best_set_reps",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          "target": {"value": 8},
+          "status": "completed",
+          "pinned": false
+        }
+      }
+    },
+    {
+      "name": "phase_zero_weeks",
+      "reason": "CON-005 docs/18 §6.5: a phase lasts 1..52 weeks",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000034",
+        "entityType": "plan_phase",
+        "entityId": "c9000000-0000-4000-8000-000000000034",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-08T09:00:00Z",
+        "payload": {
+          "id": "c9000000-0000-4000-8000-000000000034",
+          "planId": "c7000000-0000-4000-8000-000000000001",
+          "orderIndex": 0,
+          "name": "Nền tảng",
+          "weeks": 0
+        }
+      }
+    },
+    {
+      "name": "load_negative_actual",
+      "reason": "CON-006 / ADR-062: actualLoadKg >= 0 (0 kg is allowed, negative never)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000025",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000025",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000025",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5,
+          "actualLoadKg": -2.5
+        }
+      }
+    },
+    {
+      "name": "load_target_without_load_kg",
+      "reason": "CON-006 / ADR-062: a load prescription needs reps and loadKg",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000026",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000026",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000026",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 5},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "load_target_over_1000_kg",
+      "reason": "CON-006 / ADR-062: loadKg <= 1000",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000027",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000027",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000027",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 5, "loadKg": 1000.5},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "load_target_zero_reps",
+      "reason": "CON-006 / ADR-062: load reps are 1..500",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000028",
+        "entityType": "planned_exercise",
+        "entityId": "c2000000-0000-4000-8000-000000000028",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:00:00Z",
+        "payload": {
+          "id": "c2000000-0000-4000-8000-000000000028",
+          "plannedWorkoutId": "c3000000-0000-4000-8000-000000000001",
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9",
+          "orderIndex": 0,
+          "setCount": 3,
+          "target": {"kind": "load", "reps": 0, "loadKg": 60},
+          "restSeconds": 120
+        }
+      }
+    },
+    {
+      "name": "set_result_with_volume_field",
+      "reason": "CON-006 / ADR-062 + ADR-030: volume (reps x kg) is derived, never sent or stored",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000029",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000029",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-07T10:30:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000029",
+          "executionId": "c5000000-0000-4000-8000-000000000001",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {"kind": "load", "reps": 5, "loadKg": 60},
+            "setCount": 3,
+            "restSeconds": 120,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+          },
+          "confirmedAt": "2026-11-07T10:30:00Z",
+          "actualReps": 5,
+          "actualLoadKg": 60,
+          "volumeKg": 300
+        }
+      }
+    }
+  ]
+}

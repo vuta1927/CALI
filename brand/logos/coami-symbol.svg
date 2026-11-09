@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">COAMI guided companion symbol</title>
+  <desc id="desc">An open C embraces a rising rounded route and companion point.</desc>
+  <defs>
+    <linearGradient id="coami-gradient" x1="190" y1="160" x2="820" y2="860" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF7A2F"/>
+      <stop offset="0.52" stop-color="#FC4C02"/>
+      <stop offset="1" stop-color="#E83F00"/>
+    </linearGradient>
+  </defs>
+  <path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="url(#coami-gradient)" stroke-width="136" stroke-linecap="round"/>
+  <path d="M406 638L512 532L620 424" fill="none" stroke="#FFF3EC" stroke-width="80" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="694" cy="350" r="52" fill="#FFF3EC"/>
+</svg>

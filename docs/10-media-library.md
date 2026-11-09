@@ -6,6 +6,9 @@ Every catalog exercise must have a poster and thumbnail that show distinctive bo
 ## 2. Media metadata
 `mediaId, exerciseId, kind(thumbnail|poster|preview|tutorial|correct|incorrect), contentVersion, locale, durationMs, width, height, aspectRatio, mimeType, sha256, sizeBytes, attribution, license, sourceUrlOrStorageKey, isPublic, lastReviewedAt`.
 
+### 2.1 Offline bundle manifest (ADR-028)
+The starter catalog that ships in the app uses its own manifest format, `contracts/catalog-bundle.schema.json`. During development the manifest is `fixtures/exercise_catalog.json`. It is **not** the `GET /v1/exercises` wire shape. The app maps both into the same local tables. Media entries are bundle-relative paths: no URL scheme and no leading slash. When `status` is `development_fixture_only`, plain path strings are allowed. When `status` is `release`, every media entry must be an object `{path, sha256, contentVersion, mimeType, license, attribution?}`. `tools/validate_handoff.py` checks the fixture against this schema. On the wire, `ExerciseMedia.license` is required (ADR-033).
+
 ## 3. Offline availability policy
 | Media | Policy |
 |---|---|
@@ -16,6 +19,17 @@ Every catalog exercise must have a poster and thumbnail that show distinctive bo
 | history thumbnails | local cached fallback, never block history view |
 
 Media cache can be deleted/rebuilt, session logs cannot. Media files validated by SHA-256 and contentVersion; partial downloads not marked READY. Cache budget configurable (initial suggestion 500MB), manual clear cache, never delete active session pinned files.
+
+## 3.1 Personal media in the local POC (MED-002)
+Users can attach their own HTTPS links or import photos/videos through PhotosPicker
+or the Files importer. Files are copied into Application Support/exercise-media with
+UUID filenames; JSON stores relative references. Imports are capped at 20 MB for images
+and 200 MB for videos; video transfer uses a file representation instead of loading
+entire videos into RAM. No user media uploads. Cancel discards newly imported files;
+saved media is retained across launches and is not treated as an evictable cache.
+Remote links require network; webpage videos can open externally. The managed public
+catalog licensing and ingestion rules below still apply to distributed starter content.
+See [local data and QA rules](17-content-editing.md).
 
 ## 4. API and content operations
 - Catalog endpoint includes media references/metadata, not huge encoded binaries; media signed URLs expire, client refreshes as needed.

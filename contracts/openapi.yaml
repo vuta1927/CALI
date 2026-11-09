@@ -14,6 +14,7 @@ tags:
   - name: Plans
   - name: Sync
   - name: Coaching
+  - name: Ops
 security:
   - bearerAuth: []
 paths:
@@ -77,6 +78,11 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token is valid but its subject has no active user record (`code` = `user_not_found`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
   /v1/exercises:
     get:
       tags: [Catalog]
@@ -176,6 +182,8 @@ paths:
       description: >-
         Atomically process each mutation, including idempotent receipt and user
         change-log entry. Per-mutation conflicts do not fail unrelated mutations.
+        The first push from a `deviceId` registers it for the caller (`devices` row
+        upserted in the same transaction, `last_seen_at` refreshed); ADR-033.
       requestBody:
         required: true
         content:
@@ -193,6 +201,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: '`deviceId` is already registered to another user (`code` = `device_owner_mismatch`); nothing is applied (ADR-033).'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/sync/pull:
@@ -290,6 +303,35 @@ paths:
           $ref: '#/components/responses/Conflict'
         '404':
           $ref: '#/components/responses/NotFound'
+  /health/live:
+    get:
+      tags: [Ops]
+      summary: Liveness probe - process is up; no dependency is checked
+      operationId: healthLive
+      security: []
+      responses:
+        '200':
+          description: Process alive
+          content:
+            text/plain:
+              schema: {type: string, example: Healthy}
+  /health/ready:
+    get:
+      tags: [Ops]
+      summary: Readiness probe - database reachable
+      operationId: healthReady
+      security: []
+      responses:
+        '200':
+          description: Ready to serve traffic
+          content:
+            text/plain:
+              schema: {type: string, example: Healthy}
+        '503':
+          description: A dependency (PostgreSQL) is unavailable; details are logged, never returned
+          content:
+            text/plain:
+              schema: {type: string, example: Unhealthy}
 components:
   securitySchemes:
     bearerAuth:
@@ -357,7 +399,7 @@ components:
         status: {type: integer}
         code: {type: string}
         traceId: {type: string}
-        detail: {type: string}
+        detail: {type: string, description: 'Optional human-readable detail; always omitted for 5xx so no server internals leak.'}
         errors: {type: object, additionalProperties: true}
     AppleAuthRequest:
       type: object
@@ -390,10 +432,42 @@ components:
         createdAt: {type: string, format: date-time}
     ExerciseType:
       type: string
-      enum: [static_hold, reps, timed_reps, interval, skill_attempt]
+      description: >-
+        Catalog exercise type; also the prescription kind of PlannedTarget. `distance` and
+        `duration` are running types (CON-004, docs/19 §4.1). CON-006 adds `load` (weight x reps,
+        ADR-062).
+      enum: [static_hold, reps, timed_reps, interval, skill_attempt, distance, duration, load]
+    Discipline:
+      type: string
+      description: >-
+        Training discipline (docs/18 §4, docs/19 §4.1). CON-004 adds `running`. Used by
+        `Exercise.discipline` (CON-006, ADR-061); `mixed` exists only for plans (PrimaryDiscipline).
+      enum: [calisthenics, gym, running]
+    PrimaryDiscipline:
+      type: string
+      description: >-
+        Main discipline of a training plan (CON-003, docs/19 §4.1): a Discipline value or `mixed`.
+        v1 plans default to `calisthenics`.
+      enum: [calisthenics, running, gym, mixed]
+    PlanKind:
+      type: string
+      description: >-
+        CON-003 (ADR-035). `weekly` repeats by weekday; `event` prepares for a dated event and
+        requires `eventDate`.
+      enum: [weekly, event]
+    MeasurementType:
+      type: string
+      description: >-
+        Primary measured quantity of an exercise (docs/18 §4, docs/19 §4.1). CON-004 adds
+        `distance` and `duration`; CON-006 adds `load` together with the `exercise.measurementType`
+        field. Pace is derived from distance and duration and is never stored. CON-006 (ADR-060):
+        derived from ExerciseType, never stored or chosen separately: static_hold->hold,
+        reps/timed_reps/skill_attempt->reps, interval/duration->duration, distance->distance,
+        load->load.
+      enum: [hold, reps, load, distance, duration]
     ExerciseMedia:
       type: object
-      required: [id, kind, contentVersion, mimeType, sha256]
+      required: [id, kind, contentVersion, mimeType, sha256, license]
       properties:
         id: {type: string, format: uuid}
         kind:
@@ -409,12 +483,24 @@ components:
         attribution: {type: [string, 'null']}
     Exercise:
       type: object
-      required: [id, slug, name, type, equipment, cues, catalogVersion, media]
+      required: [id, slug, name, type, discipline, measurementType, equipment, cues, catalogVersion, media]
       properties:
         id: {type: string, format: uuid}
         slug: {type: string, example: tuck-planche}
         name: {type: string}
         type: {$ref: '#/components/schemas/ExerciseType'}
+        # CON-006 (ADR-060, ADR-061): discipline, derived measurementType and focus tags.
+        discipline: {$ref: '#/components/schemas/Discipline'}
+        measurementType:
+          allOf: [{$ref: '#/components/schemas/MeasurementType'}]
+          readOnly: true
+          description: Derived from `type` by the server (ADR-060); not stored.
+        focusTags:
+          type: array
+          description: Free slugs such as `push` or `core` (ADR-061). Empty when none.
+          maxItems: 10
+          uniqueItems: true
+          items: {type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 40}
         equipment:
           type: array
           items: {type: string}
@@ -460,13 +546,40 @@ components:
           properties:
             kind: {const: interval}
             workSeconds: {type: integer, minimum: 1, maximum: 3600}
-            restSeconds: {type: integer, minimum: 0, maximum: 3600}
+            restSeconds: {type: integer, minimum: 1, maximum: 3600}
           additionalProperties: false
         - type: object
           required: [kind, attempts]
           properties:
             kind: {const: skill_attempt}
             attempts: {type: integer, minimum: 1, maximum: 100}
+          additionalProperties: false
+        - type: object
+          description: >-
+            Running segment by distance (CON-004). Optional `durationSeconds` is the target time;
+            target pace is derived, never stored. One set = one segment; rest uses restSeconds.
+          required: [kind, distanceMeters]
+          properties:
+            kind: {const: distance}
+            distanceMeters: {type: integer, minimum: 1, maximum: 500000}
+            durationSeconds: {type: integer, minimum: 1, maximum: 86400}
+          additionalProperties: false
+        - type: object
+          description: Running segment by time (CON-004).
+          required: [kind, durationSeconds]
+          properties:
+            kind: {const: duration}
+            durationSeconds: {type: integer, minimum: 1, maximum: 86400}
+          additionalProperties: false
+        - type: object
+          description: >-
+            Weight x reps (CON-006, ADR-062). One `loadKg` per set, kilograms only (ADR-046), at most
+            2 decimals (server rule, ADR-020). Volume (reps x kg) is derived, never stored.
+          required: [kind, reps, loadKg]
+          properties:
+            kind: {const: load}
+            reps: {type: integer, minimum: 1, maximum: 500}
+            loadKg: {type: number, minimum: 0, maximum: 1000}
           additionalProperties: false
     PlannedExercise:
       type: object
@@ -484,7 +597,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         weekday: {type: integer, minimum: 1, maximum: 7, description: '1=Monday'}
-        title: {type: string}
+        title: {type: string, maxLength: 120, description: 'Optional; stored as empty string when omitted (ADR-027).'}
         orderIndex: {type: integer, minimum: 0}
         exercises:
           type: array
@@ -495,6 +608,10 @@ components:
       properties:
         id: {type: string, format: uuid}
         title: {type: string, minLength: 1, maxLength: 120}
+        kind: {$ref: '#/components/schemas/PlanKind'}
+        eventDate: {type: [string, 'null'], format: date, description: 'Required when kind = event (ADR-035).'}
+        eventName: {type: [string, 'null'], minLength: 1, maxLength: 120}
+        primaryDiscipline: {$ref: '#/components/schemas/PrimaryDiscipline'}
         workouts:
           type: array
           items: {$ref: '#/components/schemas/PlannedWorkout'}
@@ -506,8 +623,141 @@ components:
           properties:
             revision: {type: integer, minimum: 1}
             version: {type: integer, minimum: 1, format: int64}
-            status: {type: string, enum: [active, archived]}
+            status:
+              type: string
+              enum: [current, superseded]
+              description: >-
+                CON-003: revision status (ADR-036, breaking change ADR-056). Exactly one
+                non-deleted `current` revision per lineage. The user-facing plan status (draft,
+                scheduled, active, paused, completed, stopped, archived) is computed from
+                activations, `endedAt` and `archivedAt` (docs/19 §4.2) and is never stored.
             parentPlanId: {type: [string, 'null'], format: uuid}
+            lineageId:
+              type: string
+              format: uuid
+              description: 'Id of the plan across its revisions; the root revision id. Derived by the server from parentPlanId when omitted.'
+            endedAt: {type: [string, 'null'], format: date-time}
+            endReason: {type: [string, 'null'], enum: [completed, stopped, null], description: 'Set together with endedAt.'}
+            endNote: {type: [string, 'null'], maxLength: 500}
+            archivedAt: {type: [string, 'null'], format: date-time, description: 'Archived plans are hidden from lists; independent of endedAt.'}
+    PlanActivation:
+      type: object
+      description: >-
+        CON-003 (docs/19 §4, BR-1). A period during which a plan lineage is followed. Pushed and
+        pulled as sync entity `plan_activation`. I1: activations of one lineage never overlap.
+        I2: on any local date at most `active_plan_limit` (server setting, default 3) lineages
+        whose current revision is neither deleted nor ended have an activation; violations are
+        rejected with MutationError `active_plan_limit`.
+      required: [id, planLineageId, fromDate, timezone, version]
+      properties:
+        id: {type: string, format: uuid}
+        planLineageId: {type: string, format: uuid}
+        fromDate: {type: string, format: date}
+        toDate: {type: [string, 'null'], format: date, description: 'Inclusive; null = open-ended.'}
+        timezone: {type: string, minLength: 1, maxLength: 64, description: 'IANA time zone the local dates refer to.'}
+        endReason: {type: [string, 'null'], enum: [paused, completed, stopped, deleted, null], description: 'Lifecycle command that closed the activation; requires toDate.'}
+        version: {type: integer, minimum: 1, format: int64}
+    # CON-005 begin: plan goals, phases and indicator definitions (docs/18 §6, docs/19 §4).
+    IndicatorKind:
+      type: string
+      enum: [performance, adherence, volume, milestone, body]
+    IndicatorDefinition:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.1, ADR-051). Server/portal-owned, read-only for devices. `id` is a stable
+        slug that is never reused; `kind`, `unit` and `aggregation` never change for an id, while
+        `label`, `step`, `measurementTypes` and `enabled` may change and bump `version`.
+        `enabled: false` only hides the indicator from pickers; existing goals keep it.
+      required: [id, version, kind, label, unit, step, aggregation, measurementTypes, enabled]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        version: {type: integer, minimum: 1}
+        kind: {$ref: '#/components/schemas/IndicatorKind'}
+        label: {type: string, minLength: 1, maxLength: 120}
+        unit: {type: string, maxLength: 16, description: 'Display unit; may be empty for unitless counts.'}
+        step: {type: number, exclusiveMinimum: 0, description: 'Picker increment for baseline and target.'}
+        aggregation: {type: string, enum: [max, sum], description: 'How set results combine into the computed current value.'}
+        measurementTypes:
+          type: array
+          uniqueItems: true
+          description: 'Exercises offered for the indicator are filtered by these types; empty for adherence and body kinds.'
+          items: {$ref: '#/components/schemas/MeasurementType'}
+        enabled: {type: boolean}
+    IndicatorDefinitionSet:
+      type: object
+      description: >-
+        CON-005 / ADR-058. The versioned set of indicator definitions. No endpoint is added in
+        CON-005: CON-008 embeds this object in `GET /v1/criteria-config`; until then the client
+        uses the bundled default set (same content as the db/005 seed).
+      required: [version, publishedAt, indicators]
+      properties:
+        version: {type: integer, minimum: 1}
+        publishedAt: {type: string, format: date-time}
+        indicators:
+          type: array
+          items: {$ref: '#/components/schemas/IndicatorDefinition'}
+    GoalStatus:
+      type: string
+      enum: [active, reached, achieved, missed, archived]
+      description: >-
+        docs/18 §6.2. Changed only by the client. `reached` is a suggestion from computed progress;
+        `achieved` is always a user confirmation (requires achievedAt) and is never set by the server.
+    GoalTarget:
+      description: 'One value, or a {min, max} range (body goals). min <= max (MutationError validation_failed, field target.max).'
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [value]
+          properties:
+            value: {type: number, minimum: 0, maximum: 999999999}
+        - type: object
+          additionalProperties: false
+          required: [min, max]
+          properties:
+            min: {type: number, minimum: 0, maximum: 999999999}
+            max: {type: number, minimum: 0, maximum: 999999999}
+    PlanPhase:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.5). Ordered phase of one plan revision; synced as entity `plan_phase`.
+        Week labels and done/current/upcoming are computed on the device. A new revision gets new
+        phase ids (ADR-057). Every write is audited (ADR-059).
+      required: [id, planId, orderIndex, name, weeks, version]
+      properties:
+        id: {type: string, format: uuid}
+        planId: {type: string, format: uuid, description: 'Plan revision id; immutable.'}
+        orderIndex: {type: integer, minimum: 0}
+        name: {type: string, minLength: 1, maxLength: 120}
+        weeks: {type: integer, minimum: 1, maximum: 52}
+        description: {type: [string, 'null'], maxLength: 500}
+        version: {type: integer, minimum: 1, format: int64}
+    PlanGoal:
+      type: object
+      description: >-
+        CON-005 (docs/18 §6.1-§6.4, docs/19 §4). A goal of a plan lineage; synced as entity
+        `plan_goal`. `current` is computed on the device and never sent. `baseline` is the client's
+        snapshot (ADR-044). `scopePhaseId` null = scope plan; a deleted phase is shown as plan.
+        `planLineageId`, `indicatorId` and `exerciseId` are immutable (ADR-047, ADR-057).
+        The server rejects unlock cycles (MutationError goal_unlock_cycle) and more than
+        `pinned_goal_limit` (server setting, default 3, ADR-048) pinned goals per lineage
+        (MutationError pinned_goal_limit). Every write is audited (ADR-059).
+      required: [id, planLineageId, title, indicatorId, target, status, pinned, version]
+      properties:
+        id: {type: string, format: uuid}
+        planLineageId: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        indicatorId: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        exerciseId: {type: [string, 'null'], format: uuid, description: 'Required for performance, volume and milestone indicators; measurement type must match the indicator.'}
+        baseline: {type: [number, 'null'], minimum: 0, maximum: 999999999}
+        target: {$ref: '#/components/schemas/GoalTarget'}
+        scopePhaseId: {type: [string, 'null'], format: uuid}
+        unlockAfterGoalId: {type: [string, 'null'], format: uuid}
+        status: {$ref: '#/components/schemas/GoalStatus'}
+        achievedAt: {type: [string, 'null'], format: date-time, description: 'Required when status = achieved; kept when an achieved goal is archived; null otherwise.'}
+        pinned: {type: boolean}
+        note: {type: [string, 'null'], maxLength: 500}
+        version: {type: integer, minimum: 1, format: int64}
+    # CON-005 end
     PlanPage:
       type: object
       required: [items, hasMore]
@@ -519,9 +769,13 @@ components:
         hasMore: {type: boolean}
     SyncEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal]
     SyncMutation:
       type: object
+      description: >-
+        Envelope fields are closed (ADR-030). `payload` is validated per `entityType`/`action`
+        against contracts/entity-payloads.schema.json, which also rejects unknown payload fields.
+      additionalProperties: false
       required: [mutationId, entityType, entityId, action, baseVersion, clientChangedAt, payload]
       properties:
         mutationId: {type: string, format: uuid}
@@ -554,9 +808,34 @@ components:
         error: {$ref: '#/components/schemas/MutationError'}
     MutationError:
       type: [object, 'null']
+      description: >-
+        ADR-021. Results with `retryable: true` are never persisted as receipts, so the client may
+        resend the same mutationId later (e.g. after the missing parent is applied). Non-retryable
+        results are persisted and replayed for the same mutationId (except mutation_id_reused).
+      required: [code, message, retryable]
       properties:
-        code: {type: string}
+        code:
+          type: string
+          enum: [dependency_missing, version_conflict, validation_failed, forbidden_entity, cross_user_reference, mutation_id_reused, active_plan_limit, plan_count_limit, pinned_goal_limit, goal_unlock_cycle]
+          description: >-
+            dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
+            version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
+            validation_failed (status rejected) - schema or business rule violation (ADR-020);
+            forbidden_entity (status rejected) - entityType not writable by devices;
+            cross_user_reference (status rejected) - references an entity owned by another user;
+            mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031);
+            active_plan_limit (status rejected) - a plan_activation would make more than the server limit
+            (default 3) plans followed on one local date (docs/19 I2, BR-2; mutations are applied in
+            receive order, the later one is rejected, never retried);
+            plan_count_limit (status rejected) - a training_plan would exceed the server limit (default 50)
+            of non-deleted plans (ADR-041, BR-8);
+            pinned_goal_limit (status rejected) - a plan_goal write would make more than the server limit
+            (default 3, ADR-048) pinned non-deleted goals in one plan lineage (docs/18 §6.4; CON-005);
+            goal_unlock_cycle (status rejected) - a plan_goal unlockAfterGoalId would close a cycle in the
+            unlock chain (docs/18 §6.3; CON-005).
         message: {type: string}
+        retryable: {type: boolean}
+        details: {type: object, additionalProperties: true}
     SyncPushResponse:
       type: object
       required: [results]
@@ -566,7 +845,7 @@ components:
           items: {$ref: '#/components/schemas/SyncMutationResult'}
     ChangeEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, ai_analysis, ai_recommendation]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal, ai_analysis, ai_recommendation]
     SyncChange:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
@@ -579,6 +858,25 @@ components:
         payload:
           type: object
           additionalProperties: true
+          description: >-
+            ADR-022. Discriminated by `entityType` + `operation`. delete -> `{id, deletedAt}`.
+            upsert of a device-writable entity -> the same `<entityType>_payload` schema as push
+            (contracts/entity-payloads.schema.json). ai_analysis -> `Analysis`; ai_recommendation ->
+            `AnalysisRecommendation` plus `analysisId`.
+          x-payload-schemas:
+            training_plan: entity-payloads.schema.json#/$defs/training_plan_payload
+            planned_workout: entity-payloads.schema.json#/$defs/planned_workout_payload
+            planned_exercise: entity-payloads.schema.json#/$defs/planned_exercise_payload
+            workout_session: entity-payloads.schema.json#/$defs/workout_session_payload
+            exercise_execution: entity-payloads.schema.json#/$defs/exercise_execution_payload
+            set_result: entity-payloads.schema.json#/$defs/set_result_payload
+            workout_note: entity-payloads.schema.json#/$defs/workout_note_payload
+            plan_activation: entity-payloads.schema.json#/$defs/plan_activation_payload
+            plan_phase: entity-payloads.schema.json#/$defs/plan_phase_payload
+            plan_goal: entity-payloads.schema.json#/$defs/plan_goal_payload
+            ai_analysis: 'components/schemas/Analysis'
+            ai_recommendation: 'components/schemas/AnalysisRecommendation'
+            delete: entity-payloads.schema.json#/$defs/delete_payload
     SyncPullResponse:
       type: object
       required: [changes, nextCursor, hasMore]
@@ -608,9 +906,13 @@ components:
       required: [id, exerciseId, action, rationale, requiresApproval, decision]
       properties:
         id: {type: string, format: uuid}
-        exerciseId: {type: string, format: uuid}
+        exerciseId: {type: [string, 'null'], format: uuid, description: 'Catalog uuid; null for session-level recommendations (ADR-026).'}
         action: {type: string, enum: [maintain, reduce, increase_hold, increase_reps, change_progression, needs_more_data]}
-        proposedTarget: {type: [object, 'null'], additionalProperties: true}
+        proposedTarget:
+          description: 'Full typed target (with `kind`) or null when no target change is proposed (ADR-032).'
+          oneOf:
+            - $ref: '#/components/schemas/PlannedTarget'
+            - type: 'null'
         rationale: {type: string}
         requiresApproval: {type: boolean, const: true}
         decision: {type: string, enum: [proposed, accepted, rejected, superseded]}

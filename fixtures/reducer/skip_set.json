@@ -1,0 +1,369 @@
+{
+  "name": "skip_set",
+  "description": "SkipSet from READY, EXERCISING and AWAITING_RESULT records a skipped result and goes to the next set or exercise READY with no rest (docs/03 §4: a skipped set earns no rest), or to REVIEWING_SUMMARY on the final set; rejected while PAUSED or RESTING; duplicate, wrong-set and over-long reason are rejected without changing state; skipped sets count towards FinishSession.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 3,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 15
+            },
+            "restSeconds": 60
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000009002",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008002",
+            "exerciseId": "00000000-0000-4000-8000-000000007002",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000002",
+        "setResultId": "00000000-0000-4000-8000-000000004001",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "reason": "warm-up only"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 2,
+        "currentExecutionIndex": 0,
+        "currentSetIndex": 2,
+        "skippedSetCount": 1,
+        "confirmedSetCount": 0,
+        "phaseDeadlineAt": null,
+        "events": [
+          "set_skipped"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:06Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000003",
+        "setResultId": "00000000-0000-4000-8000-000000004002",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1
+      },
+      "expect": {
+        "error": "duplicate_set_resolution",
+        "revision": 2,
+        "skippedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:06Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "setResultId": "00000000-0000-4000-8000-000000004003",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 3
+      },
+      "expect": {
+        "error": "set_mismatch",
+        "revision": 2,
+        "currentSetIndex": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:07Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "setResultId": "00000000-0000-4000-8000-000000004004",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2,
+        "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expect": {
+        "error": "validation_failed",
+        "revision": 2,
+        "skippedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 3,
+        "phaseDeadlineAt": "2026-11-07T08:00:25Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:15Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000007",
+        "setResultId": "00000000-0000-4000-8000-000000004005",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 4,
+        "currentSetIndex": 3,
+        "skippedSetCount": 2,
+        "phaseDeadlineAt": null,
+        "events": [
+          "set_skipped",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:20Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 5,
+        "phaseDeadlineAt": "2026-11-07T08:00:35Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:30Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000009"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 6,
+        "pendingMeasuredElapsedMs": 10000
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:35Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000010",
+        "setResultId": "00000000-0000-4000-8000-000000004006",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 3,
+        "reason": "form broke down"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 7,
+        "currentExecutionIndex": 1,
+        "currentSetIndex": 1,
+        "skippedSetCount": 3,
+        "confirmedSetCount": 0,
+        "pendingMeasuredElapsedMs": null,
+        "events": [
+          "set_skipped",
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:40Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000011",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "phase": "pre_countdown",
+        "revision": 8
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:43Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:00:40Z",
+        "monotonicElapsed": 3.0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 9,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:50Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000012"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 10
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:51Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000013",
+        "setResultId": "00000000-0000-4000-8000-000000004007",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "paused",
+        "revision": 10
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:00Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000014"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 11
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:10Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000015"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 12
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:15Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000016",
+        "setResultId": "00000000-0000-4000-8000-000000004008",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 6
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 13,
+        "currentSetIndex": 2,
+        "confirmedSetCount": 1,
+        "phaseDeadlineAt": "2026-11-07T08:02:45Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:20Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000017",
+        "setResultId": "00000000-0000-4000-8000-000000004009",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 2
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "resting",
+        "revision": 13,
+        "phaseDeadlineAt": "2026-11-07T08:02:45Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:30Z",
+      "command": {
+        "type": "ready_next",
+        "commandId": "00000000-0000-4000-8000-000000000018"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 14
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:35Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000019",
+        "setResultId": "00000000-0000-4000-8000-000000004010",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 2
+      },
+      "expect": {
+        "phase": "reviewing_summary",
+        "status": "active",
+        "revision": 15,
+        "confirmedSetCount": 1,
+        "skippedSetCount": 4,
+        "phaseDeadlineAt": null,
+        "events": [
+          "set_skipped",
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:36Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000020",
+        "setResultId": "00000000-0000-4000-8000-000000004011",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 2
+      },
+      "expect": {
+        "error": "duplicate_set_resolution",
+        "phase": "reviewing_summary",
+        "revision": 15,
+        "skippedSetCount": 4
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:40Z",
+      "command": {
+        "type": "finish_session",
+        "commandId": "00000000-0000-4000-8000-000000000021"
+      },
+      "expect": {
+        "phase": "completed",
+        "status": "completed",
+        "revision": 16,
+        "confirmedSetCount": 1,
+        "skippedSetCount": 4
+      }
+    }
+  ]
+}

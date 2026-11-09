@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -8,27 +9,41 @@ import WidgetKit
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutAttributes.self) { context in
-            WorkoutLockScreenView(state: context.state)
+            WorkoutLockScreenView(state: context.state, showsPOCActions: context.attributes.deviceGatePOC == true)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(verbatim: context.state.exerciseShortName)
-                        .font(.headline)
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        CompactCOAMIMark()
+                            .frame(width: 18, height: 18)
+                        Text(verbatim: context.state.exerciseShortName)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     WorkoutCountdownText(state: context.state)
                         .font(.title3.monospacedDigit())
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(verbatim: context.state.phaseAndSetLine)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack {
+                        Text(verbatim: context.state.phaseAndSetLine)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        if context.attributes.deviceGatePOC == true {
+                            Spacer(minLength: 8)
+                            POCLiveActivityActionButton(state: context.state)
+                        }
+                    }
                 }
             } compactLeading: {
-                Text(verbatim: "\(context.state.setIndex)/\(context.state.setCount)")
-                    .monospacedDigit()
+                HStack(spacing: 2) {
+                    CompactCOAMIMark()
+                        .frame(width: 12, height: 12)
+                    Text(verbatim: "\(context.state.setIndex)/\(context.state.setCount)")
+                        .monospacedDigit()
+                }
             } compactTrailing: {
                 WorkoutCountdownText(state: context.state)
                     .monospacedDigit()
@@ -44,23 +59,91 @@ struct WorkoutLiveActivity: Widget {
 
 struct WorkoutLockScreenView: View {
     let state: WorkoutAttributes.ContentState
+    /// POC-001 device gate only (`WorkoutAttributes.deviceGatePOC`); the normal workout stays read-only.
+    var showsPOCActions = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: state.exerciseShortName)
-                    .font(.headline)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    CompactCOAMIMark()
+                        .frame(width: 20, height: 20)
+                    Text(verbatim: state.exerciseShortName)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 8)
                 WorkoutCountdownText(state: state)
                     .font(.title2.monospacedDigit())
             }
-            Text(verbatim: state.phaseAndSetLine)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            HStack {
+                Text(verbatim: state.phaseAndSetLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if showsPOCActions {
+                    Spacer(minLength: 8)
+                    POCLiveActivityActionButton(state: state)
+                }
+            }
         }
         .padding()
+    }
+}
+
+/// POC-001 Lock Screen button: "+30s" while resting, "Xong set" while awaiting a result. Runs
+/// `POCLiveActivityIntent` (authenticationPolicy = requiresAuthentication) in the app process; the widget
+/// itself never writes state. The intent carries the rendered revision so a stale snapshot is rejected.
+/// TODO(IOS-001): replace with the production buttons after the GO decision.
+struct POCLiveActivityActionButton: View {
+    let state: WorkoutAttributes.ContentState
+
+    var body: some View {
+        switch state.phase {
+        case .resting:
+            button("+30s", action: "extend_rest_30")
+        case .awaitingResult:
+            button("Xong set", action: "confirm_current_set")
+        default:
+            EmptyView()
+        }
+    }
+
+    private func button(_ title: String, action: String) -> some View {
+        Button(intent: POCLiveActivityIntent(sessionId: state.sessionId.uuidString, revision: state.revision, action: action)) {
+            Text(verbatim: title)
+                .font(.subheadline.weight(.semibold))
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color(red: 1.0, green: 0x6A / 255.0, blue: 0x2B / 255.0))
+    }
+}
+
+/// Flat, high-contrast logo for compact system surfaces. It intentionally avoids glass,
+/// blur and animation so the timer and workout state keep visual priority.
+struct CompactCOAMIMark: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                Circle()
+                    .trim(from: 0.12, to: 0.88)
+                    // COAMI orange (dark-mode accent #FF6A2B); the widget target does not link Theme.swift.
+                    .stroke(Color(red: 1.0, green: 0x6A / 255.0, blue: 0x2B / 255.0), style: StrokeStyle(lineWidth: side * 0.18, lineCap: .round))
+                    .rotationEffect(.degrees(45))
+                Capsule()
+                    .fill(.white)
+                    .frame(width: side * 0.14, height: side * 0.42)
+                    .rotationEffect(.degrees(45))
+                Circle()
+                    .fill(.white)
+                    .frame(width: side * 0.18, height: side * 0.18)
+                    .offset(x: side * 0.24, y: -side * 0.24)
+            }
+            .frame(width: side, height: side)
+        }
+        .accessibilityHidden(true)
     }
 }
 

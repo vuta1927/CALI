@@ -19,8 +19,8 @@ public static class MeEndpoints
             {
                 var profile = await query.ExecuteAsync(cancellationToken).ConfigureAwait(false);
                 return profile is null
-                    // Valid token whose subject has no (non-deleted) users row. Not yet in the OpenAPI
-                    // contract for /v1/me — reported for contract review.
+                    // Valid token whose subject has no (non-deleted) users row; declared in the OpenAPI
+                    // contract as 404 `user_not_found`.
                     ? Results.Problem(
                         statusCode: StatusCodes.Status404NotFound,
                         title: "User not found.",

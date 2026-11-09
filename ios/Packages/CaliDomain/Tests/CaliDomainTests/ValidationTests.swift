@@ -27,6 +27,21 @@ final class ValidationTests: XCTestCase {
         XCTAssertFalse(Prescription.skillAttempt(attempts: 0).validate().isEmpty)
     }
 
+    /// CON-006 (ADR-062): reps 1..500, loadKg 0..1000 with at most 2 decimals (rejected, never rounded).
+    func testLoadPrescriptionBounds() {
+        func kg(_ text: String) -> Decimal { Decimal(string: text)! }
+        XCTAssertEqual(Prescription.load(reps: 5, loadKg: kg("60")).validate(), [])
+        XCTAssertEqual(Prescription.load(reps: 1, loadKg: kg("0")).validate(), [], "0 kg is a valid load")
+        XCTAssertEqual(Prescription.load(reps: 500, loadKg: kg("1000")).validate(), [])
+        XCTAssertEqual(Prescription.load(reps: 5, loadKg: kg("57.25")).validate(), [])
+        XCTAssertEqual(fields(Prescription.load(reps: 0, loadKg: kg("60")).validate()), ["target.reps"])
+        XCTAssertEqual(fields(Prescription.load(reps: 501, loadKg: kg("60")).validate()), ["target.reps"])
+        XCTAssertEqual(fields(Prescription.load(reps: 5, loadKg: kg("-2.5")).validate()), ["target.loadKg"])
+        XCTAssertEqual(fields(Prescription.load(reps: 5, loadKg: kg("1000.5")).validate()), ["target.loadKg"])
+        XCTAssertEqual(fields(Prescription.load(reps: 5, loadKg: kg("57.555")).validate()), ["target.loadKg"])
+        XCTAssertNil(Prescription.load(reps: 5, loadKg: kg("60")).targetDurationSeconds, "load sets end by explicit stop")
+    }
+
     func testTimedTargetsExposeDuration() {
         XCTAssertEqual(Prescription.staticHold(holdSeconds: 12).targetDurationSeconds, 12)
         XCTAssertEqual(Prescription.timedReps(timeSeconds: 30).targetDurationSeconds, 30)
@@ -124,6 +139,41 @@ final class ValidationTests: XCTestCase {
         XCTAssertEqual(confirm { $0.rpe = 11 }, ["rpe"])
         XCTAssertEqual(h.s.phase, .awaitingResult)
         XCTAssertEqual(h.s.resolvedSets, [])
+    }
+
+    /// CON-006 (ADR-062): a load set needs actualReps + actualLoadKg; load is only allowed on a load target.
+    func testLoadActuals() {
+        let h = Harness()
+        let spec = ExecutionSpec(id: uuid(9300), exerciseId: uuid(7300), catalogVersion: 1, setCount: 1, target: .load(reps: 5, loadKg: 60), restSeconds: 90)
+        h.send(h.create([spec]))
+        h.send(h.startSet(countdown: 0))
+        h.send(h.stopSet())
+        let key = h.s.currentSetKey!
+        func confirm(reps: Int?, kg: String?) -> [String] {
+            let c = ConfirmSet(commandId: h.freshId(), setResultId: h.freshId(), executionId: key.executionId, setIndex: key.setIndex,
+                               actualReps: reps, actualLoadKg: kg.flatMap { Decimal(string: $0) })
+            guard case .validationFailed(let issues)? = h.reject(.confirmSet(c)) else { return [] }
+            return fields(issues)
+        }
+        XCTAssertEqual(confirm(reps: 5, kg: nil), ["actualLoadKg"])
+        XCTAssertEqual(confirm(reps: nil, kg: "60"), ["actualReps"])
+        XCTAssertEqual(confirm(reps: 5, kg: "-1"), ["actualLoadKg"])
+        XCTAssertEqual(confirm(reps: 5, kg: "1000.01"), ["actualLoadKg"])
+        XCTAssertEqual(confirm(reps: 5, kg: "57.555"), ["actualLoadKg"])
+        XCTAssertEqual(h.s.phase, .awaitingResult)
+        let t = h.send(.confirmSet(ConfirmSet(commandId: h.freshId(), setResultId: h.freshId(), executionId: key.executionId, setIndex: key.setIndex,
+                                              actualReps: 5, actualLoadKg: Decimal(string: "57.5"))))
+        XCTAssertEqual(t.setRecords.first?.actual.loadKg, Decimal(string: "57.5"))
+        XCTAssertEqual(t.setRecords.first?.actual.reps, 5)
+
+        let other = Harness()
+        other.toAwaitingResult()
+        let k = other.s.currentSetKey!
+        let wrong = ConfirmSet(commandId: other.freshId(), setResultId: other.freshId(), executionId: k.executionId, setIndex: k.setIndex,
+                               actualHoldMs: 10_000, actualLoadKg: 10)
+        guard case .validationFailed(let issues)? = other.reject(.confirmSet(wrong)) else { return XCTFail("load on a hold set") }
+        XCTAssertEqual(issues.map(\.field), ["actualLoadKg"])
+        XCTAssertEqual(issues.map(\.reason), [.notAllowed])
     }
 
     func testReasonLengthLimit() {

@@ -171,7 +171,7 @@ public enum WorkoutReducer {
             key: c.key,
             status: c.status,
             prescribed: PrescribedSnapshot(spec),
-            actual: SetActuals(reps: c.actualReps, holdMs: c.actualHoldMs, workMs: c.actualWorkMs, restMs: c.actualRestMs, rpe: c.rpe, note: c.note),
+            actual: SetActuals(reps: c.actualReps, holdMs: c.actualHoldMs, workMs: c.actualWorkMs, restMs: c.actualRestMs, rpe: c.rpe, note: c.note, loadKg: c.actualLoadKg),
             endReason: draft.endReason,
             skipReason: nil,
             confirmedAt: now,
@@ -265,6 +265,10 @@ public enum WorkoutReducer {
         b.next.status = .abandoned
         b.next.phase = .abandoned
         b.next.abandonedAt = now
+        // ADR-017: the wire has no abandonedAt; finishedAt is set for both terminal statuses.
+        // Clamped to startedAt so a backward clock jump never blocks abandoning (SQL CHECK
+        // finished_at >= started_at); abandonedAt keeps the raw device time.
+        b.next.finishedAt = max(now, s.startedAt)
         b.next.abandonReason = c.reason
         b.next.phaseStartedAt = now
         b.next.phaseDeadlineAt = nil
@@ -284,6 +288,14 @@ public enum WorkoutReducer {
         if let v = c.actualWorkMs, let i = ValidationIssue.min("actualWorkMs", v, 0) { issues.append(i) }
         if let v = c.actualRestMs, let i = ValidationIssue.min("actualRestMs", v, 0) { issues.append(i) }
         if let v = c.rpe, let i = ValidationIssue.range("rpe", v, DomainLimits.rpe) { issues.append(i) }
+        // CON-006 (ADR-062): load is kg with at most 2 decimals, and only meaningful for a load target.
+        if let v = c.actualLoadKg {
+            if case .load = target {
+                if let i = ValidationIssue.loadKg("actualLoadKg", v) { issues.append(i) }
+            } else {
+                issues.append(ValidationIssue(field: "actualLoadKg", reason: .notAllowed, detail: "only for a load target"))
+            }
+        }
 
         func require(_ present: Bool, _ field: String) {
             if !present { issues.append(ValidationIssue(field: field, reason: .missing, detail: "required for \(target.type.rawValue)")) }
@@ -297,6 +309,9 @@ public enum WorkoutReducer {
             require(c.actualWorkMs != nil, "actualWorkMs")
         case .interval: require(c.actualWorkMs != nil, "actualWorkMs")
         case .skillAttempt: break // success/fail is `status`; hold optional
+        case .load:
+            require(c.actualReps != nil, "actualReps")
+            require(c.actualLoadKg != nil, "actualLoadKg")
         }
         return issues
     }

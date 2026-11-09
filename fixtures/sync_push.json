@@ -13,7 +13,13 @@
         "executionId": "77777777-7777-4777-8777-777777777777",
         "setIndex": 1,
         "status": "completed",
-        "prescribedSnapshot": {"kind": "static_hold", "holdSeconds": 12},
+        "prescribedSnapshot": {
+          "target": {"kind": "static_hold", "holdSeconds": 12},
+          "setCount": 4,
+          "restSeconds": 90,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+        },
         "actualHoldMs": 12000,
         "rpe": 7,
         "confirmedAt": "2026-11-07T10:00:00Z"

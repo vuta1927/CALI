@@ -7,6 +7,8 @@ public enum ExerciseType: String, Codable, Sendable, CaseIterable {
     case timedReps = "timed_reps"
     case interval
     case skillAttempt = "skill_attempt"
+    /// CON-006 (ADR-062): weight x reps, kilograms only (ADR-046).
+    case load
 }
 
 /// Planned target of one set. JSON shape matches `contracts/entity-payloads.schema.json#/$defs/target`,
@@ -19,6 +21,8 @@ public enum Prescription: Equatable, Hashable, Sendable {
     /// Rest *between sets* always comes from `ExecutionSpec.restSeconds` (CON-002 question Q8).
     case interval(workSeconds: Int, restSeconds: Int)
     case skillAttempt(attempts: Int)
+    /// CON-006 (ADR-062): one set = `reps` at `loadKg` (kg, at most 2 decimals). Volume is derived, never stored.
+    case load(reps: Int, loadKg: Decimal)
 
     public var type: ExerciseType {
         switch self {
@@ -27,6 +31,7 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .timedReps: .timedReps
         case .interval: .interval
         case .skillAttempt: .skillAttempt
+        case .load: .load
         }
     }
 
@@ -37,7 +42,7 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .staticHold(let s): s
         case .timedReps(let s): s
         case .interval(let work, _): work
-        case .reps, .skillAttempt: nil
+        case .reps, .skillAttempt, .load: nil
         }
     }
 
@@ -55,18 +60,19 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .timedReps(let s):
             return [ValidationIssue.min("target.timeSeconds", s, 1)].compactMap { $0 }
         case .interval(let work, let rest):
-            // docs/03 §3 says workSeconds/restSeconds > 0; the JSON schema allows restSeconds >= 0.
-            // We follow docs/03 (stricter) — CON-002 question Q7.
+            // ADR-019: workSeconds >= 1 and restSeconds >= 1 (docs/03 §3, JSON Schema and OpenAPI agree).
             return [ValidationIssue.min("target.workSeconds", work, 1), ValidationIssue.min("target.restSeconds", rest, 1)].compactMap { $0 }
         case .skillAttempt(let attempts):
             return [ValidationIssue.min("target.attempts", attempts, 1)].compactMap { $0 }
+        case .load(let reps, let kg):
+            return [ValidationIssue.range("target.reps", reps, DomainLimits.loadReps), ValidationIssue.loadKg("target.loadKg", kg)].compactMap { $0 }
         }
     }
 }
 
 extension Prescription: Codable {
     private enum CodingKeys: String, CodingKey {
-        case kind, holdSeconds, repMin, repMax, timeSeconds, workSeconds, restSeconds, attempts
+        case kind, holdSeconds, repMin, repMax, timeSeconds, workSeconds, restSeconds, attempts, reps, loadKg
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,6 +83,7 @@ extension Prescription: Codable {
         case .timedReps: self = .timedReps(timeSeconds: try c.decode(Int.self, forKey: .timeSeconds))
         case .interval: self = .interval(workSeconds: try c.decode(Int.self, forKey: .workSeconds), restSeconds: try c.decode(Int.self, forKey: .restSeconds))
         case .skillAttempt: self = .skillAttempt(attempts: try c.decode(Int.self, forKey: .attempts))
+        case .load: self = .load(reps: try c.decode(Int.self, forKey: .reps), loadKg: try c.decode(Decimal.self, forKey: .loadKg))
         }
     }
 
@@ -93,6 +100,9 @@ extension Prescription: Codable {
             try c.encode(work, forKey: .workSeconds)
             try c.encode(rest, forKey: .restSeconds)
         case .skillAttempt(let a): try c.encode(a, forKey: .attempts)
+        case .load(let reps, let kg):
+            try c.encode(reps, forKey: .reps)
+            try c.encode(kg, forKey: .loadKg)
         }
     }
 }

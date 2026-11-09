@@ -1,0 +1,457 @@
+{
+  "name": "pause_resume_edge_cases",
+  "description": "Pause/resume outside EXERCISING/PAUSED is rejected in every other phase; a reps target pauses without any deadline; measured time excludes paused time across several pause/resume cycles; a hold paused with 0.5 s left resumes with exactly 0.5 s; SkipSet is not accepted while PAUSED (docs/03 §4 table: READY/EXERCISING/AWAITING_RESULT only).",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 2,
+            "target": {
+              "kind": "reps",
+              "repMin": 8,
+              "repMax": 10
+            },
+            "restSeconds": 60
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000009002",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008002",
+            "exerciseId": "00000000-0000-4000-8000-000000007002",
+            "catalogVersion": 3,
+            "setCount": 1,
+            "target": {
+              "kind": "static_hold",
+              "holdSeconds": 20
+            },
+            "restSeconds": 30
+          }
+        ]
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000002"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:01Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000003"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:02Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 2,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:12Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000005"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 3,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:13Z",
+      "command": {
+        "type": "skip_set",
+        "commandId": "00000000-0000-4000-8000-000000000006",
+        "setResultId": "00000000-0000-4000-8000-000000004001",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "reason": "tired"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "paused",
+        "revision": 3,
+        "skippedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:12Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000007"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 4,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:17Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000008"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 5,
+        "pendingMeasuredElapsedMs": 15000,
+        "pendingSuggestedActualMs": 15000
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:18Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000009"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "awaiting_result",
+        "revision": 5
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:20Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000010",
+        "setResultId": "00000000-0000-4000-8000-000000004002",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualReps": 9
+      },
+      "expect": {
+        "phase": "resting",
+        "revision": 6,
+        "phaseDeadlineAt": "2026-11-07T08:02:20Z",
+        "events": [
+          "set_confirmed",
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:25Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000011"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "resting",
+        "revision": 6,
+        "phaseDeadlineAt": "2026-11-07T08:02:20Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:25Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000012"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "resting",
+        "revision": 6
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:30Z",
+      "command": {
+        "type": "ready_next",
+        "commandId": "00000000-0000-4000-8000-000000000013"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 7,
+        "currentSetIndex": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:40Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000014",
+        "countdownSeconds": 3
+      },
+      "expect": {
+        "phase": "pre_countdown",
+        "revision": 8,
+        "phaseDeadlineAt": "2026-11-07T08:01:43Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:41Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000015"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "pre_countdown",
+        "revision": 8
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:43Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:01:40Z",
+        "monotonicElapsed": 3.0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 9,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ],
+        "signals": []
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:50Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000016"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 10
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:20Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000017"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 11
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:25Z",
+      "command": {
+        "type": "stop_set",
+        "commandId": "00000000-0000-4000-8000-000000000018"
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 12,
+        "pendingMeasuredElapsedMs": 12000
+      }
+    },
+    {
+      "now": "2026-11-07T08:03:26Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000019",
+        "setResultId": "00000000-0000-4000-8000-000000004003",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2,
+        "status": "completed",
+        "actualReps": 10
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 13,
+        "currentExecutionIndex": 1,
+        "currentSetIndex": 1,
+        "confirmedSetCount": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:00Z",
+      "command": {
+        "type": "start_set",
+        "commandId": "00000000-0000-4000-8000-000000000020",
+        "countdownSeconds": 0
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 14,
+        "phaseDeadlineAt": "2026-11-07T08:05:20Z",
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:19.500Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000021"
+      },
+      "expect": {
+        "phase": "paused",
+        "revision": 15,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:00Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000022"
+      },
+      "expect": {
+        "phase": "exercising",
+        "revision": 16,
+        "phaseDeadlineAt": "2026-11-07T08:10:00.500Z",
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:01Z",
+      "reconcile": {
+        "previousNow": "2026-11-07T08:10:00Z",
+        "monotonicElapsed": 1.0
+      },
+      "expect": {
+        "phase": "awaiting_result",
+        "revision": 17,
+        "pendingMeasuredElapsedMs": 20000,
+        "pendingSuggestedActualMs": 20000
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:05Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000023",
+        "setResultId": "00000000-0000-4000-8000-000000004004",
+        "executionId": "00000000-0000-4000-8000-000000009002",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 20000
+      },
+      "expect": {
+        "phase": "reviewing_summary",
+        "status": "active",
+        "revision": 18,
+        "confirmedSetCount": 3,
+        "phaseDeadlineAt": null
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:06Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000024"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "reviewing_summary",
+        "revision": 18
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:06Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000025"
+      },
+      "expect": {
+        "error": "invalid_transition",
+        "phase": "reviewing_summary",
+        "revision": 18
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:10Z",
+      "command": {
+        "type": "finish_session",
+        "commandId": "00000000-0000-4000-8000-000000000026"
+      },
+      "expect": {
+        "phase": "completed",
+        "status": "completed",
+        "revision": 19,
+        "events": [
+          "session_finished",
+          "phase_changed"
+        ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:11Z",
+      "command": {
+        "type": "pause",
+        "commandId": "00000000-0000-4000-8000-000000000027"
+      },
+      "expect": {
+        "error": "session_not_active",
+        "phase": "completed",
+        "revision": 19
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:11Z",
+      "command": {
+        "type": "resume",
+        "commandId": "00000000-0000-4000-8000-000000000028"
+      },
+      "expect": {
+        "error": "session_not_active",
+        "phase": "completed",
+        "revision": 19
+      }
+    }
+  ]
+}

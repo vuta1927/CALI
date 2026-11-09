@@ -14,6 +14,18 @@ settings:
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1"
 
+packages:
+  # Pure workout domain (reducer, reconcile, clock). The app links the library product only.
+  CaliDomain:
+    path: Packages/CaliDomain
+  # POC-002 single-writer coordinator over GRDB (docs/20 phase 0). Pinned exact; CaliCore/Package.swift
+  # pins the same version.
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    exactVersion: 7.12.0
+  CaliCore:
+    path: Packages/CaliCore
+
 targets:
   CaliApp:
     type: application
@@ -25,10 +37,16 @@ targets:
     configFiles:
       Debug: Config/CaliApp.xcconfig
       Release: Config/CaliApp.xcconfig
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Only the app copy of ios/Shared/POCLiveActivityIntents.swift calls the coordinator (ADR-013).
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) CALI_APP_PROCESS"
     info:
       path: CaliApp/Info.plist
       properties:
-        CFBundleDisplayName: CALI
+        CFBundleDisplayName: COAMI
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CaliBuildSHA: $(CALI_BUILD_SHA)
@@ -39,6 +57,10 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     dependencies:
+      - package: CaliDomain
+        product: CaliDomain
+      - package: CaliCore
+        product: CaliCore
       - target: CaliActivityWidget
         embed: true
 
@@ -58,7 +80,7 @@ targets:
     info:
       path: CaliActivityWidget/Info.plist
       properties:
-        CFBundleDisplayName: CALI
+        CFBundleDisplayName: COAMI
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:

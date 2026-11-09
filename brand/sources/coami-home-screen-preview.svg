@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1000"><stop stop-color="#0F0B07"/><stop offset="1" stop-color="#33261C"/></linearGradient></defs>
+  <rect width="1600" height="1000" fill="#EBE8E6"/>
+  <rect x="450" y="60" width="700" height="880" rx="110" fill="url(#bg)" stroke="#70645B" stroke-width="8"/>
+  <text x="520" y="150" fill="#FFF" font-family="Arial" font-size="34" font-weight="700">9:41</text>
+  <text x="520" y="260" fill="#FFF" font-family="Arial" font-size="48" font-weight="700">Train with clarity.</text>
+  <g transform="translate(540 350)">
+    <rect width="180" height="180" rx="42" fill="#1A1206"/>
+    <g transform="scale(.176)"><path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="#FC4C02" stroke-width="136" stroke-linecap="round"/><path d="M406 638L512 532L620 424" fill="none" stroke="#FFF" stroke-width="80" stroke-linecap="round"/><circle cx="694" cy="350" r="52" fill="#FFF"/></g>
+    <text x="32" y="222" fill="#FFF" font-family="Arial" font-size="30">COAMI</text>
+  </g>
+  <g transform="translate(850 350)"><rect width="180" height="180" rx="42" fill="#FAF9F9"/><circle cx="90" cy="78" r="44" fill="#AEA39C"/><text x="38" y="222" fill="#FFF" font-family="Arial" font-size="30">Fitness</text></g>
+  <text x="800" y="790" text-anchor="middle" fill="#BAB1AA" font-family="Arial" font-size="24">Home Screen recognition preview · presentation only</text>
+</svg>

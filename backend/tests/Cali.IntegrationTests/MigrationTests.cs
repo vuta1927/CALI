@@ -32,6 +32,14 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
         result.Successful.ShouldBeTrue(result.Error?.ToString());
         result.AppliedScripts.ShouldContain("001_initial.sql");
         result.AppliedScripts.ShouldNotContain(s => MigrationScripts.IsDevelopmentOnly(s));
+        // Full production upgrade path in order: 001 -> 003 (CON-004) -> 004 (CON-003) ...
+        result.AppliedScripts.ShouldBe(AllScripts(includeDevelopment: false));
+        result.AppliedScripts.ShouldContain("003_running_measurement.sql");
+        result.AppliedScripts.ShouldContain("004_plan_lineage_activation.sql");
+        (await PublicTablesAsync(connectionString)).ShouldContain("plan_activations");
+        // CON-005
+        result.AppliedScripts.ShouldContain("005_plan_goals_phases.sql");
+        (await PublicTablesAsync(connectionString)).ShouldContain("plan_goals");
 
         var expected = TablesDeclaredIn001();
         expected.Length.ShouldBeGreaterThanOrEqualTo(17);
@@ -92,7 +100,7 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         (await client.GetAsync(new Uri("/health/ready", UriKind.Relative))).IsSuccessStatusCode.ShouldBeTrue();
 
-        (await JournalAsync(connectionString)).ShouldBe(["001_initial.sql", "002_dev_catalog_seed.sql"], ignoreOrder: true);
+        (await JournalAsync(connectionString)).ShouldBe(AllScripts(includeDevelopment: true));
     }
 
     [Fact]
@@ -110,6 +118,15 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
 
         (await PublicTablesAsync(connectionString)).ShouldBeEmpty();
     }
+
+    /// <summary>Every db/*.sql file in apply order (DbUp sorts by file name), optionally without _dev_ scripts.</summary>
+    private static string[] AllScripts(bool includeDevelopment) =>
+        Directory.GetFiles(RepoPaths.DbDirectory, "*.sql")
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .Where(name => includeDevelopment || !MigrationScripts.IsDevelopmentOnly(name))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static async Task<List<string>> PublicTablesAsync(string connectionString) =>
         await QueryStringsAsync(connectionString,

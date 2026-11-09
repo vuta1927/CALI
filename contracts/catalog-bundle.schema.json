@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cali/contracts/catalog-bundle.schema.json",
+  "title": "CALI offline catalog bundle manifest",
+  "description": "ADR-028: shape of the starter catalog bundled in the iOS app (fixtures/exercise_catalog.json during development). It is NOT the GET /v1/exercises wire shape (OpenAPI Exercise/ExerciseMedia); the app maps it into the same local tables. Release bundles must carry verifiable media (sha256 + license).",
+  "type": "object",
+  "required": ["catalogVersion", "status", "items"],
+  "properties": {
+    "catalogVersion": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["development_fixture_only", "release"]},
+    "items": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "_warning": {"type": "string"}
+  },
+  "additionalProperties": false,
+  "if": {"properties": {"status": {"const": "release"}}, "required": ["status"]},
+  "then": {"properties": {"items": {"items": {"properties": {"media": {"$ref": "#/$defs/release_media"}}}}}},
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["id", "slug", "name", "type", "discipline", "measurementType", "equipment", "cues", "media"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 80},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "type": {"enum": ["static_hold", "reps", "timed_reps", "interval", "skill_attempt", "distance", "duration", "load"]},
+        "discipline": {"enum": ["calisthenics", "gym", "running"], "description": "CON-006 (ADR-061): OpenAPI Discipline; 'mixed' is plan-only."},
+        "measurementType": {"enum": ["hold", "reps", "load", "distance", "duration"], "description": "CON-006 (ADR-060): derived from type, never chosen independently; the allOf below pins the pair."},
+        "focusTags": {"type": "array", "maxItems": 10, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 40}, "description": "CON-006 (ADR-061): free slugs, no fixed vocabulary yet."},
+        "equipment": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "cues": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "media": {
+          "type": "object",
+          "required": ["poster"],
+          "properties": {
+            "poster": {"$ref": "#/$defs/media_ref"},
+            "thumbnail": {"$ref": "#/$defs/media_ref"},
+            "preview": {"$ref": "#/$defs/media_ref"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"$comment": "CON-006 (ADR-060): measurementType is a total function of type.",
+         "if": {"properties": {"type": {"const": "static_hold"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "hold"}}}},
+        {"if": {"properties": {"type": {"const": "reps"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "timed_reps"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "interval"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "duration"}}}},
+        {"if": {"properties": {"type": {"const": "skill_attempt"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "reps"}}}},
+        {"if": {"properties": {"type": {"const": "distance"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "distance"}}}},
+        {"if": {"properties": {"type": {"const": "duration"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "duration"}}}},
+        {"if": {"properties": {"type": {"const": "load"}}, "required": ["type"]}, "then": {"properties": {"measurementType": {"const": "load"}}}}
+      ]
+    },
+    "relative_path": {"type": "string", "pattern": "^(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!/)[^\\\\]+$", "description": "Bundle-relative path; no URL scheme, no leading slash."},
+    "media_ref": {
+      "oneOf": [
+        {"$ref": "#/$defs/relative_path"},
+        {"$ref": "#/$defs/media_file"}
+      ]
+    },
+    "media_file": {
+      "type": "object",
+      "required": ["path", "sha256", "contentVersion", "mimeType", "license"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relative_path"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "contentVersion": {"type": "integer", "minimum": 1},
+        "mimeType": {"type": "string"},
+        "license": {"type": "string", "minLength": 1},
+        "attribution": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "release_media": {
+      "properties": {
+        "poster": {"$ref": "#/$defs/media_file"},
+        "thumbnail": {"$ref": "#/$defs/media_file"},
+        "preview": {"$ref": "#/$defs/media_file"}
+      }
+    }
+  }
+}

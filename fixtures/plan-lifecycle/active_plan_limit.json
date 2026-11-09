@@ -1,0 +1,143 @@
+{
+  "name": "active_plan_limit",
+  "description": "IOS-011 client-side I2 check (D1 limit 3), mirroring the plan_activations_guard trigger of db/004. Counted: the candidate activation plus live activations (other ids) of plans that are neither deleted nor ended. Checked days: the candidate fromDate and every counted fromDate inside the candidate range (toDate null = open-ended). Worst day = most distinct plans, earliest on ties. An update of the same activation and plan that only shrinks or closes its range is always allowed. expect.result is allowed or exceedsLimit; for exceedsLimit, lineageIds are the plans covering the worst day, sorted. Plans: A ...001, B ...002, C ...003, D ...004.",
+  "cases": [
+    {
+      "name": "third_plan_allowed",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "fourth_plan_rejected",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "exceedsLimit", "day": "2026-11-09", "count": 4, "lineageIds": [
+        "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000004"
+      ]}
+    },
+    {
+      "name": "closed_activation_frees_slot",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-01", "toDate": "2026-11-08", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "later_start_inside_range_is_checked",
+      "comment": "C is scheduled from 11-20; D 11-09..11-30 is fine on 11-09 (3 plans) but not on 11-20 (4 plans).",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-30", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-20", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "exceedsLimit", "day": "2026-11-20", "count": 4, "lineageIds": [
+        "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000004"
+      ]}
+    },
+    {
+      "name": "candidate_ending_before_later_start_allowed",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-19", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-20", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "ended_plan_frees_slot",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "endedAt": "2026-11-08T10:00:00Z", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "deleted_plan_frees_slot_before_its_activation_is_closed",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "deletedAt": "2026-11-08T10:00:00Z", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "shrinking_update_always_allowed",
+      "comment": "Already 4 plans (e.g. the server limit was lowered); closing D's activation must still go through.",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-15", "timezone": "Asia/Ho_Chi_Minh"},
+      "previous": {"lineageId": "00000000-0000-4000-8000-000000000004", "activation": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000004", "activations": [{"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "allowed"}
+    },
+    {
+      "name": "extending_update_is_checked",
+      "limit": 3,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-25", "timezone": "Asia/Ho_Chi_Minh"},
+      "previous": {"lineageId": "00000000-0000-4000-8000-000000000004", "activation": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-15", "timezone": "Asia/Ho_Chi_Minh"}},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-20", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000004", "activations": [{"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "toDate": "2026-11-15", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "exceedsLimit", "day": "2026-11-20", "count": 4, "lineageIds": [
+        "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000004"
+      ]}
+    },
+    {
+      "name": "worst_day_earliest_on_tie",
+      "limit": 2,
+      "candidateLineageId": "00000000-0000-4000-8000-000000000004",
+      "candidate": {"id": "00000000-0000-4000-8000-000000000041", "fromDate": "2026-11-09", "timezone": "Asia/Ho_Chi_Minh"},
+      "plans": [
+        {"lineageId": "00000000-0000-4000-8000-000000000001", "activations": [{"id": "00000000-0000-4000-8000-000000000011", "fromDate": "2026-11-01", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000002", "activations": [{"id": "00000000-0000-4000-8000-000000000021", "fromDate": "2026-11-12", "toDate": "2026-11-14", "timezone": "Asia/Ho_Chi_Minh"}]},
+        {"lineageId": "00000000-0000-4000-8000-000000000003", "activations": [{"id": "00000000-0000-4000-8000-000000000031", "fromDate": "2026-11-20", "toDate": "2026-11-22", "timezone": "Asia/Ho_Chi_Minh"}]}
+      ],
+      "expect": {"result": "exceedsLimit", "day": "2026-11-12", "count": 3, "lineageIds": [
+        "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000004"
+      ]}
+    }
+  ]
+}

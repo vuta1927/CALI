@@ -20,6 +20,12 @@ public enum DomainLimits {
     public static let maxReasonLength = 500
     /// Maximum exercises per session (defensive bound; not a documented product policy).
     public static let maxExecutionsPerSession = 50
+    /// CON-006 (ADR-062): load `reps` 1..500 (schema `target.load`).
+    public static let loadReps: ClosedRange<Int> = 1...500
+    /// CON-006 (ADR-062): `loadKg` / `actualLoadKg` 0..1000 kg (ADR-046: kilograms only).
+    public static let loadKg: ClosedRange<Decimal> = 0...1000
+    /// CON-006 (ADR-062): at most 2 decimals; more precision is rejected, never rounded (db/006).
+    public static let loadKgFractionDigits = 2
 }
 
 /// A single validation failure. `field` uses the contract JSON key names.
@@ -50,5 +56,14 @@ public struct ValidationIssue: Error, Equatable, Hashable, Sendable, CustomStrin
 
     static func min<T: Comparable>(_ field: String, _ value: T, _ minimum: T) -> ValidationIssue? {
         value >= minimum ? nil : ValidationIssue(field: field, reason: .outOfRange, detail: "\(value) < \(minimum)")
+    }
+
+    /// CON-006 (ADR-062): kilograms in `DomainLimits.loadKg` with at most `DomainLimits.loadKgFractionDigits` decimals.
+    static func loadKg(_ field: String, _ value: Decimal) -> ValidationIssue? {
+        if let issue = range(field, value, DomainLimits.loadKg) { return issue }
+        var source = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, DomainLimits.loadKgFractionDigits, .plain)
+        return rounded == value ? nil : ValidationIssue(field: field, reason: .outOfRange, detail: "\(value) has more than \(DomainLimits.loadKgFractionDigits) decimals")
     }
 }

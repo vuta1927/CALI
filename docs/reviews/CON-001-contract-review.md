@@ -106,24 +106,24 @@ Quy ước đặt tên: wire (OpenAPI/JSON Schema) dùng `camelCase`, SQL dùng 
 | F7 | Medium | SQL `entity_type` của `sync_mutations`/`sync_change_log` là text tự do | **Fixed** |
 | F8 | Medium | Ví dụ payload docs/08 §3 thiếu field bắt buộc `prescribedSnapshot`, `confirmedAt` | **Fixed** |
 | F9 | Medium | Tên cột trong docs/07 §1/§3 lệch so với SQL | **Fixed** |
-| D1 | High | docs/03 §2 dùng tên khái niệm khác tên wire | Needs ADR/decision |
-| D2 | High | Field có trong docs/03 nhưng không có trong contract nào | Needs ADR/decision |
-| D3 | High | `prescribedSnapshot` là object tự do, không ràng buộc snapshot target + catalog version | Needs ADR/decision |
-| D4 | Medium | docs/03: INTERVAL `restSeconds > 0`; contract cho phép 0 | Needs ADR/decision |
-| D5 | Medium | `repMin ≤ repMax`, `target.kind == exercise type` không biểu diễn được trong schema | Needs ADR/decision |
-| D6 | High | Receipt `conflict` lưu theo `mutationId` chặn retry dependency conflict; `MutationError.code` không có enum | Needs ADR/decision |
-| D7 | Medium | Shape `SyncChange.payload` khi pull không được đặc tả | Needs ADR/decision |
-| D8 | Medium | Không ràng buộc nhất quán `status` ↔ `phase` | Needs ADR/decision |
-| D9 | Low | `date-time` cho phép mọi offset (không chỉ `Z`); IANA `timezone` không được validate | Needs ADR/decision |
-| D10 | Medium | `UNIQUE (execution_id, set_index)` không tính soft delete | Needs ADR/decision |
-| D11 | Medium | `AnalysisRecommendation.exerciseId` bắt buộc ở OpenAPI, nullable ở SQL | Needs ADR/decision |
-| D12 | Low | `planned_workout.title` bắt buộc ở JSON Schema, optional ở OpenAPI, `DEFAULT ''` ở SQL | Needs ADR/decision |
-| D13 | Medium | Shape `fixtures/exercise_catalog.json` khác OpenAPI `Exercise`/`ExerciseMedia` | Needs ADR/decision |
-| D14 | Low | Sơ đồ mermaid docs/03 thiếu transition abandon/skip mà bảng command cho phép | Needs ADR/decision |
-| D15 | Medium | Envelope mutation không từ chối field lạ dù schema mô tả "reject unknown fields" | Needs ADR/decision |
-| D16 | Medium | Không phát hiện tái sử dụng `mutationId` với payload khác | Needs ADR/decision |
-| D17 | Medium | docs/09 §6 ví dụ output AI lệch OpenAPI (`exerciseId` slug, `proposedTarget` thiếu `kind`, action ngoài enum) | Needs ADR/decision |
-| D18 | Low | Các điểm nhỏ: `set_result.note` không giới hạn độ dài; `sync_mutations.device_id` không FK; `ExerciseMedia.license` optional ở wire nhưng NOT NULL ở SQL | Needs ADR/decision |
+| D1 | High | docs/03 §2 dùng tên khái niệm khác tên wire | **Decided** ([ADR-016](../15-decisions-risks.md)) |
+| D2 | High | Field có trong docs/03 nhưng không có trong contract nào | **Decided** ([ADR-017](../15-decisions-risks.md)) |
+| D3 | High | `prescribedSnapshot` là object tự do, không ràng buộc snapshot target + catalog version | **Decided** ([ADR-018](../15-decisions-risks.md)) |
+| D4 | Medium | docs/03: INTERVAL `restSeconds > 0`; contract cho phép 0 | **Decided** ([ADR-019](../15-decisions-risks.md)) |
+| D5 | Medium | `repMin ≤ repMax`, `target.kind == exercise type` không biểu diễn được trong schema | **Decided** ([ADR-020](../15-decisions-risks.md)) |
+| D6 | High | Receipt `conflict` lưu theo `mutationId` chặn retry dependency conflict; `MutationError.code` không có enum | **Decided** ([ADR-021](../15-decisions-risks.md)) |
+| D7 | Medium | Shape `SyncChange.payload` khi pull không được đặc tả | **Decided** ([ADR-022](../15-decisions-risks.md)) |
+| D8 | Medium | Không ràng buộc nhất quán `status` ↔ `phase` | **Decided** ([ADR-023](../15-decisions-risks.md)) |
+| D9 | Low | `date-time` cho phép mọi offset (không chỉ `Z`); IANA `timezone` không được validate | **Decided** ([ADR-024](../15-decisions-risks.md)) |
+| D10 | Medium | `UNIQUE (execution_id, set_index)` không tính soft delete | **Decided** ([ADR-025](../15-decisions-risks.md)) |
+| D11 | Medium | `AnalysisRecommendation.exerciseId` bắt buộc ở OpenAPI, nullable ở SQL | **Decided** ([ADR-026](../15-decisions-risks.md)) |
+| D12 | Low | `planned_workout.title` bắt buộc ở JSON Schema, optional ở OpenAPI, `DEFAULT ''` ở SQL | **Decided** ([ADR-027](../15-decisions-risks.md)) |
+| D13 | Medium | Shape `fixtures/exercise_catalog.json` khác OpenAPI `Exercise`/`ExerciseMedia` | **Decided** ([ADR-028](../15-decisions-risks.md)) |
+| D14 | Low | Sơ đồ mermaid docs/03 thiếu transition abandon/skip mà bảng command cho phép | **Decided** ([ADR-029](../15-decisions-risks.md)) |
+| D15 | Medium | Envelope mutation không từ chối field lạ dù schema mô tả "reject unknown fields" | **Decided** ([ADR-030](../15-decisions-risks.md)) |
+| D16 | Medium | Không phát hiện tái sử dụng `mutationId` với payload khác | **Decided** ([ADR-031](../15-decisions-risks.md)) |
+| D17 | Medium | docs/09 §6 ví dụ output AI lệch OpenAPI (`exerciseId` slug, `proposedTarget` thiếu `kind`, action ngoài enum) | **Decided** ([ADR-032](../15-decisions-risks.md)) |
+| D18 | Low | Các điểm nhỏ: `set_result.note` không giới hạn độ dài; `sync_mutations.device_id` không FK; `ExerciseMedia.license` optional ở wire nhưng NOT NULL ở SQL | **Decided** ([ADR-033](../15-decisions-risks.md)) |
 
 ## 4. Chi tiết — Fixed
 
@@ -172,6 +172,8 @@ Quy ước đặt tên: wire (OpenAPI/JSON Schema) dùng `camelCase`, SQL dùng 
 Lý do sửa: docs/07 đứng sau `db/001_initial.sql` trong thứ tự ưu tiên, và docs/07 §6 yêu cầu "avoid undefined field names". "Per client profile" mâu thuẫn trực tiếp với partial unique index và comment MVP trong SQL.
 
 ## 5. Chi tiết — Needs ADR/decision
+
+> **Cập nhật 2026-11-07:** cả 18 điểm đã được quyết định thành ADR-016..033 trong [docs/15](../15-decisions-risks.md) (D*n* → ADR-0(15+*n*)) và áp dụng đồng bộ vào OpenAPI, JSON Schema, SQL, fixtures, docs và test. Lựa chọn đã chọn: D1 (a), D2 (c), D3 (a), D4 (a), D5 (a), D6 (a) + enum có `mutation_id_reused`, D7 (a), D8 (a), D9 (b), D10 (b), D11 (a), D12 (a), D13 (a), D14 (cập nhật sơ đồ), D15 (`additionalProperties: false` trên envelope), D16 (a), D17 (b) + pain rule dùng `reduce`/`maintain` + `safetyFlags`, D18 (note ≤1000, FK device + tự đăng ký device khi push, `license` bắt buộc). Nội dung bên dưới giữ nguyên làm lịch sử phân tích.
 
 **D1 — Tên khái niệm docs/03 §2 khác tên wire.** docs/03 dùng `localDay`, `startedAtUtc`, `finishedAtUtc`, `phaseDeadlineUtc`, `exerciseCatalogId`, `sequence`/`ordering`/`order`, `confirmedAtUtc`, `WorkoutNote.text` và viết tắt `REST`/`COMPLETE`. Contract dùng `localDate`, `startedAt`, `finishedAt`, `phaseDeadlineAt`, `exerciseId`, `orderIndex`, `confirmedAt`, `noteText`, `resting`/`completed`. Theo thứ tự ưu tiên docs/03 thắng OpenAPI, nhưng đổi tên wire là breaking change cho mọi artifact.
 - (a) ADR tuyên bố docs/03 §2 là mô hình khái niệm, tên chuẩn là tên wire; thêm bảng ánh xạ vào docs/03. *(khuyến nghị — không breaking)*
@@ -222,5 +224,5 @@ Lý do sửa: docs/07 đứng sau `db/001_initial.sql` trong thứ tự ưu tiê
 
 ## 7. Chưa xác minh được
 - Chưa có code backend/Swift để kiểm tra conformance thực tế; workflow CI chưa chạy trên GitHub (chỉ chạy validator cục bộ).
-- `fixtures/exercise_catalog.json` không được validate với OpenAPI (xem D13).
+- ~~`fixtures/exercise_catalog.json` không được validate với OpenAPI (xem D13).~~ Đã giải quyết bởi ADR-028: fixture được validate với `contracts/catalog-bundle.schema.json` (manifest bundle offline, không phải `Exercise` của OpenAPI).
 - Smoke test ràng buộc chỉ chạy thủ công một lần, chưa thành test tự động.

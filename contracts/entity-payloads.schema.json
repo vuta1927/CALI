@@ -10,18 +10,25 @@
     {"$ref": "#/$defs/workout_session_mutation"},
     {"$ref": "#/$defs/exercise_execution_mutation"},
     {"$ref": "#/$defs/set_result_mutation"},
-    {"$ref": "#/$defs/workout_note_mutation"}
+    {"$ref": "#/$defs/workout_note_mutation"},
+    {"$ref": "#/$defs/plan_activation_mutation"},
+    {"$ref": "#/$defs/plan_phase_mutation"},
+    {"$ref": "#/$defs/plan_goal_mutation"}
   ],
   "$defs": {
     "uuid": {"type": "string", "format": "uuid"},
     "dateTime": {"type": "string", "format": "date-time"},
+    "localDate": {"type": "string", "format": "date"},
     "target": {
       "oneOf": [
         {"type": "object", "required": ["kind", "holdSeconds"], "properties": {"kind": {"const": "static_hold"}, "holdSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "repMin", "repMax"], "properties": {"kind": {"const": "reps"}, "repMin": {"type": "integer", "minimum": 1, "maximum": 500}, "repMax": {"type": "integer", "minimum": 1, "maximum": 500}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "timeSeconds"], "properties": {"kind": {"const": "timed_reps"}, "timeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 100}}, "additionalProperties": false}
+        {"type": "object", "required": ["kind", "workSeconds", "restSeconds"], "properties": {"kind": {"const": "interval"}, "workSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "restSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "attempts"], "properties": {"kind": {"const": "skill_attempt"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 100}}, "additionalProperties": false},
+        {"$comment": "CON-004 running: one set = one segment. Optional durationSeconds is the target time; pace is derived, never stored.", "type": "object", "required": ["kind", "distanceMeters"], "properties": {"kind": {"const": "distance"}, "distanceMeters": {"type": "integer", "minimum": 1, "maximum": 500000}, "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "durationSeconds"], "properties": {"kind": {"const": "duration"}, "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}}, "additionalProperties": false},
+        {"$comment": "CON-006 load (ADR-062): one set = reps at loadKg. Kilograms only (ADR-046), at most 2 decimals (enforced by backend/CaliDomain, ADR-020); volume is derived, never stored.", "type": "object", "required": ["kind", "reps", "loadKg"], "properties": {"kind": {"const": "load"}, "reps": {"type": "integer", "minimum": 1, "maximum": 500}, "loadKg": {"type": "number", "minimum": 0, "maximum": 1000}}, "additionalProperties": false}
       ]
     },
     "delete_payload": {
@@ -29,27 +36,110 @@
       "properties": {"id": {"$ref": "#/$defs/uuid"}, "deletedAt": {"$ref": "#/$defs/dateTime"}},
       "additionalProperties": false
     },
+    "prescribed_snapshot": {
+      "description": "ADR-018: immutable copy of the prescription at session start (target + set/rest policy + catalog version). Same shape for exercise_execution and set_result.",
+      "type": "object", "required": ["target", "setCount", "restSeconds", "catalogVersion"],
+      "properties": {
+        "target": {"$ref": "#/$defs/target"},
+        "setCount": {"type": "integer", "minimum": 1, "maximum": 20},
+        "restSeconds": {"type": "integer", "minimum": 0, "maximum": 3600},
+        "catalogVersion": {"type": "integer", "minimum": 1},
+        "exerciseId": {"$ref": "#/$defs/uuid"},
+        "plannedExerciseId": {"type": ["string", "null"], "format": "uuid"}
+      }, "additionalProperties": false
+    },
     "mutation_common": {
       "type": "object", "required": ["mutationId", "entityType", "entityId", "action", "baseVersion", "clientChangedAt", "payload"],
       "properties": {
         "mutationId": {"$ref": "#/$defs/uuid"}, "entityType": {"type": "string"}, "entityId": {"$ref": "#/$defs/uuid"},
         "action": {"enum": ["upsert", "delete"]}, "baseVersion": {"type": "integer", "minimum": 0},
         "clientChangedAt": {"$ref": "#/$defs/dateTime"}, "payload": {"type": "object"}
-      }
+      },
+      "additionalProperties": false
     },
     "training_plan_payload": {
+      "$comment": "CON-003: status is the REVISION status (ADR-036, ADR-056); the user-facing plan status is computed from activations, endedAt and archivedAt (docs/19 section 4.2). lineageId is optional on the wire: the server derives it from parentPlanId (root plan = own id).",
       "type": "object", "required": ["id", "title", "revision", "status"],
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "title": {"type": "string", "minLength": 1, "maxLength": 120},
-        "revision": {"type": "integer", "minimum": 1}, "status": {"enum": ["active", "archived"]},
-        "parentPlanId": {"type": ["string", "null"], "format": "uuid"}
-      }, "additionalProperties": false
+        "revision": {"type": "integer", "minimum": 1}, "status": {"enum": ["current", "superseded"]},
+        "parentPlanId": {"type": ["string", "null"], "format": "uuid"},
+        "lineageId": {"$ref": "#/$defs/uuid"},
+        "kind": {"enum": ["weekly", "event"]},
+        "eventDate": {"type": ["string", "null"], "format": "date"},
+        "eventName": {"type": ["string", "null"], "minLength": 1, "maxLength": 120},
+        "primaryDiscipline": {"enum": ["calisthenics", "running", "gym", "mixed"]},
+        "endedAt": {"type": ["string", "null"], "format": "date-time"},
+        "endReason": {"enum": ["completed", "stopped", null]},
+        "endNote": {"type": ["string", "null"], "maxLength": 500},
+        "archivedAt": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "event"}}},
+      "then": {"required": ["eventDate"], "properties": {"eventDate": {"type": "string"}}},
+      "additionalProperties": false
     },
-    "planned_workout_payload": {
-      "type": "object", "required": ["id", "planId", "weekday", "title", "orderIndex"],
+    "plan_activation_payload": {
+      "$comment": "CON-003 (docs/19 section 4, BR-1): a period during which a plan lineage is followed. Local dates plus the IANA time zone they refer to; toDate null = open-ended; endReason records the lifecycle command that closed it. I1/I2 are enforced by the server (MutationError active_plan_limit).",
+      "type": "object", "required": ["id", "planLineageId", "fromDate", "timezone"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planLineageId": {"$ref": "#/$defs/uuid"},
+        "fromDate": {"$ref": "#/$defs/localDate"},
+        "toDate": {"type": ["string", "null"], "format": "date"},
+        "timezone": {"type": "string", "minLength": 1, "maxLength": 64},
+        "endReason": {"enum": ["paused", "completed", "stopped", "deleted", null]}
+      },
+      "if": {"required": ["endReason"], "properties": {"endReason": {"type": "string"}}},
+      "then": {"required": ["toDate"], "properties": {"toDate": {"type": "string"}}},
+      "additionalProperties": false
+    },
+    "goal_target": {
+      "$comment": "CON-005 (docs/18 section 6.1): a goal target is one value or a {min,max} range (body goals). Units come from the indicator definition. min <= max is a business rule (validation_failed, field target.max).",
+      "oneOf": [
+        {"type": "object", "required": ["value"], "properties": {"value": {"type": "number", "minimum": 0, "maximum": 999999999}}, "additionalProperties": false},
+        {"type": "object", "required": ["min", "max"], "properties": {"min": {"type": "number", "minimum": 0, "maximum": 999999999}, "max": {"type": "number", "minimum": 0, "maximum": 999999999}}, "additionalProperties": false}
+      ]
+    },
+    "plan_phase_payload": {
+      "$comment": "CON-005 (docs/18 section 6.5, docs/19 section 4): an ordered phase of ONE plan revision (planId). Week labels and done/current/upcoming are computed, never sent. A new revision gets new phase ids (ADR-057).",
+      "type": "object", "required": ["id", "planId", "orderIndex", "name", "weeks"],
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
-        "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string"},
+        "orderIndex": {"type": "integer", "minimum": 0},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "weeks": {"type": "integer", "minimum": 1, "maximum": 52},
+        "description": {"type": ["string", "null"], "maxLength": 500}
+      }, "additionalProperties": false
+    },
+    "plan_goal_payload": {
+      "$comment": "CON-005 (docs/18 sections 6.1-6.4, docs/19 section 4): a goal belongs to the plan LINEAGE, not to a revision. current is computed on the device and never sent. baseline is the client's snapshot (ADR-044). scopePhaseId null = scope 'plan'. status is only changed by the client; 'achieved' is a user confirmation and needs achievedAt (AGENTS rules 3 and 5). indicatorId and exerciseId are immutable (ADR-047, ADR-057). Pinned limit and unlock cycles are enforced by the server (MutationError pinned_goal_limit, goal_unlock_cycle).",
+      "type": "object", "required": ["id", "planLineageId", "title", "indicatorId", "target", "status", "pinned"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planLineageId": {"$ref": "#/$defs/uuid"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 120},
+        "indicatorId": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+        "exerciseId": {"type": ["string", "null"], "format": "uuid"},
+        "baseline": {"type": ["number", "null"], "minimum": 0, "maximum": 999999999},
+        "target": {"$ref": "#/$defs/goal_target"},
+        "scopePhaseId": {"type": ["string", "null"], "format": "uuid"},
+        "unlockAfterGoalId": {"type": ["string", "null"], "format": "uuid"},
+        "status": {"enum": ["active", "reached", "achieved", "missed", "archived"]},
+        "achievedAt": {"type": ["string", "null"], "format": "date-time"},
+        "pinned": {"type": "boolean"},
+        "note": {"type": ["string", "null"], "maxLength": 500}
+      },
+      "allOf": [
+        {"if": {"required": ["status"], "properties": {"status": {"const": "achieved"}}},
+         "then": {"required": ["achievedAt"], "properties": {"achievedAt": {"type": "string"}}}},
+        {"if": {"required": ["status"], "properties": {"status": {"enum": ["active", "reached", "missed"]}}},
+         "then": {"properties": {"achievedAt": {"type": "null"}}}}
+      ],
+      "additionalProperties": false
+    },
+    "planned_workout_payload": {
+      "type": "object", "required": ["id", "planId", "weekday", "orderIndex"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
+        "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string", "maxLength": 120},
         "orderIndex": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     },
@@ -73,8 +163,19 @@
         "phaseStartedAt": {"type": ["string", "null"], "format": "date-time"},
         "phaseDeadlineAt": {"type": ["string", "null"], "format": "date-time"},
         "currentExecutionId": {"type": ["string", "null"], "format": "uuid"},
-        "currentSetIndex": {"type": ["integer", "null"], "minimum": 1}
-      }, "additionalProperties": false
+        "currentSetIndex": {"type": ["integer", "null"], "minimum": 1},
+        "pausedAt": {"type": ["string", "null"], "format": "date-time"},
+        "accumulatedExerciseMs": {"type": ["integer", "null"], "minimum": 0},
+        "abandonReason": {"type": ["string", "null"], "maxLength": 500}
+      }, "additionalProperties": false,
+      "allOf": [
+        {"$comment": "ADR-023: terminal status and terminal phase move together.",
+         "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]}, "then": {"properties": {"phase": {"const": "completed"}}}},
+        {"if": {"properties": {"phase": {"const": "completed"}}, "required": ["phase"]}, "then": {"properties": {"status": {"const": "completed"}}}},
+        {"if": {"properties": {"status": {"const": "abandoned"}}, "required": ["status"]}, "then": {"properties": {"phase": {"const": "abandoned"}}}},
+        {"if": {"properties": {"phase": {"const": "abandoned"}}, "required": ["phase"]}, "then": {"properties": {"status": {"const": "abandoned"}}}},
+        {"if": {"properties": {"phase": {"not": {"const": "paused"}}}, "required": ["phase"]}, "then": {"properties": {"pausedAt": {"type": "null"}}}}
+      ]
     },
     "exercise_execution_payload": {
       "type": "object", "required": ["id", "sessionId", "exerciseId", "orderIndex", "prescribedSnapshot"],
@@ -82,7 +183,7 @@
         "id": {"$ref": "#/$defs/uuid"}, "sessionId": {"$ref": "#/$defs/uuid"},
         "plannedExerciseId": {"type": ["string", "null"], "format": "uuid"},
         "exerciseId": {"$ref": "#/$defs/uuid"}, "orderIndex": {"type": "integer", "minimum": 0},
-        "prescribedSnapshot": {"type": "object"}
+        "prescribedSnapshot": {"$ref": "#/$defs/prescribed_snapshot"}
       }, "additionalProperties": false
     },
     "set_result_payload": {
@@ -90,12 +191,19 @@
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "executionId": {"$ref": "#/$defs/uuid"},
         "setIndex": {"type": "integer", "minimum": 1, "maximum": 100}, "status": {"enum": ["completed", "failed", "skipped"]},
-        "prescribedSnapshot": {"type": "object"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
+        "prescribedSnapshot": {"$ref": "#/$defs/prescribed_snapshot"}, "actualReps": {"type": ["integer", "null"], "minimum": 0},
         "actualHoldMs": {"type": ["integer", "null"], "minimum": 0},
         "actualWorkMs": {"type": ["integer", "null"], "minimum": 0},
         "actualRestMs": {"type": ["integer", "null"], "minimum": 0},
-        "rpe": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
-        "note": {"type": ["string", "null"]}, "confirmedAt": {"$ref": "#/$defs/dateTime"},
+        "distanceMeters": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
+        "durationSeconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 86400},
+        "source": {"enum": ["manual"], "description": "CON-004. Omitted = manual. 'healthkit' is reserved for Apple Health (ADR-043) and not accepted yet."},
+        "actualLoadKg": {"type": ["number", "null"], "minimum": 0, "maximum": 1000, "description": "CON-006 (ADR-062). Load actually lifted in kg (ADR-046: never lb). Only for a load target; at most 2 decimals (backend/CaliDomain rule, ADR-020)."},
+        "rpe":{"type": ["integer", "null"], "minimum": 1, "maximum": 10},
+        "note": {"type": ["string", "null"], "maxLength": 1000},
+        "skipReason": {"type": ["string", "null"], "maxLength": 500},
+        "painReported": {"type": "boolean"},
+        "confirmedAt": {"$ref": "#/$defs/dateTime"},
         "revision": {"type": "integer", "minimum": 1}
       }, "additionalProperties": false
     },
@@ -113,12 +221,18 @@
     "exercise_execution_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "exercise_execution"}}, "allOf": [{"$ref": "#/$defs/payload_switch_exercise_execution"}]}]},
     "set_result_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "set_result"}}, "allOf": [{"$ref": "#/$defs/payload_switch_set_result"}]}]},
     "workout_note_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "workout_note"}}, "allOf": [{"$ref": "#/$defs/payload_switch_workout_note"}]}]},
+    "plan_activation_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_activation"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_activation"}]}]},
     "payload_switch_training_plan": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/training_plan_payload"}}}},
     "payload_switch_planned_workout": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/planned_workout_payload"}}}},
     "payload_switch_planned_exercise": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/planned_exercise_payload"}}}},
     "payload_switch_workout_session": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_session_payload"}}}},
     "payload_switch_exercise_execution": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/exercise_execution_payload"}}}},
     "payload_switch_set_result": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/set_result_payload"}}}},
-    "payload_switch_workout_note": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_note_payload"}}}}
+    "payload_switch_workout_note": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/workout_note_payload"}}}},
+    "payload_switch_plan_activation": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_activation_payload"}}}},
+    "plan_phase_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_phase"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_phase"}]}]},
+    "plan_goal_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_goal"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_goal"}]}]},
+    "payload_switch_plan_phase": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_phase_payload"}}}},
+    "payload_switch_plan_goal": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_goal_payload"}}}}
   }
 }

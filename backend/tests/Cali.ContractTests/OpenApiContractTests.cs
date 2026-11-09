@@ -66,6 +66,9 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
     {
         var operation = _spec.Paths["/v1/me"]!.Operations![HttpMethod.Get];
         operation.Responses!.Keys.ShouldContain("401");
+        // The endpoint returns 404 `user_not_found` for a valid token without a users row.
+        operation.Responses["404"]!.Content!["application/problem+json"].Schema.ShouldBeOfType<OpenApiSchemaReference>()
+            .Reference.Id.ShouldBe("Problem");
         operation.Responses["200"]!.Content!["application/json"].Schema.ShouldBeOfType<OpenApiSchemaReference>()
             .Reference.Id.ShouldBe("UserProfile");
     }
@@ -98,7 +101,6 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
             .SelectMany(s => s.Endpoints)
             .OfType<RouteEndpoint>()
             .Select(e => (Path: "/" + e.RoutePattern.RawText!.TrimStart('/'), Methods: e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []))
-            .Where(r => !r.Path.StartsWith("/health/", StringComparison.Ordinal)) // ops endpoints; see report
             .ToList();
 
         routes.ShouldNotBeEmpty();

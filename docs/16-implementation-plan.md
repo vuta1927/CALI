@@ -3,6 +3,7 @@
 **Phiên bản:** v0.1 (2026-11-07) · **Trạng thái:** đề xuất, chờ chủ dự án duyệt
 **Phạm vi:** chi tiết hóa M0 → M2 trong [`13-delivery-backlog.md`](13-delivery-backlog.md) cho iOS app và backend. AI Coach (M3) chỉ nêu điểm nối.
 Tài liệu này **không thay thế** ADR/contract. Nếu mâu thuẫn, ưu tiên theo quy tắc trong README.
+Thứ tự triển khai toàn hệ thống (gồm docs/17–19, AI, media, phát hành) và hiện trạng sau các PR đã merge: xem [`20-system-implementation-plan.md`](20-system-implementation-plan.md).
 
 ---
 
@@ -77,6 +78,8 @@ Windows: tải artifact → Sideloadly (Apple ID free) ký + cài qua USB → iP
 ---
 
 ## 3. Quyết định kỹ thuật đề xuất (cần duyệt → ghi ADR)
+
+> **PO duyệt 2026-11-08:** ADR-011..015 ở bảng dưới đã Accepted ([docs/15](15-decisions-risks.md)). ADR-013 vẫn phải có bằng chứng POC-001/002 trước khi sửa docs/04, docs/05 (ghi chú ở cuối bảng).
 
 | ID đề xuất | Quyết định | Lý do | Ảnh hưởng nếu từ chối |
 |---|---|---|---|
@@ -284,6 +287,19 @@ Stack: Swift 6 (strict concurrency), SwiftUI + Observation, GRDB, ActivityKit/Wi
 | Trạng thái task | GitHub Projects import `contracts/backlog.csv`; mỗi PR link task ID; cập nhật `CHANGELOG.md` |
 
 ---
+
+### IOS-009 / MED-002 — số đo CI (UTC, 2026-11-07)
+
+| Run | Job | Bắt đầu → kết thúc | Thời gian đo | Kết quả |
+|---|---|---|---|---|
+| 42397123588 | archive | 17:36:12 → 17:37:02 | 50s | app/widget archive passed |
+| 42397123588 | XCTest | 17:36:13 → 17:42:55 | 402s | 17/18 passed; timestamp precision assertion fixed |
+| 42397716104 | archive | 17:43:41 → 17:46:11 | 150s | app/widget archive passed |
+| 42397716104 | XCTest | 17:43:40 → 17:48:52 | 312s | 18/18 passed |
+
+Các số trên lấy từ bước Record job duration, chưa gồm runner setup; tổng tháng
+và cách tính phí thực tế cần xem GitHub Billing. Source đã kiểm tra: `67456a8`.
+Bằng chứng và artifact: [run 42397716104](https://github.com/vuta1927/CALI/actions/runs/42397716104).
 
 ## 9. Mốc cần tài khoản Apple Developer trả phí (99 USD/năm)
 

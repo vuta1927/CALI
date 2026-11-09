@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1400" role="img" aria-labelledby="title desc">
+  <title id="title">COAMI identity master</title>
+  <desc id="desc">Editable master showing the recommended Guided Companion C in color and monochrome.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="2400" y2="1400" gradientUnits="userSpaceOnUse"><stop stop-color="#0F0B07"/><stop offset="1" stop-color="#1A1206"/></linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse"><stop stop-color="#FF7A2F"/><stop offset=".52" stop-color="#FC4C02"/><stop offset="1" stop-color="#E83F00"/></linearGradient>
+  </defs>
+  <rect width="2400" height="1400" fill="url(#bg)"/>
+  <text x="120" y="140" fill="#FFF3EC" font-family="Avenir Next, Arial, sans-serif" font-size="72" font-weight="700">COAMI — GUIDED COMPANION C</text>
+  <text x="120" y="214" fill="#B3A9A2" font-family="Avenir Next, Arial, sans-serif" font-size="36">Recommended implementation direction · pending human approval and trademark review</text>
+  <g transform="translate(90 250)">
+    <rect width="980" height="980" rx="80" fill="#332E2A" stroke="#645951" stroke-width="3"/>
+    <g transform="translate(-22 -22)">
+      <path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="url(#g)" stroke-width="136" stroke-linecap="round"/>
+      <path d="M406 638L512 532L620 424" fill="none" stroke="#FFF3EC" stroke-width="80" stroke-linecap="round"/><circle cx="694" cy="350" r="52" fill="#FFF3EC"/>
+    </g>
+  </g>
+  <g transform="translate(1220 250)">
+    <rect width="1080" height="430" rx="64" fill="#FFF3EC"/>
+    <g transform="translate(20 -16) scale(.43)"><path d="M746 264C684 194 596 156 500 156C304 156 160 308 160 512C160 716 304 868 500 868C596 868 684 830 746 760" fill="none" stroke="#1A1206" stroke-width="136" stroke-linecap="round"/><path d="M406 638L512 532L620 424" fill="none" stroke="#1A1206" stroke-width="80" stroke-linecap="round"/><circle cx="694" cy="350" r="52" fill="#1A1206"/></g>
+    <text x="470" y="275" fill="#1A1206" font-family="Avenir Next, Arial, sans-serif" font-size="180" font-weight="700" letter-spacing="18">COAMI</text>
+  </g>
+  <g transform="translate(1220 800)">
+    <text x="0" y="0" fill="#FF7A2F" font-family="Avenir Next, Arial, sans-serif" font-size="38" font-weight="700">FORM</text>
+    <text x="0" y="64" fill="#FFF3EC" font-family="Avenir Next, Arial, sans-serif" font-size="34">Open C = companion space</text>
+    <text x="0" y="116" fill="#FFF3EC" font-family="Avenir Next, Arial, sans-serif" font-size="34">Rising route = guided progress</text>
+    <text x="0" y="168" fill="#FFF3EC" font-family="Avenir Next, Arial, sans-serif" font-size="34">Point = coach presence, not a chatbot</text>
+    <text x="0" y="268" fill="#FF7A2F" font-family="Avenir Next, Arial, sans-serif" font-size="38" font-weight="700">PALETTE</text>
+    <g transform="translate(0 310)"><rect width="150" height="100" rx="24" fill="#FF7A2F"/><rect x="170" width="150" height="100" rx="24" fill="#FC4C02"/><rect x="340" width="150" height="100" rx="24" fill="#E83F00"/><rect x="510" width="150" height="100" rx="24" fill="#1A1206" stroke="#95887E"/><rect x="680" width="150" height="100" rx="24" fill="#FFF3EC"/></g>
+  </g>
+</svg>

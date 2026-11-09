@@ -8,6 +8,8 @@ internal static class RepoPaths
     public static string RepoRoot => Root.Value;
     public static string DbDirectory => Path.Combine(RepoRoot, "db");
     public static string OpenApiFile => Path.Combine(RepoRoot, "contracts", "openapi.yaml");
+    public static string EntityPayloadsSchemaFile => Path.Combine(RepoRoot, "contracts", "entity-payloads.schema.json");
+    public static string CatalogBundleSchemaFile => Path.Combine(RepoRoot, "contracts", "catalog-bundle.schema.json");
 
     private static string FindRoot()
     {

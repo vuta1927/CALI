@@ -10,6 +10,12 @@ import Foundation
 /// `ContentState` is a small display snapshot only (docs/05 §2). It is never the source
 /// of truth for workout state: the app's durable session state is.
 struct WorkoutAttributes: ActivityAttributes, Sendable {
+    /// `true` only for activities started by the POC-001/002 device-gate screen. The widget shows the
+    /// Lock Screen buttons (`POCLiveActivityIntent`) for these activities only, so the normal workout
+    /// Live Activity stays read-only. Optional so existing activities decode unchanged.
+    /// TODO(IOS-001): remove once the GO decision moves Live Activity buttons to the real workout.
+    var deviceGatePOC: Bool? = nil
+
     struct ContentState: Codable, Hashable, Sendable {
         var sessionId: UUID
         var exerciseShortName: String
@@ -54,8 +60,13 @@ extension WorkoutAttributes.ContentState {
     /// Range for `Text(timerInterval:pauseTime:countsDown:showsHours:)`, or `nil` when the
     /// current phase has no countdown. Never inverted: `a...b` traps at runtime when `a > b`,
     /// and a clock change or bad snapshot must not crash the widget.
+    /// Reps / skill sets have no target duration (`targetSeconds == 0`): nothing to count down.
+    var isOpenEndedSet: Bool {
+        targetSeconds == 0 && (phase == .exercising || phase == .paused)
+    }
+
     var countdownInterval: ClosedRange<Date>? {
-        guard phase.showsCountdown else { return nil }
+        guard phase.showsCountdown, !isOpenEndedSet else { return nil }
         let end = max(phaseStartUtc, phaseEndUtc)
         return phaseStartUtc...end
     }

@@ -14,12 +14,45 @@ Xem bối cảnh ở `docs/16-implementation-plan.md` §1 (ngân sách phút mac
 |---|---|
 | `project.yml` | XcodeGen spec: targets `CaliApp`, `CaliActivityWidget` (WidgetKit extension, nhúng vào app), `CaliAppTests` |
 | `Config/*.xcconfig` | Bundle ID, `DEVELOPMENT_TEAM`, version. Chỉ placeholder `com.example`, Team rỗng — **không commit ID thật** |
-| `CaliApp/` | App: màn hình "CALI" + version + build SHA (`CaliBuildSHA` trong Info.plist) |
+| `CaliApp/` | POC SwiftUI hoàn chỉnh: 5 tab, workout player, mock catalog/plan/history/AI, lưu JSON local và side effects notification/Live Activity |
 | `CaliActivityWidget/` | Live Activity (Lock Screen + Dynamic Island), chỉ render — không đọc DB, chưa có nút/intent (ADR-013) |
 | `Shared/WorkoutAttributes.swift` | `ActivityAttributes` + `ContentState` (docs/05 §2), biên dịch vào cả app và extension |
 | `CaliAppTests/` | Unit test XCTest (chạy trên Simulator, chỉ khi bật thủ công) |
 
-`ios/Packages/CaliDomain` (Swift package thuần, test trên Linux) **chưa** được project này tham chiếu.
+`ios/Packages/CaliDomain` được link trực tiếp vào app. Workout player gửi command qua
+`WorkoutReducer` và gọi reconcile; countdown hết giờ chỉ chuyển sang bước nhập kết quả,
+không tự ghi nhận người dùng đã hoàn thành set.
+
+## UI POC trên mock data
+
+Commit `606030e` cung cấp lát cắt UI/UX chạy hoàn toàn local, chưa kết nối backend:
+
+- 5 tab: **Hôm nay**, **Giáo án**, **Bài tập**, **Lịch sử**, **Cá nhân**.
+- Workout player toàn màn hình: ready → pre-countdown → active → xác nhận kết quả → rest → summary; có pause, skip kèm lý do, +30 giây nghỉ, abandon và cảnh báo clock jump/recovery.
+- Dữ liệu đang tập được persist atomically vào `Application Support/cali-poc.json`; app có thể khôi phục session active sau khi mở lại.
+- Đề xuất AI là mẫu cố định, chỉ thay đổi giáo án sau khi người dùng accept/reject và luôn tạo audit entry.
+- Catalog/plan/history/AI mẫu đều được gắn nhãn **Dữ liệu mẫu**. Poster dùng SF Symbol và nhãn **PLACEHOLDER**, không giả làm media production.
+- TODO còn lại: thay JSON bằng GRDB/outbox (`POC-003`), thay poster bằng media catalog (`POC-002`), kiểm chứng Live Activity và hành vi lock/unlock trên iPhone thật (`POC-001/002`).
+
+Archive unsigned của POC đã build thành công trên GitHub Actions với Xcode 16.4 ở commit
+`606030e` (run `42384088704`). Việc sideload và device matrix trên iPhone thật vẫn chưa được xác minh.
+
+## Quản lý bài tập và giáo án (IOS-009 / MED-002)
+
+Tab **Bài tập** → **+** để thêm; mở chi tiết → **Sửa** để đổi thông tin, ảnh/video.
+Media nhận link HTTPS hoặc chọn từ Thư viện ảnh/Tệp. Tệp được sao chép vào
+Application Support để dùng offline, không gửi lên server. Link trang video có nút mở
+bằng trình duyệt; phát trong app cần URL video tương thích AVPlayer.
+
+Tab **Giáo án** → menu **…** để sửa tên/xóa; chạm ngày nghỉ để thêm buổi.
+Mỗi buổi có menu sửa/xóa, editor có chọn ngày, thêm/bớt/sắp xếp bài và mục tiêu.
+Xóa giáo án giữ lịch sử và buổi đang tập; màn hình trống cho phép tạo lại.
+
+Bản tính năng ở commit `67456a8` đã archive app/widget và qua 18/18 XCTest trên
+[GitHub Actions run 42397716104](https://github.com/vuta1927/CALI/actions/runs/42397716104).
+Artifact: `CaliApp-unsigned-67456a8`; kiểm thử iPhone thật còn chờ.
+
+Chi tiết lưu trữ, phạm vi contract và checklist thiết bị: [docs/17](../docs/17-content-editing.md).
 
 ## CI build như thế nào
 
