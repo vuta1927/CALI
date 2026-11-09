@@ -100,7 +100,8 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
         var routes = factory.Services.GetServices<EndpointDataSource>()
             .SelectMany(s => s.Endpoints)
             .OfType<RouteEndpoint>()
-            .Select(e => (Path: "/" + e.RoutePattern.RawText!.TrimStart('/'), Methods: e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []))
+            // Route constraints ({id:guid}) are server-side detail; the spec names the bare parameter ({id}).
+            .Select(e => (Path: "/" + RouteConstraint.Replace(e.RoutePattern.RawText!.TrimStart('/'), "{$1}"), Methods: e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []))
             .ToList();
 
         routes.ShouldNotBeEmpty();
@@ -115,51 +116,18 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
         }
     }
 
+    private static readonly System.Text.RegularExpressions.Regex RouteConstraint =
+        new(@"\{(\w+):[^}]+\}", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+
     private IOpenApiSchema Schema(string name) => _spec.Components!.Schemas![name];
 
+    // Problem allows extension members (code, traceId); SchemaValidator only rejects unknown members
+    // where the spec says additionalProperties: false.
     private static void AssertMatchesSchema(JsonElement value, IOpenApiSchema schema, string path)
     {
         value.ValueKind.ShouldBe(JsonValueKind.Object, path);
-        foreach (var required in schema.Required ?? new HashSet<string>())
-        {
-            value.TryGetProperty(required, out _).ShouldBeTrue($"{path}.{required} is required by the spec");
-        }
-
-        var properties = schema.Properties ?? new Dictionary<string, IOpenApiSchema>();
-        foreach (var member in value.EnumerateObject())
-        {
-            // Problem allows extension members; UserProfile has no additionalProperties=false in the spec either.
-            if (!properties.TryGetValue(member.Name, out var propertySchema))
-            {
-                continue;
-            }
-
-            AssertType(member.Value, propertySchema, $"{path}.{member.Name}");
-        }
+        SchemaValidator.ShouldMatch(value, schema, path);
     }
-
-    private static void AssertType(JsonElement value, IOpenApiSchema schema, string path)
-    {
-        var type = schema.Type ?? throw new InvalidOperationException($"{path} has no declared type in the spec");
-        var ok = value.ValueKind switch
-        {
-            JsonValueKind.Null => type.HasFlag(JsonSchemaType.Null),
-            JsonValueKind.String => type.HasFlag(JsonSchemaType.String) && FormatOk(value.GetString()!, schema.Format),
-            JsonValueKind.Number => type.HasFlag(JsonSchemaType.Number) || (type.HasFlag(JsonSchemaType.Integer) && value.TryGetInt64(out _)),
-            JsonValueKind.True or JsonValueKind.False => type.HasFlag(JsonSchemaType.Boolean),
-            JsonValueKind.Object => type.HasFlag(JsonSchemaType.Object),
-            JsonValueKind.Array => type.HasFlag(JsonSchemaType.Array),
-            _ => false,
-        };
-        ok.ShouldBeTrue($"{path}: JSON {value.ValueKind} '{value}' does not match spec type {type} (format {schema.Format ?? "-"})");
-    }
-
-    private static bool FormatOk(string value, string? format) => format switch
-    {
-        "uuid" => Guid.TryParseExact(value, "D", out _),
-        "date-time" => DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _) && value.Contains('T', StringComparison.Ordinal),
-        _ => true,
-    };
 
     public sealed class SpecFixture : IAsyncLifetime
     {

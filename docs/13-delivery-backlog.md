@@ -50,6 +50,8 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 | A11Y-001 | QA/Design | IOS-013, IOS-014, IOS-015, IOS-016, IOS-017 | accessibility audit |
 
 ## Milestone M2 — Backend and sync
+**B1 (2026-11-09, PO duyệt ADR-068):** BE-001/002 có catalog (`GET /v1/exercises`, `/v1/exercises/{id}`, `GET /v1/criteria-config`) và plans (`GET/POST /v1/plans`, idempotent theo `Idempotency-Key`, `db/009_http_idempotency.sql`). `url` của media vẫn null cho tới BE-006.
+
 | Task | Owner | Depends | Output / DoD |
 |---|---|---|---|
 | BE-001 | BE | CON-001 | .NET modular monolith, auth stubs/prod validation, OpenAPI implementation |
@@ -57,6 +59,7 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 | BE-003 | BE | BE-002 | transactional sync push idempotent + receipts |
 | BE-004 | BE | BE-003 | cursor pull/change-log + tombstones |
 | BE-005 | BE | BE-004 | auth Apple + hardening (B4) |
+| BE-006 | BE | BE-002 | object storage + signed media URLs for catalog |
 | CON-009 | Integrator/BE/iOS | BE-004 | personal content sync |
 | IOS-007 | iOS | IOS-001,BE-004 | outbox push/pull/visible status/conflict inbox |
 | IOS-008 | iOS/BE | IOS-007 | Sign in with Apple, guest attach workflow |

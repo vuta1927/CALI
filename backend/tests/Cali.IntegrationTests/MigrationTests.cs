@@ -43,6 +43,9 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
         // CON-007
         result.AppliedScripts.ShouldContain("007_body_measurement.sql");
         (await PublicTablesAsync(connectionString)).ShouldContain("body_measurements");
+        // BE-002 (ADR-068)
+        result.AppliedScripts.ShouldContain("009_http_idempotency.sql");
+        (await PublicTablesAsync(connectionString)).ShouldContain("http_idempotency_keys");
 
         var expected = TablesDeclaredIn001();
         expected.Length.ShouldBeGreaterThanOrEqualTo(17);

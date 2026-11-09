@@ -12,6 +12,9 @@ public static class RateLimitPolicies
     public const string Auth = "auth";
     public const string Sync = "sync";
     public const string Ai = "ai";
+
+    /// <summary>Anonymous read-only publisher content (catalog, criteria config): per client IP.</summary>
+    public const string Public = "public";
 }
 
 public sealed class FixedWindowSettings
@@ -28,6 +31,7 @@ public sealed class RateLimitingSettings
     public FixedWindowSettings Auth { get; set; } = new() { PermitLimit = 10, WindowSeconds = 60 };
     public FixedWindowSettings Sync { get; set; } = new() { PermitLimit = 60, WindowSeconds = 60 };
     public FixedWindowSettings Ai { get; set; } = new() { PermitLimit = 5, WindowSeconds = 60 };
+    public FixedWindowSettings Public { get; set; } = new() { PermitLimit = 120, WindowSeconds = 60 };
 }
 
 public static class RateLimitingSetup
@@ -43,6 +47,10 @@ public static class RateLimitingSetup
             // Auth endpoints are anonymous: partition by client IP.
             options.AddPolicy(RateLimitPolicies.Auth, http =>
                 FixedWindow($"ip:{ClientIp(http)}", Settings(http).Auth));
+
+            // Anonymous publisher content (docs/11 §2): per client IP, separate budget from auth.
+            options.AddPolicy(RateLimitPolicies.Public, http =>
+                FixedWindow($"public-ip:{ClientIp(http)}", Settings(http).Public));
 
             // Authenticated endpoints: partition by token subject (falls back to IP).
             options.AddPolicy(RateLimitPolicies.Sync, http => FixedWindow(UserOrIp(http), Settings(http).Sync));

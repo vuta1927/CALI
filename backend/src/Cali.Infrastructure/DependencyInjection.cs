@@ -1,3 +1,5 @@
+using Cali.Application.Catalog;
+using Cali.Application.Plans;
 using Cali.Application.Identity;
 using Cali.Infrastructure.Persistence;
 using Cali.Infrastructure.Persistence.Migrations;
@@ -29,6 +31,10 @@ public static class DependencyInjection
         services.AddOptions<MigrationOptions>().BindConfiguration(MigrationOptions.SectionName);
         services.AddSingleton<DatabaseMigrator>();
         services.AddScoped<IUserProfileReader, UserProfileReader>();
+        services.AddScoped<IExerciseCatalogReader, ExerciseCatalogReader>();
+        services.AddScoped<ICriteriaConfigReader, CriteriaConfigReader>();
+        services.AddScoped<IPlanReader, PlanReader>();
+        services.AddScoped<IPlanWriter, PlanWriter>();
         return services;
     }
 }

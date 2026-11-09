@@ -12,4 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Cali.Application\Cali.Application.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cali.UnitTests" />
+  </ItemGroup>
 </Project>
