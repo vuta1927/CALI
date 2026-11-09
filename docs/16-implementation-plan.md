@@ -216,6 +216,7 @@ COMMIT  (lỗi validation ⇒ ROLLBACK riêng mutation đó, trả 'rejected')
 - `GET /v1/sync/pull?cursor&limit`: cursor opaque mã hóa `(user_id, seq)` + chữ ký HMAC để chống sửa; trả `changes`, `nextCursor`, `hasMore`.
 - Tombstone qua feed; cursor cũ hơn retention (180 ngày, cấu hình) ⇒ **410** full resync.
 - **Tests:** phân trang không mất/trùng khi có ghi đồng thời; cursor của user khác ⇒ 400/401; tombstone xuất hiện; 410 khi hết hạn.
+- **Đã làm (B3, ADR-070 Accepted):** khác kế hoạch ở bốn điểm. (1) Cursor của user khác/bị sửa là **400** (401 dành cho token). (2) `changeId` cùng dạng với cursor nên dùng được làm cursor. (3) 410 khi `seq` vượt `last_seq`, dòng tại `seq` không còn, hoặc dòng cũ hơn retention; pull không cursor không bao giờ 410. (4) **Chưa có job dọn log**: ADR-070 chỉ ghi hợp đồng nén log (giữ dòng mới nhất của entity còn sống) cho `TODO(OPS-001)`; test mô phỏng nén bằng SQL. Tests: `PullTests` (unit), `SyncContractTests`, `SyncPullTests` (integration, gồm 3 thiết bị push song song trong khi một client pull). p95 pull chưa đo.
 
 ### B4 — Auth thật + hardening (IOS-008 phía BE, OPS-001 một phần)
 - `POST /v1/auth/apple`: validate issuer/audience/signature (JWKS cache + refresh)/exp/nonce; map `sub` → user; access JWT ngắn hạn + refresh token **lưu hash**, rotate, phát hiện reuse ⇒ revoke family.

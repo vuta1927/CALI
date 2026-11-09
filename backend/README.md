@@ -51,8 +51,10 @@ dotnet run --project src/Cali.Api        # http://localhost:5080, Development
 ```
 
 The API and `Cali.DevToken` share the user-secrets id `cali-backend-dev`. Secrets come from
-user-secrets or environment variables only (`ConnectionStrings__Cali`, `Auth__DevTokens__SigningKey`);
-nothing secret is committed.
+user-secrets or environment variables only (`ConnectionStrings__Cali`, `Auth__DevTokens__SigningKey`,
+`Sync__CursorSigningKey`); nothing secret is committed. `Sync__CursorSigningKey` signs sync pull cursors (base64,
+at least 32 bytes, required outside Development; in Development it is derived from the dev token key when unset).
+`Sync__ChangeLogRetentionDays` (default 180) is how long a pull cursor stays valid.
 
 ## Migrations
 
@@ -73,7 +75,7 @@ the content root to the repo `db/`. The image sets it to `/app/db`.
 
 ## Dev tokens (Development only)
 
-Sign in with Apple is not implemented yet (`TODO(BE-004)`). Until then, Development uses locally minted
+Sign in with Apple is not implemented yet (`TODO(BE-005)`). Until then, Development uses locally minted
 HS256 tokens from issuer `cali-dev-token`, audience `cali-api`. **The API trusts this issuer only when
 `ASPNETCORE_ENVIRONMENT=Development`.** In every other environment those tokens get 401, even if a key
 is configured.

@@ -339,12 +339,20 @@ paths:
     get:
       tags: [Sync]
       summary: Pull changes since last acknowledged cursor
+      description: >-
+        The caller's change feed in commit order (ADR-070). Omit `cursor` for the initial sync, which returns the
+        whole feed from the start (the latest state of every entity plus tombstones still retained). Save
+        `nextCursor` in the same local transaction that applies the page. A page may repeat a change the device
+        already holds (its own pushes appear in the feed): applying it is an idempotent upsert. The response is
+        never cached (`Cache-Control: no-store`).
       operationId: syncPull
       parameters:
         - name: cursor
           in: query
-          description: Opaque user-scoped cursor; omit for initial sync.
-          schema: {type: string}
+          description: >-
+            A `nextCursor` or `changeId` this server issued to the same user. Anything else (malformed, altered,
+            another user's) is a 400. Omit for initial sync.
+          schema: {type: string, maxLength: 128}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 100}
@@ -360,11 +368,16 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '410':
-          description: Cursor expired; client must perform full resync
+          description: >-
+            The cursor is older than the change-log retention window (180 days by default), or ahead of the feed.
+            Problem `code` is `cursor_expired`. The client keeps unsynced outbox rows, resets its pull cursor and
+            pulls again without a cursor (docs/08 section 7).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/analyses:
     post:
       tags: [Coaching]
@@ -1118,7 +1131,7 @@ components:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
       properties:
-        changeId: {type: string, description: Opaque user-scoped sequence token}
+        changeId: {type: string, description: Opaque user-scoped sequence token; accepted as `cursor` to resume right after this change}
         entityType: {$ref: '#/components/schemas/ChangeEntityType'}
         entityId: {type: string, format: uuid}
         operation: {type: string, enum: [upsert, delete]}
@@ -1153,7 +1166,7 @@ components:
         changes:
           type: array
           items: {$ref: '#/components/schemas/SyncChange'}
-        nextCursor: {type: string}
+        nextCursor: {type: string, description: Position after the last change of this page; unchanged when the page is empty}
         hasMore: {type: boolean}
     AnalysisRequest:
       type: object

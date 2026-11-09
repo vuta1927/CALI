@@ -105,4 +105,73 @@ public sealed class SyncContractTests : IClassFixture<OpenApiContractTests.SpecF
     {
         Push.Responses!.Keys.ShouldBe(["200", "400", "401", "404", "409", "413", "415", "429"], ignoreOrder: true);
     }
+
+    // ---- pull (BE-004, ADR-070) -------------------------------------------------------------------
+
+    private OpenApiOperation Pull => _spec.Paths["/v1/sync/pull"]!.Operations![HttpMethod.Get];
+
+    private static readonly Guid User = Guid.Parse("a0000000-0000-4000-8000-000000000001");
+
+    [Fact]
+    public void Pull_response_shapes_match_the_SyncPullResponse_schema()
+    {
+        var codec = new SyncCursorCodec(new byte[SyncCursorCodec.MinKeyBytes]);
+        var response = new JsonObject
+        {
+            ["changes"] = new JsonArray(
+                new JsonObject
+                {
+                    ["changeId"] = codec.Encode(User, 1),
+                    ["entityType"] = "body_measurement",
+                    ["entityId"] = "0b8c3c2e-8f0e-4a43-9a43-2d9d7c1d1a11",
+                    ["operation"] = "upsert",
+                    ["serverVersion"] = 1,
+                    ["payload"] = new JsonObject { ["id"] = "0b8c3c2e-8f0e-4a43-9a43-2d9d7c1d1a11", ["kind"] = "weight", ["value"] = 72.35 },
+                },
+                new JsonObject
+                {
+                    ["changeId"] = codec.Encode(User, 2),
+                    ["entityType"] = "body_measurement",
+                    ["entityId"] = "0b8c3c2e-8f0e-4a43-9a43-2d9d7c1d1a11",
+                    ["operation"] = "delete",
+                    ["serverVersion"] = 2,
+                    ["payload"] = new JsonObject { ["id"] = "0b8c3c2e-8f0e-4a43-9a43-2d9d7c1d1a11", ["deletedAt"] = "2026-11-07T08:00:00.000Z" },
+                }),
+            ["nextCursor"] = codec.Encode(User, 2),
+            ["hasMore"] = false,
+        };
+        var empty = new JsonObject { ["changes"] = new JsonArray(), ["nextCursor"] = codec.Encode(User, 0), ["hasMore"] = false };
+
+        SchemaValidator.ShouldMatch(Json(response.ToJsonString()), Schema("SyncPullResponse"), "SyncPullResponse");
+        SchemaValidator.ShouldMatch(Json(empty.ToJsonString()), Schema("SyncPullResponse"), "SyncPullResponse");
+    }
+
+    [Fact]
+    public void Pull_declares_every_status_the_endpoint_returns()
+    {
+        Pull.Responses!.Keys.ShouldBe(["200", "400", "401", "410", "429"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Pull_parameters_match_the_server()
+    {
+        var limit = Pull.Parameters!.Single(p => p.Name == "limit").Schema!;
+        var cursor = Pull.Parameters!.Single(p => p.Name == "cursor");
+
+        decimal.Parse(limit.Minimum!, System.Globalization.CultureInfo.InvariantCulture).ShouldBe(1m);
+        decimal.Parse(limit.Maximum!, System.Globalization.CultureInfo.InvariantCulture).ShouldBe(PullChanges.MaxLimit);
+        limit.Default!.GetValue<decimal>().ShouldBe(PullChanges.DefaultLimit);
+        cursor.Required.ShouldBeFalse();
+        cursor.Schema!.MaxLength.ShouldBe(128);
+        Pull.Parameters!.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Every_change_type_the_feed_can_carry_is_declared()
+    {
+        var declared = Schema("ChangeEntityType").Enum!.Select(e => e!.GetValue<string>()).ToArray();
+
+        declared.ShouldBe([.. SyncEntityTypes.All, "ai_analysis", "ai_recommendation"], ignoreOrder: true);
+        Schema("SyncChange").Properties!["operation"].Enum!.Select(e => e!.GetValue<string>()).ShouldBe(["upsert", "delete"], ignoreOrder: true);
+    }
 }

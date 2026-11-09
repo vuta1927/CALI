@@ -7,6 +7,7 @@ using Cali.Api.Telemetry;
 using Cali.Application.Catalog;
 using Cali.Application.Identity;
 using Cali.Application.Plans;
+using Cali.Api.Sync;
 using Cali.Application.Sync;
 using Cali.Infrastructure;
 using Cali.Infrastructure.Persistence.Migrations;
@@ -45,6 +46,7 @@ internal static class CaliApi
         services.AddScoped<ListPlans>();
         services.AddScoped<CreatePlan>();
         services.AddScoped<SyncPush>();
+        services.AddCaliSyncPull();
         services.AddCaliAuthentication();
         services.AddCaliRateLimiting();
         services.AddCaliTelemetry(builder.Configuration);

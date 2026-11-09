@@ -29,8 +29,8 @@ public static class TrustedIssuers
             }
         }
 
-        // TODO(BE-004): register the CALI access-token issuer minted after Sign in with Apple exchange
-        // (POST /v1/auth/apple). Expiry: remove this TODO when BE-004 lands; until then non-Development
+        // TODO(BE-005): register the CALI access-token issuer minted after Sign in with Apple exchange
+        // (POST /v1/auth/apple). Expiry: remove this TODO when BE-005 lands; until then non-Development
         // environments trust no issuer and reject every bearer token.
         return issuers;
     }
