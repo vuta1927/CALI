@@ -54,6 +54,9 @@ public struct HandleResult: Sendable {
     public var state: SessionState?
     /// Domain events of THIS application only (empty on replay or rejection).
     public var events: [DomainEvent]
+    /// The reducer error of THIS rejection, for user-facing messages (nil on success and on replay, where
+    /// only `outcome.errorCode` is stored).
+    public var error: DomainError? = nil
 }
 
 public enum CoordinatorError: Error, Equatable, Sendable {
@@ -103,11 +106,12 @@ public final class WorkoutCoordinator: Sendable {
 
     /// Applies a user command to the active session (or creates one). Safe to call repeatedly with the
     /// same command: the second call returns the stored outcome with `replayed == true`.
-    public func handle(_ command: Command) throws -> HandleResult {
-        try immediateTransaction { db in
+    /// `sessionTitle` is stored with a session that `createSession` creates and copied to its history row.
+    public func handle(_ command: Command, sessionTitle: String? = nil) throws -> HandleResult {
+        try writer.immediateTransaction { db in
             if let replay = try self.replay(db, commandId: command.commandId) { return replay }
             let state = try Self.loadActive(db)
-            return try self.apply(db, state: state, command: command, now: self.clock.now())
+            return try self.apply(db, state: state, command: command, now: self.clock.now(), sessionTitle: sessionTitle)
         }
     }
 
@@ -120,7 +124,7 @@ public final class WorkoutCoordinator: Sendable {
         case .extendRest30: .extendRest
         case .confirmCurrentSet: .confirmSet
         }
-        return try immediateTransaction { db in
+        return try writer.immediateTransaction { db in
             if let replay = try self.replay(db, commandId: commandId) { return replay }
             let now = self.clock.now()
             guard let state = try Self.load(db, sessionId: sessionId) else {
@@ -145,7 +149,7 @@ public final class WorkoutCoordinator: Sendable {
     public func reconcile(
         previousNow: Date?, monotonicElapsed: TimeInterval?, acknowledgeClockJump: Bool = false, policy: ReconcilePolicy = .standard
     ) throws -> ReconcileResult? {
-        try immediateTransaction { db in
+        try writer.immediateTransaction { db in
             guard let state = try Self.loadActive(db) else { return nil }
             let result = WorkoutReducer.reconcile(
                 state, now: self.clock.now(), previousNow: previousNow, monotonicElapsed: monotonicElapsed,
@@ -224,25 +228,13 @@ public final class WorkoutCoordinator: Sendable {
 
     // MARK: Transaction pipeline
 
-    /// `BEGIN IMMEDIATE … COMMIT`; any thrown error rolls back every write of the command.
-    private func immediateTransaction<T>(_ body: (Database) throws -> T) throws -> T {
-        try writer.writeWithoutTransaction { db in
-            var result: T?
-            try db.inTransaction(.immediate) {
-                result = try body(db)
-                return .commit
-            }
-            return result!
-        }
-    }
-
     private func replay(_ db: Database, commandId: UUID) throws -> HandleResult? {
         guard let outcome = try Self.outcome(db, commandId: commandId) else { return nil }
         let state = try outcome.sessionId.flatMap { try Self.load(db, sessionId: $0) }
         return HandleResult(outcome: outcome, replayed: true, state: state, events: [])
     }
 
-    private func apply(_ db: Database, state: SessionState?, command: Command, now: Date) throws -> HandleResult {
+    private func apply(_ db: Database, state: SessionState?, command: Command, now: Date, sessionTitle: String? = nil) throws -> HandleResult {
         let transition: Transition
         switch WorkoutReducer.reduce(state, command, now: now) {
         case .failure(let error):
@@ -252,7 +244,7 @@ public final class WorkoutCoordinator: Sendable {
                 outcome.setResultIds = [existing.setResultId]
             }
             try Self.record(db, outcome)
-            return HandleResult(outcome: outcome, replayed: false, state: state, events: [])
+            return HandleResult(outcome: outcome, replayed: false, state: state, events: [], error: error)
         case .success(let t):
             transition = t
         }
@@ -261,7 +253,7 @@ public final class WorkoutCoordinator: Sendable {
         try Self.checkInvariants(next)
         let creating = state == nil || state?.sessionId != next.sessionId
         if creating {
-            try Self.insert(db, next)
+            try Self.insert(db, next, title: sessionTitle ?? "")
             try Self.appendOutbox(db, commandId: command.commandId, entityType: "workout_session", entityId: next.sessionId,
                                   baseVersion: 0, changedAt: now, payload: next)
         } else if let state {
@@ -287,6 +279,9 @@ public final class WorkoutCoordinator: Sendable {
             // TODO(IOS-001): baseVersion must be the server version acknowledged by sync; unknown in the POC.
             try Self.appendOutbox(db, commandId: command.commandId, entityType: "workout_session", entityId: next.sessionId,
                                   baseVersion: nil, changedAt: now, payload: next)
+        }
+        if next.phase.isTerminal, state?.phase.isTerminal != true {
+            try Self.insertHistory(db, finished: next)
         }
 
         var outcome = Self.outcome(for: command.commandId, kind: command.kind, status: .applied, state: next, code: nil, now: now)
@@ -347,15 +342,35 @@ public final class WorkoutCoordinator: Sendable {
             .map { try decode(SessionState.self, $0) }
     }
 
-    private static func insert(_ db: Database, _ s: SessionState) throws {
+    static func insert(_ db: Database, _ s: SessionState, title: String) throws {
         try db.execute(
             sql: """
-                INSERT INTO local_session_state (session_id, status, phase, revision, phase_deadline_at, state_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO local_session_state (session_id, status, phase, revision, phase_deadline_at, state_json, updated_at, title)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             arguments: [DBText.id(s.sessionId), s.status.rawValue, s.phase.rawValue, s.revision,
-                        s.phaseDeadlineAt.map(DBText.time), try encode(s), DBText.time(s.updatedAt)]
+                        s.phaseDeadlineAt.map(DBText.time), try encode(s), DBText.time(s.updatedAt), title]
         )
+    }
+
+    /// History row for a session that just became terminal, written in the same transaction.
+    private static func insertHistory(_ db: Database, finished s: SessionState) throws {
+        let title = try String.fetchOne(db, sql: "SELECT title FROM local_session_state WHERE session_id = ?", arguments: [DBText.id(s.sessionId)]) ?? ""
+        let records = try String.fetchAll(
+            db, sql: "SELECT record_json FROM set_results WHERE session_id = ? ORDER BY revision, rowid", arguments: [DBText.id(s.sessionId)]
+        ).map { try decode(SetRecord.self, $0) }
+        let session = CompletedSession(
+            id: s.sessionId, title: title, plannedWorkoutId: s.plannedWorkoutId, startedAt: s.startedAt,
+            finishedAt: s.finishedAt ?? s.abandonedAt ?? s.updatedAt, status: s.status,
+            exerciseIds: s.executions.map(\.exerciseId), plannedSetCount: s.totalPlannedSets,
+            sets: records.map(LoggedSet.init(record:)), isSample: false
+        )
+        try ContentStore.insertHistory(db, session, source: "live")
+    }
+
+    /// Title stored with the active session (empty when it was created without one).
+    public func activeSessionTitle() throws -> String? {
+        try writer.read { db in try String.fetchOne(db, sql: "SELECT title FROM local_session_state WHERE status = 'active'") }
     }
 
     private static func update(_ db: Database, from old: SessionState, to s: SessionState) throws {
@@ -414,13 +429,9 @@ public final class WorkoutCoordinator: Sendable {
         guard violations.isEmpty else { throw CoordinatorError.invariantViolation(violations) }
     }
 
-    private static func encode<T: Encodable>(_ value: T) throws -> String {
-        String(decoding: try DomainJSON.makeEncoder().encode(value), as: UTF8.self)
-    }
+    static func encode<T: Encodable>(_ value: T) throws -> String { try DBJSON.encode(value) }
 
-    private static func decode<T: Decodable>(_ type: T.Type, _ text: String) throws -> T {
-        try DomainJSON.makeDecoder().decode(type, from: Data(text.utf8))
-    }
+    static func decode<T: Decodable>(_ type: T.Type, _ text: String) throws -> T { try DBJSON.decode(type, text) }
 }
 
 private struct OutboxEnvelope<Payload: Encodable>: Encodable {

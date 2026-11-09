@@ -19,24 +19,26 @@ enum Fmt {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
+    /// "90 giây", "2 phút", "2 phút 30 giây" (mockup wording, no unit abbreviations).
     static func seconds(_ s: Int) -> String {
         if s >= 60 && s % 60 == 0 { return "\(s / 60) phút" }
-        if s > 60 { return "\(s / 60)p\(String(format: "%02d", s % 60))s" }
-        return "\(s)s"
+        if s > 60 { return "\(s / 60) phút \(s % 60) giây" }
+        return "\(s) giây"
     }
 
+    /// "12 giây", "11,5 giây" with the `vi` decimal comma.
     static func holdSeconds(ms: Int64) -> String {
-        let tenths = Double(ms) / 1000
-        return tenths.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(tenths))s" : String(format: "%.1fs", tenths)
+        let value = Double(ms) / 1000
+        return "\(value.formatted(.number.precision(.fractionLength(0...1)).locale(vi))) giây"
     }
 
-    /// Target of one set: "giữ 12s", "8–10 lần".
+    /// Target of one set: "giữ 12 giây", "8–10 lần".
     static func target(_ p: Prescription) -> String {
         switch p {
-        case .staticHold(let s): "giữ \(s)s"
+        case .staticHold(let s): "giữ \(s) giây"
         case .reps(let lo, let hi): lo == hi ? "\(lo) lần" : "\(lo)–\(hi) lần"
-        case .timedReps(let s): "\(s)s tối đa lần"
-        case .interval(let work, let rest): "\(work)s tập / \(rest)s nghỉ"
+        case .timedReps(let s): "\(s) giây tối đa lần"
+        case .interval(let work, let rest): "\(work) giây tập / \(rest) giây nghỉ"
         case .skillAttempt(let n): "\(n) lần thử"
         case .load(let reps, let kg): "\(reps) lần @ \(loadKg(kg))"
         }
@@ -48,9 +50,36 @@ enum Fmt {
         "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
     }
 
-    /// "4 × giữ 12s · nghỉ 90s", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
+    /// "4 × giữ 12 giây · nghỉ 90 giây", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
     static func prescription(_ item: PlannedExercise) -> String {
-        "\(item.setCount) × \(target(item.target)) · nghỉ \(seconds(item.restSeconds))"
+        "\(setsTarget(item)) · nghỉ \(seconds(item.restSeconds))"
+    }
+
+    /// "4 × giữ 12 giây"
+    static func setsTarget(_ item: PlannedExercise) -> String {
+        "\(item.setCount) × \(target(item.target))"
+    }
+
+    /// "Nghỉ 2 phút · Giữ tĩnh"
+    static func restLine(_ item: PlannedExercise) -> String {
+        "Nghỉ \(seconds(item.restSeconds)) · \(item.target.type.label)"
+    }
+
+    /// "5 bài · 15 set · ~55 phút"
+    static func workoutMeta(_ workout: PlannedWorkout) -> String {
+        "\(workout.exercises.count) bài · \(workout.totalSets) set · ~\(workout.estimatedMinutes) phút"
+    }
+
+    /// "6/11"
+    static func dayMonthShort(_ date: Date, calendar: Calendar = .current) -> String {
+        let c = calendar.dateComponents([.day, .month], from: date)
+        return "\(c.day ?? 0)/\(c.month ?? 0)"
+    }
+
+    /// "2 – 8/11", "27/10 – 2/11"
+    static func range(_ start: Date, _ end: Date, calendar: Calendar = .current) -> String {
+        let sameMonth = calendar.component(.month, from: start) == calendar.component(.month, from: end)
+        return sameMonth ? "\(calendar.component(.day, from: start)) – \(dayMonthShort(end))" : "\(dayMonthShort(start)) – \(dayMonthShort(end))"
     }
 
     static func weekdayShort(_ iso: Int) -> String {
@@ -103,6 +132,12 @@ enum Fmt {
         if cal.isDateInYesterday(date) { return "Hôm qua" }
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: now)).day ?? 0
         return days > 0 ? "\(days) ngày trước" : dayMonth(date)
+    }
+
+    /// "Hôm nay, 9/11", "Thứ Sáu, 6/11"
+    static func relativeDayLong(_ date: Date) -> String {
+        let day = Calendar.current.isDateInToday(date) ? "Hôm nay" : weekdayLong(isoWeekday(date))
+        return "\(day), \(dayMonthShort(date))"
     }
 
     /// Actual result of a logged set: "11.5s", "9 lần", "Bỏ qua".
@@ -165,6 +200,32 @@ extension ExerciseType {
         case .skillAttempt: .skillAttempt(attempts: 3)
         // Conservative starting point; the plan editor steps kg by 2.5 (docs/18 §4).
         case .load: .load(reps: 5, loadKg: 20)
+        }
+    }
+}
+
+/// Training discipline shown as a chip (mockup `pchip`). Derived from exercise types: `load` is Gym,
+/// everything else Calisthenics. Running has no exercise type yet (IOS-016).
+enum Discipline: Equatable {
+    case calisthenics, gym, mixed
+
+    init(types: [ExerciseType]) {
+        let load = types.filter { $0 == .load }.count
+        self = load == 0 ? .calisthenics : (load == types.count ? .gym : .mixed)
+    }
+
+    var label: String {
+        switch self {
+        case .calisthenics: "Calisthenics"
+        case .gym: "Gym"
+        case .mixed: "Calisthenics + Gym"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .calisthenics: "figure.strengthtraining.functional"
+        case .gym, .mixed: "dumbbell"
         }
     }
 }

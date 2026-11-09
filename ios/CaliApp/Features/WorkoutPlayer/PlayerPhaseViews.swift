@@ -1,7 +1,7 @@
 import CaliDomain
 import SwiftUI
 
-// MARK: - Ready (UX-05)
+// MARK: - Ready (UX-05, mockup `pReady`)
 
 struct ReadyPhaseView: View {
     let model: WorkoutPlayerModel
@@ -11,51 +11,63 @@ struct ReadyPhaseView: View {
 
     var body: some View {
         PlayerScaffold {
-            PlayerExerciseHeader(model: model, posterHeight: 240)
-            if let exercise = model.currentExercise, let cue = exercise.cues.first {
-                Label(cue, systemImage: "lightbulb")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.caliSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .caliCard(padding: Spacing.m)
+            PosterView(exercise: model.currentExercise, height: 240)
+            if let execution = model.currentExecution {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.currentExercise?.name ?? "Bài tập")
+                        .font(.title2.bold())
+                        .foregroundStyle(Color.caliText)
+                    SetLine(model: model, execution: execution, font: .headline)
+                    HStack(spacing: 6) {
+                        TagChip(text: execution.target.type.label)
+                        TagChip(text: "Nghỉ \(Fmt.seconds(execution.restSeconds))", systemImage: "clock")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Button("Xem hướng dẫn kỹ thuật", systemImage: "book", action: onShowGuide)
-                .buttonStyle(.caliQuiet)
+            Button("Xem hướng dẫn kỹ thuật", systemImage: "doc.text", action: onShowGuide)
+                .buttonStyle(.caliSecondary)
         } actions: {
             Button("Bắt đầu set", systemImage: "play.fill") { model.startSet() }
                 .buttonStyle(.caliPrimary)
             Button("Bỏ qua set này") { showSkipReasons = true }
-                .buttonStyle(.caliQuiet)
+                .buttonStyle(.caliSecondary)
         }
         .skipReasonDialog(isPresented: $showSkipReasons) { model.skipCurrentSet(reason: $0) }
     }
 }
 
-// MARK: - Pre-countdown (UX-06)
+// MARK: - Pre-countdown (UX-06, mockup `pCountdown`)
 
 struct CountdownPhaseView: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
+        let seconds = Int(((model.remainingMs ?? 0) + 999) / 1000)
         VStack(spacing: Spacing.xl) {
-            Spacer()
             PosterView(exercise: model.currentExercise, height: 160, showsLabel: false)
-                .padding(.horizontal, Spacing.xxl)
-            Text("Chuẩn bị")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.caliSecondary)
-            TimerText(text: "\(Int(((model.remainingMs ?? 0) + 999) / 1000))", size: 140, tint: .caliAccent)
-                .accessibilityLabel("Bắt đầu sau \(Int(((model.remainingMs ?? 0) + 999) / 1000)) giây")
-            Text(model.currentExercise?.name ?? "")
-                .font(.title2.bold())
-                .foregroundStyle(Color.caliText)
+                .opacity(0.45)
+            TimerRing(progress: 1, size: 210) {
+                Text("Chuẩn bị")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.caliSecondary)
+                TimerText(text: "\(seconds)", size: 96)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Bắt đầu sau \(seconds) giây")
+            if let execution = model.currentExecution {
+                Text("\(model.currentExercise?.name ?? "") · Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
+                    .multilineTextAlignment(.center)
+            }
             Spacer()
         }
         .padding(Spacing.l)
     }
 }
 
-// MARK: - Exercising (UX-06/07)
+// MARK: - Exercising (UX-06/07, mockup `pActive`)
 
 struct ActivePhaseView: View {
     let model: WorkoutPlayerModel
@@ -66,46 +78,41 @@ struct ActivePhaseView: View {
 
     var body: some View {
         PlayerScaffold {
-            PosterView(exercise: model.currentExercise, height: 150, showsLabel: false)
-            Text(model.currentExercise?.name ?? "")
-                .font(.title2.bold())
-                .foregroundStyle(Color.caliText)
-            if let execution = model.currentExecution {
-                Text("Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
-                    .font(.headline)
-                    .foregroundStyle(Color.caliAccentInk)
-            }
+            ExerciseRow(model: model)
             if isTimed {
-                ZStack {
-                    ProgressRing(progress: 1 - model.phaseProgress, lineWidth: 16)
-                    VStack(spacing: Spacing.xs) {
-                        TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0))
-                        Text("còn lại")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.caliSecondary)
-                    }
+                TimerRing(progress: 1 - model.phaseProgress) {
+                    TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0), size: 68)
+                    Text("còn lại").font(.subheadline).foregroundStyle(Color.caliSecondary)
                 }
-                .frame(width: 250, height: 250)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Còn lại \(Fmt.countdown(ms: model.remainingMs ?? 0))")
+                Text("Hết giờ: rung + chuyển sang Nhập kết quả. Set chỉ được ghi khi bạn bấm Lưu.")
+                    .font(.caption)
+                    .foregroundStyle(Color.caliSecondary)
+                    .multilineTextAlignment(.center)
             } else {
-                VStack(spacing: Spacing.xs) {
-                    TimerText(text: Fmt.clock(ms: model.elapsedMs))
-                    Text(openEndedHint)
-                        .font(.subheadline)
+                TimerRing(progress: 0) {
+                    TimerText(text: model.currentExecution.map { Fmt.target($0.target) } ?? "", size: 44)
+                    Text("mục tiêu").font(.subheadline).foregroundStyle(Color.caliSecondary)
+                    Text(Fmt.clock(ms: model.elapsedMs))
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(Color.caliSecondary)
-                        .multilineTextAlignment(.center)
+                        .padding(.top, 6)
                 }
-                .padding(.vertical, Spacing.xl)
+                .accessibilityElement(children: .combine)
+                Text(openEndedHint)
+                    .font(.caption)
+                    .foregroundStyle(Color.caliSecondary)
+                    .multilineTextAlignment(.center)
             }
         } actions: {
             Button(isTimed ? "Kết thúc sớm" : "Xong set", systemImage: "checkmark") { model.stopSet() }
-                .buttonStyle(isTimed ? .caliSecondary : .caliPrimary)
-            HStack(spacing: Spacing.m) {
+                .buttonStyle(.caliPrimary)
+            HStack(spacing: Spacing.s) {
                 Button("Tạm dừng", systemImage: "pause.fill") { model.pause() }
                     .buttonStyle(.caliSecondary)
                 Button("Bỏ qua") { showSkipReasons = true }
-                    .buttonStyle(.caliQuiet)
+                    .buttonStyle(.caliSecondary)
             }
         }
         .skipReasonDialog(isPresented: $showSkipReasons) { model.skipCurrentSet(reason: $0) }
@@ -113,45 +120,46 @@ struct ActivePhaseView: View {
 
     private var openEndedHint: String {
         switch model.currentExecution?.target {
-        case .skillAttempt: "Thực hiện lần thử, bấm Xong set khi kết thúc"
-        default: "Bấm Xong set khi bạn hoàn thành số lần"
+        case .skillAttempt: "Thực hiện lần thử, bấm Xong set khi kết thúc."
+        default: "Bấm Xong set khi bạn hoàn thành số lần."
         }
     }
 }
 
-// MARK: - Paused
+// MARK: - Paused (mockup `pPaused`)
 
 struct PausedPhaseView: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
         PlayerScaffold {
-            PlayerExerciseHeader(model: model, posterHeight: 160)
-            VStack(spacing: Spacing.s) {
-                Label("Đã tạm dừng", systemImage: "pause.circle.fill")
-                    .font(.title3.bold())
-                    .foregroundStyle(Color.caliWarning)
-                if let remaining = model.state.pausedRemainingMs {
-                    TimerText(text: Fmt.countdown(ms: remaining), tint: .caliSecondary)
-                    Text("còn lại khi tiếp tục")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.caliSecondary)
-                } else {
-                    TimerText(text: Fmt.clock(ms: model.state.accumulatedExerciseMs), tint: .caliSecondary)
-                    Text("đã tập")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.caliSecondary)
+            ExerciseRow(model: model, paused: true)
+            if let remaining = model.state.pausedRemainingMs {
+                TimerRing(progress: progress(remaining)) {
+                    TimerText(text: Fmt.countdown(ms: remaining), size: 68, tint: .caliSecondary)
+                    Text("còn lại khi tiếp tục").font(.subheadline).foregroundStyle(Color.caliSecondary)
                 }
+                .accessibilityElement(children: .combine)
+            } else {
+                TimerRing(progress: 0) {
+                    TimerText(text: Fmt.clock(ms: model.state.accumulatedExerciseMs), size: 56, tint: .caliSecondary)
+                    Text("đã tập").font(.subheadline).foregroundStyle(Color.caliSecondary)
+                }
+                .accessibilityElement(children: .combine)
             }
-            .padding(.vertical, Spacing.l)
         } actions: {
             Button("Tiếp tục", systemImage: "play.fill") { model.resume() }
                 .buttonStyle(.caliPrimary)
         }
     }
+
+    private func progress(_ remainingMs: Int64) -> Double {
+        guard let total = model.currentExecution?.target.targetDurationSeconds, total > 0 else { return 0 }
+        return min(1, Double(remainingMs) / Double(total * 1000))
+    }
 }
 
-// MARK: - Rest (UX-08)
+// MARK: - Rest (UX-08, mockup `pRest`)
 
 struct RestPhaseView: View {
     let model: WorkoutPlayerModel
@@ -159,21 +167,20 @@ struct RestPhaseView: View {
     var body: some View {
         PlayerScaffold {
             Text("Nghỉ")
-                .font(.title.bold())
+                .font(.title2.bold())
                 .foregroundStyle(Color.caliText)
-            ZStack {
-                ProgressRing(progress: 1 - model.phaseProgress, lineWidth: 16, tint: .caliWarning)
-                VStack(spacing: Spacing.xs) {
-                    TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0))
-                    Text("thời gian nghỉ")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.caliSecondary)
-                }
+            TimerRing(progress: 1 - model.phaseProgress) {
+                TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0), size: 68)
+                Text("thời gian nghỉ").font(.subheadline).foregroundStyle(Color.caliSecondary)
             }
-            .frame(width: 250, height: 250)
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Nghỉ còn \(Fmt.countdown(ms: model.remainingMs ?? 0))")
-
+            HStack(spacing: Spacing.s) {
+                Button("+30 giây", systemImage: "plus") { model.extendRest(30) }
+                    .buttonStyle(.caliSecondary)
+                Button("Bỏ nghỉ") { model.skipRest() }
+                    .buttonStyle(.caliSecondary)
+            }
             if let next = model.nextUp {
                 HStack(spacing: Spacing.m) {
                     PosterThumb(exercise: model.exercise(for: next.execution), size: 64)
@@ -185,50 +192,46 @@ struct RestPhaseView: View {
                             .font(.headline)
                             .foregroundStyle(Color.caliText)
                         Text("Set \(next.setIndex)/\(next.execution.setCount) · \(Fmt.target(next.execution.target))")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.caliAccentInk)
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(Color.caliSecondary)
                     }
                     Spacer()
                 }
                 .caliCard(padding: Spacing.m)
                 .accessibilityElement(children: .combine)
             }
+            Text("Hết giờ nghỉ chỉ nhắc (rung / thông báo), không tự bắt đầu set.")
+                .font(.caption)
+                .foregroundStyle(Color.caliSecondary)
+                .multilineTextAlignment(.center)
         } actions: {
             Button("Bắt đầu set tiếp", systemImage: "play.fill") { model.startNextSet() }
                 .buttonStyle(.caliPrimary)
-            HStack(spacing: Spacing.m) {
-                Button("+30 giây", systemImage: "plus") { model.extendRest(30) }
-                    .buttonStyle(.caliSecondary)
-                Button("Bỏ nghỉ") { model.skipRest() }
-                    .buttonStyle(.caliQuiet)
-            }
         }
     }
 }
 
-// MARK: - Summary (UX-09)
+// MARK: - Summary (UX-09, mockup `pSummary`)
 
 struct SummaryPhaseView: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
         PlayerScaffold {
-            Image(systemName: "flag.checkered")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.caliAccent)
             Text("Đã xong tất cả set")
-                .font(.title.bold())
+                .font(.title2.bold())
                 .foregroundStyle(Color.caliText)
+                .frame(maxWidth: .infinity, alignment: .leading)
             SessionStatsRow(model: model)
             SessionSetList(model: model)
         } actions: {
-            Button("Lưu buổi tập", systemImage: "checkmark.circle.fill") { model.finish() }
+            Button("Lưu buổi tập", systemImage: "checkmark.circle") { model.finish() }
                 .buttonStyle(.caliPrimary)
         }
     }
 }
 
-// MARK: - Completed / abandoned
+// MARK: - Completed / abandoned (mockup `pFinished`)
 
 struct FinishedPhaseView: View {
     let model: WorkoutPlayerModel
@@ -238,30 +241,41 @@ struct FinishedPhaseView: View {
 
     var body: some View {
         PlayerScaffold {
-            Image(systemName: completed ? "checkmark.seal.fill" : "stop.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(completed ? Color.caliAccent : Color.caliWarning)
+            Image(systemName: completed ? "checkmark" : "flag.fill")
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(completed ? Color.caliOnAccent : Color.caliWarning)
+                .frame(width: 96, height: 96)
+                .background(completed ? Color.caliAccent : Color.caliSurfaceRaised, in: Circle())
+                .padding(.top, Spacing.xl)
+                .accessibilityHidden(true)
             Text(completed ? "Buổi tập hoàn thành!" : "Đã dừng buổi tập")
-                .font(.title.bold())
+                .font(.title2.bold())
                 .foregroundStyle(Color.caliText)
-            Text(completed
-                 ? "Kết quả đã được lưu vào Lịch sử trên máy của bạn."
-                 : "Các set đã xác nhận vẫn được lưu trong Lịch sử\(model.state.abandonReason.map { " · Lý do: \($0)" } ?? "").")
+            Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(Color.caliSecondary)
                 .multilineTextAlignment(.center)
-            if model.state.abandonReason == "Đau" {
-                Label("Nếu cơn đau kéo dài hoặc tăng lên, hãy nghỉ tập và hỏi ý kiến chuyên gia y tế.", systemImage: "cross.case")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.caliWarning)
-                    .caliCard(padding: Spacing.m)
-            }
             SessionStatsRow(model: model)
-            SessionSetList(model: model)
+            Text(completed ? "Đã lưu vào Lịch sử." : "Các set đã xác nhận được giữ lại trong Lịch sử, buổi được đánh dấu “Dừng sớm”.")
+                .font(.footnote)
+                .foregroundStyle(Color.caliSecondary)
+                .multilineTextAlignment(.center)
+            Label("Nếu cơn đau kéo dài hoặc tăng lên, hãy nghỉ tập và hỏi ý kiến chuyên gia y tế.", systemImage: "cross.case")
+                .font(.caption)
+                .foregroundStyle(model.state.abandonReason == "Đau" ? Color.caliWarning : Color.caliSecondary)
+                .caliCard(padding: Spacing.m)
         } actions: {
             Button("Đóng", action: onClose)
                 .buttonStyle(.caliPrimary)
         }
+    }
+
+    /// "Pull / Legs · 52 phút" or "Pull / Legs · Dừng ở bài 2/5 · lý do: Mệt"
+    private var subtitle: String {
+        let s = model.state
+        if completed { return "\(model.title) · \(max(1, model.sessionElapsedSeconds / 60)) phút" }
+        let reason = s.abandonReason.map { " · lý do: \($0)" } ?? ""
+        return "\(model.title) · Dừng ở bài \(min(s.currentExecutionIndex + 1, s.executions.count))/\(s.executions.count)\(reason)"
     }
 }
 
@@ -269,10 +283,11 @@ struct SessionStatsRow: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
+        let s = model.state
         HStack(spacing: Spacing.m) {
-            StatTile(value: Fmt.clock(seconds: model.sessionElapsedSeconds), label: "Thời gian", systemImage: "clock")
-            StatTile(value: "\(model.state.confirmedSetCount)", label: "Set xong", systemImage: "checkmark.circle", tint: .caliAccent)
-            StatTile(value: "\(model.state.skippedSetCount)", label: "Bỏ qua", systemImage: "forward", tint: .caliSecondary)
+            StatTile(value: "\(s.confirmedSetCount)/\(s.totalPlannedSets)", label: "Set đạt", systemImage: "checkmark.circle", tint: .caliAccent)
+            StatTile(value: "\(s.skippedSetCount)", label: "Bỏ qua", systemImage: "forward")
+            StatTile(value: "\(max(1, model.sessionElapsedSeconds / 60))", label: "Phút", systemImage: "clock")
         }
     }
 }
@@ -283,44 +298,66 @@ struct SessionSetList: View {
     var body: some View {
         VStack(spacing: Spacing.m) {
             ForEach(model.state.executions, id: \.id) { execution in
-                let sets = model.records(for: execution)
-                HStack(alignment: .top, spacing: Spacing.m) {
-                    PosterThumb(exercise: model.exercise(for: execution), size: 52)
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text(model.exercise(for: execution)?.name ?? "")
-                            .font(.headline)
-                            .foregroundStyle(Color.caliText)
-                        Text("Mục tiêu: \(execution.setCount) × \(Fmt.target(execution.target))")
-                            .font(.caption)
-                            .foregroundStyle(Color.caliSecondary)
-                        if sets.isEmpty {
-                            Text("Chưa có set nào")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.caliSecondary)
-                        } else {
-                            ForEach(sets, id: \.setResultId) { record in
-                                let logged = LoggedSet(record: record)
-                                HStack {
-                                    Text("Set \(record.key.setIndex)")
-                                        .foregroundStyle(Color.caliSecondary)
-                                    Spacer()
-                                    Text(Fmt.actual(logged))
-                                        .foregroundStyle(record.status == .skipped ? Color.caliSecondary : Color.caliText)
-                                    if let rpe = record.actual.rpe {
-                                        Text("RPE \(rpe)")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.caliSecondary)
-                                    }
-                                }
-                                .font(.subheadline.monospacedDigit())
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .caliCard(padding: Spacing.m)
+                ExerciseResultCard(exercise: model.exercise(for: execution),
+                                   sets: model.records(for: execution).map(LoggedSet.init(record:)),
+                                   plannedSetCount: execution.setCount)
             }
         }
+    }
+}
+
+// MARK: - Shared pieces
+
+/// "Set 2/4 · giữ 12 giây" in the accent color.
+private struct SetLine: View {
+    let model: WorkoutPlayerModel
+    let execution: ExecutionSpec
+    var font: Font = .footnote
+
+    var body: some View {
+        Text("Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
+            .font(font.monospacedDigit())
+            .foregroundStyle(Color.caliAccentInk)
+    }
+}
+
+/// Poster + name + set line, with a paused chip (mockup `pActive` header row).
+private struct ExerciseRow: View {
+    let model: WorkoutPlayerModel
+    var paused = false
+
+    var body: some View {
+        HStack(spacing: Spacing.m) {
+            PosterThumb(exercise: model.currentExercise, size: 64)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.currentExercise?.name ?? "Bài tập")
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
+                if let execution = model.currentExecution {
+                    SetLine(model: model, execution: execution)
+                }
+            }
+            Spacer(minLength: 0)
+            if paused { TagChip(text: "Đã tạm dừng", systemImage: "pause.fill", tint: .caliWarning) }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Orange progress ring with centered content (mockup `ring`, 230pt).
+struct TimerRing<Content: View>: View {
+    let progress: Double
+    var size: CGFloat = 230
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ZStack {
+            ProgressRing(progress: progress, lineWidth: 14)
+            VStack(spacing: 2) { content }
+                .padding(Spacing.xl)
+        }
+        .frame(width: size, height: size)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -347,7 +384,7 @@ struct PlayerScaffold<Content: View, Actions: View>: View {
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.m)
             .padding(.bottom, Spacing.s)
-            .background(Color.caliCanvas.opacity(0.96))
+            .background(LinearGradient(colors: [Color.caliCanvas.opacity(0), Color.caliCanvas], startPoint: .top, endPoint: .init(x: 0.5, y: 0.3)))
         }
     }
 }

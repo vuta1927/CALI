@@ -14,10 +14,10 @@ final class CoordinatorTests: XCTestCase {
         defer { dir.remove() }
         do {
             let pool = try CaliDatabase.openPool(at: dir.dbURL)
-            XCTAssertEqual(try pool.read { try CaliDatabase.migrator.appliedIdentifiers($0) }, ["v1"])
+            XCTAssertEqual(try pool.read { try CaliDatabase.migrator.appliedIdentifiers($0) }, ["v1", "v2_content"])
         }
         let reopened = try CaliDatabase.openPool(at: dir.dbURL)
-        XCTAssertEqual(try reopened.read { try CaliDatabase.migrator.appliedIdentifiers($0) }, ["v1"])
+        XCTAssertEqual(try reopened.read { try CaliDatabase.migrator.appliedIdentifiers($0) }, ["v1", "v2_content"])
         let mode = try reopened.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }
         XCTAssertEqual(mode?.lowercased(), "wal")
     }

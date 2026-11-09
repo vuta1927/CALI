@@ -1,13 +1,31 @@
 import SwiftUI
 
-enum AppTab: Hashable {
+enum AppTab: String, Hashable {
     case today, plan, catalog, history, profile
+
+    /// DEBUG only: `-uiTab history` opens a tab directly (simulator screenshots for mockup review).
+    static var launchTab: AppTab {
+        #if DEBUG
+        UserDefaults.standard.string(forKey: "uiTab").flatMap(AppTab.init(rawValue:)) ?? .today
+        #else
+        .today
+        #endif
+    }
+
+    /// DEBUG only: `-uiSkipWelcome YES` hides the first-launch sheet without changing stored settings.
+    static var skipsWelcome: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "uiSkipWelcome")
+        #else
+        false
+        #endif
+    }
 }
 
 /// Five-tab shell (docs/02 §2). The workout player is a full-screen modal on top of any tab.
 struct RootView: View {
     @Environment(AppStore.self) private var store
-    @State private var tab: AppTab = .today
+    @State private var tab: AppTab = AppTab.launchTab
 
     var body: some View {
         @Bindable var store = store
@@ -25,7 +43,7 @@ struct RootView: View {
                 NavigationStack { HistoryView() }
             }
             Tab("Cá nhân", systemImage: "person.crop.circle", value: AppTab.profile) {
-                NavigationStack { ProfileView() }
+                NavigationStack { ProfileView(tab: $tab) }
             }
             .badge(store.pendingRecommendationCount)
         }
@@ -56,7 +74,7 @@ struct RootView: View {
     }
 
     private var welcomeBinding: Binding<Bool> {
-        Binding(get: { !store.settings.hasSeenWelcome }, set: { _ in })
+        Binding(get: { !store.settings.hasSeenWelcome && !AppTab.skipsWelcome }, set: { _ in })
     }
 
     private var alertBinding: Binding<Bool> {
@@ -71,33 +89,40 @@ struct WelcomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                VStack(alignment: .leading, spacing: Spacing.l) {
+                HStack(spacing: Spacing.m) {
                     COAMISymbol()
-                        .frame(width: 92, height: 92)
+                        .frame(width: 56, height: 56)
                     COAMIWordmark(includesTagline: true)
                 }
-                    .padding(.top, Spacing.xxl)
-                Text("Tập rõ ràng. Tiến bộ bền vững.")
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(Color.caliText)
-                Text("COAMI đồng hành cùng bạn từ giáo án, hướng dẫn trực quan đến từng set và khoảng nghỉ — kể cả khi offline.")
-                    .font(.title3)
-                    .foregroundStyle(Color.caliSecondary)
+                .padding(.top, Spacing.xl)
+                VStack(alignment: .leading, spacing: Spacing.m) {
+                    Text("Tập rõ ràng. Tiến bộ bền vững.")
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(Color.caliText)
+                    Text("COAMI đồng hành cùng bạn từ giáo án, hướng dẫn trực quan đến từng set và khoảng nghỉ — kể cả khi offline.")
+                        .font(.title3)
+                        .foregroundStyle(Color.caliSecondary)
+                }
                 VStack(alignment: .leading, spacing: Spacing.l) {
                     WelcomeRow(systemImage: "wifi.slash", title: "Chạy hoàn toàn offline",
                                text: "Mọi dữ liệu nằm trên iPhone của bạn. Chưa kết nối máy chủ.")
-                    WelcomeRow(systemImage: "tag", title: "Có dữ liệu mẫu",
+                    WelcomeRow(systemImage: "flask", title: "Có dữ liệu mẫu",
                                text: "Giáo án, lịch sử và đề xuất AI ban đầu là dữ liệu mẫu, được gắn nhãn \"Dữ liệu mẫu\". Ảnh bài tập là ảnh tạm (PLACEHOLDER).")
-                    WelcomeRow(systemImage: "timer", title: "Thử nhanh trong 3 phút",
+                    WelcomeRow(systemImage: "clock", title: "Thử nhanh trong 3 phút",
                                text: "Ở tab Hôm nay, chọn \"Buổi thử nhanh\" để đi qua đủ 5 loại bài: giữ tĩnh, số lần, theo thời gian, interval và kỹ năng.")
                     WelcomeRow(systemImage: "cross.case", title: "An toàn là trên hết",
                                text: "COAMI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
                 }
-                Button("Bắt đầu", action: onContinue)
-                    .buttonStyle(.caliPrimary)
-                    .padding(.top, Spacing.l)
             }
-            .padding(Spacing.xl)
+            .padding(.horizontal, Spacing.l)
+            .padding(.bottom, Spacing.xl)
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button("Bắt đầu", action: onContinue)
+                .buttonStyle(.caliPrimary)
+                .padding(.horizontal, Spacing.l)
+                .padding(.vertical, Spacing.m)
+                .background(LinearGradient(colors: [Color.caliCanvas.opacity(0), Color.caliCanvas], startPoint: .top, endPoint: .center))
         }
         .background(COAMIScreenBackground())
     }
@@ -112,7 +137,7 @@ private struct WelcomeRow: View {
         HStack(alignment: .top, spacing: Spacing.m) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(Color.caliAccent)
+                .foregroundStyle(Color.caliAccentInk)
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(title)

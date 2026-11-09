@@ -1,9 +1,9 @@
-# Reducer conformance vectors (CON-002) — READY FOR REVIEW
+# Reducer conformance vectors (CON-002) — APPROVED
 
-> **Status: ready for review (2026-11-08); CON-002 is NOT approved yet.** These vectors encode the `CaliDomain` reducer's
-> current interpretation of `docs/03-workout-domain.md`. Where docs/03 was ambiguous the
-> chosen behavior is listed as an open CON-002 question in the I1a PR. Do not treat these files as
-> a frozen contract until CON-002 is approved; changes to them require the same review as a
+> **Status: approved by the PO on 2026-11-09 (ADR-069).** These vectors encode the `CaliDomain` reducer's
+> interpretation of `docs/03-workout-domain.md` and are now the frozen reducer contract.
+> Where docs/03 was ambiguous the chosen behavior was listed as a CON-002 question in the I1a PR.
+> Changes to them require the same review as a
 > contract change (AGENTS.md "Contracts first").
 
 Each `*.json` file is one scenario, replayed step by step against a fresh (nil) session by

@@ -23,9 +23,18 @@ struct WorkoutEditorView: View {
                 Section {
                     TextField("Tên buổi", text: $draft.title)
                     TextField("Trọng tâm", text: $draft.focus)
-                    Picker("Ngày tập", selection: $draft.weekday) {
-                        ForEach(1...7, id: \.self) { Text(Fmt.weekdayLong($0)).tag($0) }
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        Text("Thứ").font(.caption).foregroundStyle(Color.caliSecondary)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(1...7, id: \.self) { day in
+                                    FilterChip(title: Fmt.weekdayShort(day), isSelected: draft.weekday == day) { draft.weekday = day }
+                                        .accessibilityLabel(Fmt.weekdayLong(day))
+                                }
+                            }
+                        }
                     }
+                    .padding(.vertical, Spacing.xs)
                 } header: {
                     Text("Thông tin")
                 }
@@ -90,7 +99,7 @@ private struct PlannedExerciseEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             HStack(spacing: Spacing.m) {
-                PosterThumb(exercise: exercise, size: 44)
+                PosterThumb(exercise: exercise, size: 56)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(exercise?.name ?? "Bài tập")
                         .font(.headline)

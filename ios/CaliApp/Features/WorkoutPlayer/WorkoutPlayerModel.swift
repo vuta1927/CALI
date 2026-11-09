@@ -1,11 +1,12 @@
+import CaliCore
 import CaliDomain
 import Foundation
 import Observation
 
-/// Drives one workout session through the pure `WorkoutReducer`.
+/// Drives one workout session through the single-writer `WorkoutCoordinator` (via `AppStore`).
 ///
-/// - Every user action becomes a domain `Command` with a fresh `commandId`; only accepted transitions
-///   change state, and each one is persisted by `AppStore` before side effects run.
+/// - Every user action becomes a domain `Command` with a fresh `commandId`; only transitions the
+///   coordinator committed change state, so the UI never shows something the database does not hold.
 /// - Time-based transitions (countdown → exercising, target reached → awaiting result, rest over →
 ///   ready) are derived by `reconcile` only while the app is executing (tick / foreground). A set is
 ///   never confirmed because a countdown hit zero (AGENTS safety rules).
@@ -44,10 +45,6 @@ final class WorkoutPlayerModel {
         state = active.state
         records = active.records
         title = active.title
-    }
-
-    var activeSnapshot: ActiveSession {
-        ActiveSession(state: state, title: title, records: records)
     }
 
     // MARK: Derived
@@ -160,18 +157,19 @@ final class WorkoutPlayerModel {
 
     @discardableResult
     func send(_ command: Command) -> Bool {
-        let at = Date()
-        switch WorkoutReducer.reduce(state, command, now: at) {
-        case .success(let transition):
+        guard let result = store?.execute(command) else { return false }
+        switch result.outcome.status {
+        case .applied:
+            guard let next = result.state else { return false }
             clockAcknowledged = false
             banner = nil
-            apply(transition.state, events: transition.events, at: at)
+            apply(next, events: result.events, at: Date())
             return true
-        case .failure(.duplicateSetResolution):
+        case .alreadyResolved:
             // Idempotent double tap: the set already has its canonical result.
             return true
-        case .failure(let error):
-            banner = .error(Self.message(for: error))
+        case .rejected:
+            banner = .error(result.error.map(Self.message(for:)) ?? "Thao tác không hợp lệ (\(result.outcome.errorCode ?? "-")).")
             return false
         }
     }
@@ -186,13 +184,20 @@ final class WorkoutPlayerModel {
         guard state.isActive, clockAnomaly == nil else { return }
 
         let monoElapsed = lastTickMono.map { MonotonicClock.seconds(from: $0, to: mono) }
-        let result = WorkoutReducer.reconcile(
+        // Pure check first so the 4 Hz tick only opens a write transaction when something is due.
+        var result = WorkoutReducer.reconcile(
             state,
             now: wall,
             previousNow: lastTickWall,
             monotonicElapsed: monoElapsed,
             acknowledgeClockJump: clockAcknowledged
         )
+        if result.changed, !result.requiresUserReconciliation {
+            guard let store,
+                  let persisted = store.reconcile(previousNow: lastTickWall, monotonicElapsed: monoElapsed, acknowledgeClockJump: clockAcknowledged)
+            else { return }
+            result = persisted
+        }
         for signal in result.signals {
             switch signal {
             case .clockJumpDetected(let anomaly):

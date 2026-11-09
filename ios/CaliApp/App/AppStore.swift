@@ -1,9 +1,11 @@
+import CaliCore
 import CaliDomain
 import Foundation
 import Observation
 
-/// App-wide state for the POC. Owns the plan, history, recommendations and the active workout,
-/// and persists everything locally after each change (offline-first; no backend in the POC).
+/// App-wide state. Owns the plan, history, recommendations and the active workout. Every change is
+/// committed to the local GRDB database first (`AppDatabase`, offline-first) and only then published to
+/// the UI; workout commands go through the single-writer `WorkoutCoordinator`.
 @Observable
 @MainActor
 final class AppStore {
@@ -24,33 +26,59 @@ final class AppStore {
     /// Shown when a start request is refused (e.g. another workout is active).
     var alertMessage: String?
 
-    @ObservationIgnored private let createdAt: Date
-    @ObservationIgnored private let persists: Bool
+    @ObservationIgnored private let database: AppDatabase
     @ObservationIgnored private let notifications = NotificationService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
-    init(persists: Bool = true, now: Date = Date()) {
-        self.persists = persists
-        if persists, let snapshot = LocalStore.load() {
-            catalog = snapshot.catalog ?? MockData.catalog
-            plan = snapshot.plan
-            history = snapshot.history
-            recommendations = snapshot.recommendations
-            audit = snapshot.audit
-            settings = snapshot.settings
-            createdAt = snapshot.createdAt
-            if let active = snapshot.active {
-                player = WorkoutPlayerModel(active: active)
-            }
+
+    /// - Parameters:
+    ///   - persists: `false` uses a fresh in-memory database (unit tests hosted in the app).
+    ///   - database: an explicit database (tests that simulate a relaunch share one).
+    init(persists: Bool = true, now: Date = Date(), database: AppDatabase? = nil) {
+        var openError: String?
+        if let database {
+            self.database = database
+        } else if persists, let onDisk = Self.open(now: now, error: &openError) {
+            self.database = onDisk
         } else {
-            catalog = MockData.catalog
-            plan = MockData.plan
-            history = MockData.sampleHistory(now: now)
-            recommendations = MockData.sampleRecommendations()
-            audit = []
-            settings = AppSettings()
-            createdAt = now
+            // Never touch the file we could not open; the session runs in memory and says so.
+            self.database = try! AppDatabase.inMemory()
         }
-        player?.store = self
+        let loaded: LocalContent
+        do {
+            try self.database.content.seedIfEmpty(AppDatabase.seed(now: now), now: now)
+            loaded = try self.database.content.load()
+        } catch {
+            openError = "Không đọc được dữ liệu trên máy (\(error.localizedDescription))."
+            loaded = LocalContent(catalog: MockData.catalog, plan: MockData.plan, history: [], recommendations: [], audit: [], settings: AppSettings())
+        }
+        catalog = loaded.catalog
+        plan = loaded.plan ?? MockData.plan
+        history = loaded.history
+        recommendations = loaded.recommendations
+        audit = loaded.audit
+        settings = loaded.settings
+        alertMessage = openError
+        restoreActiveSession()
+    }
+
+    private static func open(now: Date, error: inout String?) -> AppDatabase? {
+        do {
+            return try AppDatabase.openOnDisk(now: now)
+        } catch let failure {
+            error = "Không mở được dữ liệu trên máy; thay đổi lần này sẽ không được lưu. (\(failure.localizedDescription))"
+            return nil
+        }
+    }
+
+    /// Rebuilds the player for a session that was active when the app was last terminated.
+    private func restoreActiveSession() {
+        let coordinator = database.coordinator
+        guard let state = try? coordinator.activeState() else { return }
+        let records = (try? coordinator.setResults(sessionId: state.sessionId)) ?? []
+        let title = (try? coordinator.activeSessionTitle()) ?? ""
+        let model = WorkoutPlayerModel(active: ActiveSession(state: state, title: title, records: records))
+        model.store = self
+        player = model
     }
 
     // MARK: Lookups
@@ -94,6 +122,20 @@ final class AppStore {
         recommendations.filter { $0.decision == nil }.count
     }
 
+    /// True while sample history or undecided sample recommendations are visible; screens then show
+    /// the "Dữ liệu mẫu" badge (AGENTS: no mock data masquerading as production data).
+    var showsSampleData: Bool {
+        history.contains(where: \.isSample) || recommendations.contains { $0.isSample && $0.decision == nil }
+    }
+
+    func exercises(of workout: PlannedWorkout) -> [Exercise?] {
+        workout.exercises.map { exercise($0.exerciseId) }
+    }
+
+    func discipline(of workout: PlannedWorkout) -> Discipline {
+        Discipline(types: workout.exercises.map(\.target.type))
+    }
+
     // MARK: Workout lifecycle
 
     func startWorkout(_ workout: PlannedWorkout) {
@@ -117,17 +159,41 @@ final class AppStore {
             )
         }
         let command = CreateSession(commandId: UUID(), sessionId: UUID(), plannedWorkoutId: workout.id, executions: executions)
-        switch WorkoutReducer.reduce(nil, .createSession(command), now: Date()) {
-        case .success(let transition):
-            let model = WorkoutPlayerModel(active: ActiveSession(state: transition.state, title: workout.title, records: []))
-            model.store = self
-            player = model
-            isPlayerPresented = true
-            if settings.notificationsEnabled { notifications.requestAuthorizationIfNeeded() }
-            persist()
-            syncSideEffects()
-        case .failure(let error):
-            alertMessage = "Không bắt đầu được buổi tập: \(WorkoutPlayerModel.message(for: error))"
+        guard let result = execute(.createSession(command), sessionTitle: workout.title) else { return }
+        guard result.outcome.status == .applied, let state = result.state else {
+            let reason = result.error.map(WorkoutPlayerModel.message(for:)) ?? (result.outcome.errorCode ?? "-")
+            alertMessage = "Không bắt đầu được buổi tập: \(reason)"
+            return
+        }
+        let model = WorkoutPlayerModel(active: ActiveSession(state: state, title: workout.title, records: []))
+        model.store = self
+        player = model
+        isPlayerPresented = true
+        if settings.notificationsEnabled { notifications.requestAuthorizationIfNeeded() }
+        syncSideEffects()
+    }
+
+    /// Runs one workout command through the coordinator (transactional, deduplicated by `commandId`).
+    /// Returns `nil` and shows an alert when the database write failed; nothing changed then.
+    func execute(_ command: Command, sessionTitle: String? = nil) -> HandleResult? {
+        do {
+            return try database.coordinator.handle(command, sessionTitle: sessionTitle)
+        } catch {
+            alertMessage = "Không lưu được thao tác trên máy. Hãy thử lại. (\(error.localizedDescription))"
+            return nil
+        }
+    }
+
+    /// Persists deadline-derived transitions (countdown over, target reached, rest over). Called from the
+    /// player's foreground tick only when the pure reducer already sees a change.
+    func reconcile(previousNow: Date?, monotonicElapsed: TimeInterval?, acknowledgeClockJump: Bool) -> ReconcileResult? {
+        do {
+            return try database.coordinator.reconcile(
+                previousNow: previousNow, monotonicElapsed: monotonicElapsed, acknowledgeClockJump: acknowledgeClockJump
+            )
+        } catch {
+            alertMessage = "Không lưu được trạng thái buổi tập trên máy. (\(error.localizedDescription))"
+            return nil
         }
     }
 
@@ -140,9 +206,9 @@ final class AppStore {
     func playerDidChange(_ model: WorkoutPlayerModel) {
         guard model === player else { return }
         if model.state.phase.isTerminal {
-            archive(model)
+            // The coordinator wrote the history row in the same transaction as the terminal state.
+            reloadContent()
         }
-        persist()
         syncSideEffects()
     }
 
@@ -151,26 +217,7 @@ final class AppStore {
         isPlayerPresented = false
         if let player, !player.state.isActive {
             self.player = nil
-            persist()
         }
-    }
-
-    private func archive(_ model: WorkoutPlayerModel) {
-        let s = model.state
-        guard !history.contains(where: { $0.id == s.sessionId }) else { return }
-        let session = CompletedSession(
-            id: s.sessionId,
-            title: model.title,
-            plannedWorkoutId: s.plannedWorkoutId,
-            startedAt: s.startedAt,
-            finishedAt: s.finishedAt ?? s.abandonedAt ?? s.updatedAt,
-            status: s.status,
-            exerciseIds: s.executions.map(\.exerciseId),
-            plannedSetCount: s.totalPlannedSets,
-            sets: model.records.map(LoggedSet.init(record:)),
-            isSample: false
-        )
-        history.insert(session, at: 0)
     }
 
     private func syncSideEffects() {
@@ -205,10 +252,7 @@ final class AppStore {
                 return false
             }
         }
-        var copy = catalog
-        if let index = copy.firstIndex(where: { $0.id == exercise.id }) { copy[index] = exercise }
-        else { copy.append(exercise) }
-        return commitContent(catalog: copy, plan: plan, action: "Lưu bài tập", detail: exercise.name, commandId: commandId)
+        return commitContent(ContentChange(exercises: [exercise]), action: "Lưu bài tập", detail: exercise.name, commandId: commandId)
     }
 
     @discardableResult
@@ -228,7 +272,7 @@ final class AppStore {
         copy.deletedAt = nil
         if let index = copy.workouts.firstIndex(where: { $0.id == workout.id }) { copy.workouts[index] = workout }
         else { copy.workouts.append(workout) }
-        return commitContent(catalog: catalog, plan: copy, action: "Lưu buổi tập", detail: workout.title, commandId: commandId)
+        return commitContent(ContentChange(plan: copy), action: "Lưu buổi tập", detail: workout.title, commandId: commandId)
     }
 
     @discardableResult
@@ -239,19 +283,19 @@ final class AppStore {
         if copy.deletedAt != nil { copy.id = UUID() }
         copy.title = title
         copy.deletedAt = nil
-        return commitContent(catalog: catalog, plan: copy, action: "Sửa giáo án", detail: title, commandId: commandId)
+        return commitContent(ContentChange(plan: copy), action: "Sửa giáo án", detail: title, commandId: commandId)
     }
 
     @discardableResult
     func deleteWorkout(_ id: UUID, commandId: UUID = UUID()) -> Bool {
         if audit.contains(where: { $0.id == commandId }) { return true }
-        guard plan.workouts.contains(where: { $0.id == id }) else {
+        guard let workout = plan.workouts.first(where: { $0.id == id }) else {
             alertMessage = "Buổi tập này không còn trong giáo án."
             return false
         }
         var copy = plan
         copy.workouts.removeAll { $0.id == id }
-        return commitContent(catalog: catalog, plan: copy, action: "Xóa buổi tập", detail: id.uuidString, commandId: commandId)
+        return commitContent(ContentChange(plan: copy), action: "Xóa buổi tập", detail: workout.title, commandId: commandId)
     }
 
     @discardableResult
@@ -259,21 +303,22 @@ final class AppStore {
         var copy = plan
         copy.workouts = []
         copy.deletedAt = Date()
-        return commitContent(catalog: catalog, plan: copy, action: "Xóa giáo án", detail: plan.title, commandId: commandId)
+        return commitContent(ContentChange(plan: copy), action: "Xóa giáo án", detail: plan.title, commandId: commandId)
     }
 
-    /// Write one atomic snapshot before publishing success; a failed write leaves state untouched.
-    private func commitContent(catalog: [Exercise], plan: WorkoutPlan, action: String, detail: String, commandId: UUID) -> Bool {
-        if audit.contains(where: { $0.id == commandId }) { return true }
-        var next = snapshot()
-        next.catalog = catalog
-        next.plan = plan
-        next.audit.insert(AuditEntry(id: commandId, at: Date(), action: action, detail: detail), at: 0)
+    /// Commits the change and its audit row in one transaction before publishing it; a failed write leaves
+    /// state untouched. A repeated `commandId` is a no-op that reports success.
+    private func commitContent(_ change: ContentChange, action: String, detail: String, commandId: UUID) -> Bool {
+        var change = change
+        change.audit = AuditEntry(id: commandId, at: Date(), action: action, detail: detail)
+        return commit(change)
+    }
+
+    @discardableResult
+    private func commit(_ change: ContentChange) -> Bool {
         do {
-            if persists { try LocalStore.save(next) }
-            self.catalog = catalog
-            self.plan = plan
-            audit = next.audit
+            try database.content.apply(change)
+            reloadContent()
             return true
         } catch {
             alertMessage = "Không lưu được thay đổi trên máy. Hãy kiểm tra dung lượng và thử lại."
@@ -281,35 +326,46 @@ final class AppStore {
         }
     }
 
-    // MARK: Recommendations (approval workflow + audit trail, AGENTS rule 5)
-
-    func decide(_ recommendation: Recommendation, accept: Bool, now: Date = Date()) {
-        guard let index = recommendations.firstIndex(where: { $0.id == recommendation.id }),
-              recommendations[index].decision == nil else { return }
-        recommendations[index].decision = accept ? .accepted : .rejected
-        recommendations[index].decidedAt = now
-
-        let summary = "\(recommendation.title) (\(recommendation.fromLabel) → \(recommendation.toLabel))"
-        guard accept else {
-            log("Từ chối đề xuất", summary, at: now)
-            persist()
-            return
-        }
-        if let change = recommendation.change, apply(change) {
-            log("Chấp nhận đề xuất", "\(summary) — đã cập nhật giáo án", at: now)
-        } else {
-            log("Chấp nhận đề xuất", "\(summary) — không áp dụng được: bài tập không còn trong giáo án", at: now)
-        }
-        persist()
+    private func reloadContent() {
+        guard let loaded = try? database.content.load() else { return }
+        catalog = loaded.catalog
+        if let loadedPlan = loaded.plan { plan = loadedPlan }
+        history = loaded.history
+        recommendations = loaded.recommendations
+        audit = loaded.audit
+        settings = loaded.settings
     }
 
-    private func apply(_ change: PlanChange) -> Bool {
+    // MARK: Recommendations (approval workflow + audit trail, AGENTS rule 5)
+
+    /// The decision, the plan edit it approves and the audit row are written in one transaction.
+    func decide(_ recommendation: Recommendation, accept: Bool, now: Date = Date(), commandId: UUID = UUID()) {
+        guard var decided = recommendations.first(where: { $0.id == recommendation.id }), decided.decision == nil else { return }
+        decided.decision = accept ? .accepted : .rejected
+        decided.decidedAt = now
+
+        let summary = "\(recommendation.title) (\(recommendation.fromLabel) → \(recommendation.toLabel))"
+        var change = ContentChange(recommendations: [decided])
+        if !accept {
+            change.audit = AuditEntry(id: commandId, at: now, action: "Từ chối đề xuất", detail: summary)
+        } else if let planChange = recommendation.change, let edited = applying(planChange, to: plan) {
+            change.plan = edited
+            change.audit = AuditEntry(id: commandId, at: now, action: "Chấp nhận đề xuất", detail: "\(summary) — đã cập nhật giáo án")
+        } else {
+            change.audit = AuditEntry(id: commandId, at: now, action: "Chấp nhận đề xuất",
+                                      detail: "\(summary) — không áp dụng được: bài tập không còn trong giáo án")
+        }
+        commit(change)
+    }
+
+    private func applying(_ change: PlanChange, to plan: WorkoutPlan) -> WorkoutPlan? {
+        var plan = plan
         guard let w = plan.workouts.firstIndex(where: { $0.id == change.plannedWorkoutId }),
-              let e = plan.workouts[w].exercises.firstIndex(where: { $0.id == change.plannedExerciseId }) else { return false }
+              let e = plan.workouts[w].exercises.firstIndex(where: { $0.id == change.plannedExerciseId }) else { return nil }
         if let sets = change.newSetCount { plan.workouts[w].exercises[e].setCount = sets }
         if let target = change.newTarget { plan.workouts[w].exercises[e].target = target }
         if let rest = change.newRestSeconds { plan.workouts[w].exercises[e].restSeconds = rest }
-        return true
+        return plan
     }
 
     // MARK: Settings & data
@@ -319,9 +375,8 @@ final class AppStore {
         body(&copy)
         guard copy != settings else { return }
         let notificationsTurnedOn = copy.notificationsEnabled && !settings.notificationsEnabled
-        settings = copy
+        guard commit(ContentChange(settings: copy)) else { return }
         if notificationsTurnedOn { notifications.requestAuthorizationIfNeeded() }
-        persist()
         syncSideEffects()
     }
 
@@ -331,33 +386,14 @@ final class AppStore {
         player = nil
         notifications.cancelAll()
         liveActivity.sync(nil, enabled: false)
-        catalog = MockData.catalog
-        plan = MockData.plan
-        history = MockData.sampleHistory(now: now)
-        recommendations = MockData.sampleRecommendations()
-        audit = []
-        let welcomeSeen = settings.hasSeenWelcome
-        settings = AppSettings()
-        settings.hasSeenWelcome = welcomeSeen
-        if persists { LocalStore.delete() }
-        persist()
-    }
-
-    private func log(_ action: String, _ detail: String, at date: Date = Date()) {
-        audit.insert(AuditEntry(id: UUID(), at: date, action: action, detail: detail), at: 0)
-    }
-
-    private func snapshot() -> PersistedSnapshot {
-        PersistedSnapshot(
-            catalog: catalog, plan: plan, history: history, recommendations: recommendations,
-            audit: audit, settings: settings,
-            active: player.flatMap { $0.state.isActive ? $0.activeSnapshot : nil }, createdAt: createdAt
-        )
-    }
-
-    private func persist() {
-        guard persists else { return }
-        do { try LocalStore.save(snapshot()) }
-        catch { alertMessage = "Không lưu được dữ liệu trên máy. Hãy kiểm tra dung lượng và thử lại." }
+        var fresh = AppSettings()
+        fresh.hasSeenWelcome = settings.hasSeenWelcome
+        do {
+            try database.content.resetAll(to: AppDatabase.seed(now: now, settings: fresh), now: now)
+            reloadContent()
+            if let seededPlan = try database.content.load().plan { plan = seededPlan }
+        } catch {
+            alertMessage = "Không đặt lại được dữ liệu trên máy. (\(error.localizedDescription))"
+        }
     }
 }

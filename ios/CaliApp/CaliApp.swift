@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 // The type is not named `CaliApp` so it does not shadow the `CaliApp` module name
@@ -13,8 +14,12 @@ struct CaliAppMain: App {
         }
     }
 
-    /// Unit tests are hosted in the app; keep them away from the user's local data file.
+    /// Unit tests are hosted in the app; keep them away from the user's local database.
+    /// `XCTestConfigurationFilePath` is not set for device runs from an `.xctestrun` (Xcode 27), so also
+    /// check whether XCTest was injected into the process.
     private static var isRunningTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 }

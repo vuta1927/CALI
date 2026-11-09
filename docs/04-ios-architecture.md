@@ -46,6 +46,18 @@ Use GRDB over SQLite to make schema/versioning, atomic transactions and outbox e
 
 Main tables mirror server business entities plus `processed_commands(command_id PK,response_json)`, `sync_outbox(seq PK, mutation_id UNIQUE, entity_type, entity_id, action, base_version, json, state, attempts, created_at, last_error)`, `sync_cursor(user_id, cursor)`, `media_cache`, `local_session_state`.
 
+**Implemented (IOS-001, ADR-070).** `ios/Packages/CaliCore` owns the database `Application Support/cali.sqlite` (WAL `DatabasePool`, foreign keys on). The app process is the only writer (ADR-013); the widget extension never opens it.
+- Migration `v1` (POC-002): `local_session_state`, `set_results`, `sync_outbox`, `processed_commands`.
+- Migration `v2_content`:
+  - Plan tables per CON-003: `training_plans`, `plan_activations`, `planned_workouts`, `planned_exercises`, each with `server_version` and `dirty`.
+  - `exercises`, `session_history`, `recommendations`, `audit_log` (id = commandId), `app_settings`, `sync_cursor`, `media_cache`, `legacy_imports`.
+  - A `title` column on `local_session_state`.
+- Writers:
+  - `WorkoutCoordinator` handles workout commands. A session's terminal transition also writes its `session_history` row in the same transaction.
+  - `ContentStore` handles catalog, plan, AI decision and settings edits. Each edit is one `BEGIN IMMEDIATE` transaction with its audit row, deduplicated on the commandId.
+- Legacy import: `LegacySnapshotImporter` moves the pre-IOS-001 `cali-poc.json` into the database once, then renames the file to `cali-poc.imported.json`. An unreadable file is moved aside and nothing is written.
+- Sync: content edits only set `dirty` for now. Enqueuing them in `sync_outbox` is `TODO(IOS-007)`.
+
 ## 4. Data flow
 ```mermaid
 flowchart LR

@@ -115,40 +115,47 @@ private struct PlayerHeader: View {
     let onClose: () -> Void
 
     var body: some View {
+        let s = model.state
         VStack(spacing: Spacing.s) {
             HStack(spacing: Spacing.m) {
-                CircleIconButton(systemImage: model.state.isActive ? "chevron.down" : "xmark", label: model.state.isActive ? "Thu nhỏ hoặc dừng" : "Đóng", action: onClose)
-                COAMISymbol()
-                    .frame(width: 28, height: 28)
-                VStack(alignment: .leading, spacing: 2) {
+                if s.isActive {
+                    CircleIconButton(systemImage: "chevron.down", label: "Thu nhỏ hoặc dừng", action: onClose)
+                } else {
+                    Color.clear.frame(width: minTapTarget, height: minTapTarget)
+                }
+                VStack(spacing: 0) {
                     Text(model.title)
                         .font(.headline)
                         .foregroundStyle(Color.caliText)
                         .lineLimit(1)
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(Color.caliSecondary)
                         .lineLimit(1)
                 }
-                Spacer()
-                Label(Fmt.clock(seconds: model.sessionElapsedSeconds), systemImage: "clock")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(Color.caliSecondary)
-                    .accessibilityLabel("Thời gian buổi tập \(Fmt.clock(seconds: model.sessionElapsedSeconds))")
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .combine)
+                CircleIconButton(systemImage: "xmark", label: s.isActive ? "Rời buổi tập" : "Đóng", action: onClose)
             }
-            LinearProgress(progress: model.progress)
-                .accessibilityLabel("Đã xong \(model.state.resolvedSets.count) trên \(model.state.totalPlannedSets) set")
+            HStack(spacing: Spacing.s) {
+                LinearProgress(progress: model.progress)
+                Text("\(s.resolvedSets.count)/\(s.totalPlannedSets) set")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Color.caliSecondary)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Đã xong \(s.resolvedSets.count) trên \(s.totalPlannedSets) set")
         }
         .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.s)
     }
 
+    /// "Bài 1/5 · 18:42"
     private var subtitle: String {
         let s = model.state
-        guard s.isActive, s.phase != .reviewingSummary else {
-            return "\(s.resolvedSets.count)/\(s.totalPlannedSets) set"
-        }
-        return "Bài \(s.currentExecutionIndex + 1)/\(s.executions.count) · \(s.phase.label)"
+        let clock = Fmt.clock(seconds: model.sessionElapsedSeconds)
+        guard s.isActive, s.phase != .reviewingSummary else { return clock }
+        return "Bài \(s.currentExecutionIndex + 1)/\(s.executions.count) · \(clock)"
     }
 }
 
@@ -187,29 +194,6 @@ struct BannerView: View {
 }
 
 // MARK: - Shared pieces
-
-/// Exercise identity block: poster first, name supplemental (AGENTS non-negotiable #2).
-struct PlayerExerciseHeader: View {
-    let model: WorkoutPlayerModel
-    var posterHeight: CGFloat = 200
-
-    var body: some View {
-        VStack(spacing: Spacing.m) {
-            PosterView(exercise: model.currentExercise, height: posterHeight)
-            if let execution = model.currentExecution {
-                VStack(spacing: Spacing.xs) {
-                    Text(model.currentExercise?.name ?? "Bài tập")
-                        .font(.title2.bold())
-                        .foregroundStyle(Color.caliText)
-                        .multilineTextAlignment(.center)
-                    Text("Set \(model.state.currentSetIndex)/\(execution.setCount) · \(Fmt.target(execution.target))")
-                        .font(.headline)
-                        .foregroundStyle(Color.caliAccentInk)
-                }
-            }
-        }
-    }
-}
 
 /// Large timer text (≥ 56 pt, docs/02 accessibility).
 struct TimerText: View {

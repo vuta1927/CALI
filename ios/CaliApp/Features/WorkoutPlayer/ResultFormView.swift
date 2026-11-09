@@ -27,6 +27,9 @@ struct ResultFormView: View {
 
     var body: some View {
         PlayerScaffold {
+            Text("Nhập kết quả set")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
             header
             if let target {
                 inputs(for: target)
@@ -34,12 +37,21 @@ struct ResultFormView: View {
             }
             rpePicker
             noteField
+            HStack(alignment: .top, spacing: Spacing.m) {
+                Image(systemName: "info.circle").foregroundStyle(Color.caliSecondary)
+                Text("COAMI không tự đánh dấu set hoàn thành khi hết giờ. Set chỉ được ghi khi bạn bấm Lưu.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.caliSecondary)
+            }
+            .caliCard(padding: Spacing.m)
         } actions: {
-            Button("Lưu set", systemImage: "checkmark.circle.fill", action: save)
-                .buttonStyle(.caliPrimary)
-                .disabled(!canSave)
-            Button("Bỏ qua set này") { showSkipReasons = true }
-                .buttonStyle(.caliQuiet)
+            HStack(spacing: Spacing.m) {
+                Button("Bỏ qua set") { showSkipReasons = true }
+                    .buttonStyle(.caliSecondary)
+                Button("Lưu", systemImage: "checkmark", action: save)
+                    .buttonStyle(.caliPrimary)
+                    .disabled(!canSave)
+            }
         }
         .skipReasonDialog(isPresented: $showSkipReasons) { model.skipCurrentSet(reason: $0) }
         .toolbar {
@@ -54,34 +66,32 @@ struct ResultFormView: View {
     // MARK: Sections
 
     private var header: some View {
-        VStack(spacing: Spacing.m) {
+        VStack(alignment: .leading, spacing: Spacing.m) {
             if deadlineReached {
                 Label("Đã hết thời gian — xác nhận kết quả", systemImage: "bell.badge")
                     .font(.headline)
                     .foregroundStyle(Color.caliWarning)
-            } else {
-                Text("Nhập kết quả set")
-                    .font(.headline)
-                    .foregroundStyle(Color.caliSecondary)
             }
             HStack(spacing: Spacing.m) {
                 PosterThumb(exercise: model.currentExercise, size: 72)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(model.currentExercise?.name ?? "")
-                        .font(.title3.bold())
+                        .font(.headline)
                         .foregroundStyle(Color.caliText)
                     if let execution = model.currentExecution {
                         Text("Set \(draft?.key.setIndex ?? model.state.currentSetIndex)/\(execution.setCount) · Mục tiêu \(Fmt.target(execution.target))")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.caliAccentInk)
-                    }
-                    if let draft, draft.measuredElapsedMs > 0 {
-                        Text("Đo được: \(Fmt.holdSeconds(ms: draft.measuredElapsedMs))")
-                            .font(.caption)
+                            .font(.footnote.monospacedDigit())
                             .foregroundStyle(Color.caliSecondary)
+                        HStack(spacing: 6) {
+                            let discipline = Discipline(types: [execution.target.type])
+                            TagChip(text: discipline.label, systemImage: discipline.systemImage)
+                            if let draft, draft.measuredElapsedMs > 0 {
+                                TagChip(text: "Đo được \(Fmt.clock(ms: draft.measuredElapsedMs))", systemImage: "clock")
+                            }
+                        }
                     }
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .caliCard(padding: Spacing.m)
             .accessibilityElement(children: .combine)
@@ -122,24 +132,26 @@ struct ResultFormView: View {
     @ViewBuilder
     private func statusPicker(for target: Prescription) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text(target.type == .skillAttempt ? "Kết quả lần thử" : "Đánh giá set")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.caliSecondary)
+            Label(target.type == .skillAttempt ? "Kết quả lần thử" : "Đánh giá set", systemImage: "star")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
+                .labelStyle(AccentIconLabelStyle())
             HStack(spacing: Spacing.s) {
                 FilterChip(title: target.type == .skillAttempt ? "Thành công" : "Đạt mục tiêu",
                            systemImage: "checkmark", isSelected: status == .completed) { status = .completed }
                 FilterChip(title: "Chưa đạt", systemImage: "xmark", isSelected: status == .failed) { status = .failed }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .caliCard()
     }
 
     private var rpePicker: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
-                Text("Mức gắng sức (RPE)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                Label("Mức gắng sức (RPE)", systemImage: "flame")
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
+                    .labelStyle(AccentIconLabelStyle())
                 Spacer()
                 Text(rpe.map(Self.rpeLabel) ?? "Không bắt buộc")
                     .font(.caption)
@@ -154,29 +166,33 @@ struct ResultFormView: View {
                             .font(.headline.monospacedDigit())
                             .frame(maxWidth: .infinity, minHeight: minTapTarget)
                             .foregroundStyle(rpe == value ? Color.caliOnAccent : Color.caliText)
-                            .background(rpe == value ? Color.caliAccent : Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.chip))
+                            .background(rpe == value ? Color.caliAccent : Color.caliSurfaceRaised, in: RoundedRectangle(cornerRadius: Radius.chip))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("RPE \(value), \(Self.rpeLabel(value))")
                     .accessibilityAddTraits(rpe == value ? .isSelected : [])
                 }
             }
+            Text("Không bắt buộc.").font(.caption).foregroundStyle(Color.caliSecondary)
         }
+        .caliCard()
     }
 
     private var noteField: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text("Ghi chú")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.caliSecondary)
+            Label("Ghi chú", systemImage: "square.and.pencil")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
+                .labelStyle(AccentIconLabelStyle())
             TextField("Ví dụ: hơi mỏi cổ tay", text: $note, axis: .vertical)
                 .lineLimit(1...3)
                 .focused($focused)
                 .padding(Spacing.m)
                 .frame(minHeight: minTapTarget)
-                .background(Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.chip))
+                .background(Color.caliSurfaceRaised, in: RoundedRectangle(cornerRadius: Radius.chip))
                 .foregroundStyle(Color.caliText)
         }
+        .caliCard()
     }
 
     // MARK: Logic
@@ -256,10 +272,10 @@ private struct SecondsInput: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
-                Button("= mục tiêu \(targetSeconds)s") { value = Double(targetSeconds) }
+                Button("= mục tiêu \(targetSeconds) giây") { value = Double(targetSeconds) }
                     .font(.caption.weight(.semibold))
                     .frame(minHeight: minTapTarget)
             }
@@ -283,8 +299,8 @@ private struct SecondsInput: View {
                     value = (value ?? Double(targetSeconds) - 1) + 1
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
     }
 }
@@ -299,8 +315,8 @@ private struct RepsInput: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
                 Text(hint)
                     .font(.caption)
@@ -326,8 +342,8 @@ private struct RepsInput: View {
                     value = (value ?? 0) + 1
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
     }
 }
@@ -347,8 +363,8 @@ private struct KgInput: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
                 Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = targetKg }
                     .font(.caption.weight(.semibold))
@@ -375,8 +391,18 @@ private struct KgInput: View {
                     value = min(1000, (value ?? targetKg - step) + step)
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Headline label whose icon uses the accent ink (mockup criteria cards).
+private struct AccentIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: Spacing.s) {
+            configuration.icon.foregroundStyle(Color.caliAccentInk)
+            configuration.title
+        }
     }
 }
