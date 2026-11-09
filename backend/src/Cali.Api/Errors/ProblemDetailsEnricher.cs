@@ -20,6 +20,8 @@ public static class ProblemCodes
     public const string InternalError = "internal_error";
     public const string ServiceUnavailable = "service_unavailable";
     public const string UserNotFound = "user_not_found";
+
+    public const string DeviceOwnerMismatch = "device_owner_mismatch";
     public const string CriteriaVersionNotFound = "criteria_version_not_found";
     public const string PlanCountLimit = "plan_count_limit";
     public const string IdempotencyKeyReused = "idempotency_key_reused";

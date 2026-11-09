@@ -52,6 +52,8 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 ## Milestone M2 — Backend and sync
 **B1 (2026-11-09, PO duyệt ADR-068):** BE-001/002 có catalog (`GET /v1/exercises`, `/v1/exercises/{id}`, `GET /v1/criteria-config`) và plans (`GET/POST /v1/plans`, idempotent theo `Idempotency-Key`, `db/009_http_idempotency.sql`). `url` của media vẫn null cho tới BE-006.
 
+**B2 (2026-11-09, PO duyệt ADR-069):** BE-003 có `POST /v1/sync/push`: một transaction cho cả push, mỗi mutation một savepoint, receipt idempotent theo `mutationId` + fingerprint, change log liên tục theo user, đăng ký thiết bị an toàn khi push song song. Chưa đo p95 push 100 mutation. Pull (BE-004) chưa làm.
+
 | Task | Owner | Depends | Output / DoD |
 |---|---|---|---|
 | BE-001 | BE | CON-001 | .NET modular monolith, auth stubs/prod validation, OpenAPI implementation |

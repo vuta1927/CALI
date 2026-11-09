@@ -210,6 +210,7 @@ COMMIT  (lỗi validation ⇒ ROLLBACK riêng mutation đó, trả 'rejected')
 - Rate limit sync; giới hạn kích thước body.
 - **Tests (bắt buộc):** push cùng mutation 10× ⇒ 1 row, receipt giống nhau (T-07); `baseVersion` sai ⇒ conflict, không ghi đè; thiếu cha ⇒ dependency conflict; 2 request song song cùng user ⇒ `change_seq` liên tục không trùng; batch 101 ⇒ 400; entityType lạ ⇒ rejected; IDOR qua `entityId` của user khác.
 - Đo p95 push 100 mutations local (ghi số, không cam kết).
+- **Đã làm (B2, ADR-069 Accepted):** khác với giả mã trên ở bốn điểm. (1) Cả push là **một** transaction; mỗi mutation một savepoint, `user_sync_state` khoá `FOR UPDATE` một lần ở đầu. (2) Envelope/batch sai ⇒ 400 cả request trước khi ghi; payload sai ⇒ receipt `rejected` của riêng mutation đó. (3) Không lưu receipt `dependency_missing`, `mutation_id_reused`, `forbidden_entity`. (4) Entity cho phép là toàn bộ `SyncEntityType` (thêm `plan_activation`, `plan_phase`, `plan_goal`, `body_measurement`). Tests: `SyncPushTests` (integration, gồm T-07 với 10 request song song và mọi vector trong `fixtures/validation/`), `Cali.UnitTests/Sync`, `SyncContractTests`. p95 chưa đo.
 
 ### B3 — Sync pull (BE-004)
 - `GET /v1/sync/pull?cursor&limit`: cursor opaque mã hóa `(user_id, seq)` + chữ ký HMAC để chống sửa; trả `changes`, `nextCursor`, `hasMore`.

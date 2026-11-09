@@ -1,6 +1,7 @@
 using Cali.Application.Catalog;
 using Cali.Application.Plans;
 using Cali.Application.Identity;
+using Cali.Application.Sync;
 using Cali.Infrastructure.Persistence;
 using Cali.Infrastructure.Persistence.Migrations;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<ICriteriaConfigReader, CriteriaConfigReader>();
         services.AddScoped<IPlanReader, PlanReader>();
         services.AddScoped<IPlanWriter, PlanWriter>();
+        services.AddScoped<ISyncWriter, SyncWriter>();
         return services;
     }
 }

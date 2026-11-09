@@ -457,7 +457,7 @@
       "name": "set_result_with_volume_field",
       "reason": "CON-006 / ADR-062 + ADR-030: volume (reps x kg) is derived, never sent or stored",
       "mutation": {
-        "mutationId": "c1000000-0000-4000-8000-000000000029",
+        "mutationId": "c1000000-0000-4000-8000-000000000055",
         "entityType": "set_result",
         "entityId": "c4000000-0000-4000-8000-000000000029",
         "action": "upsert",

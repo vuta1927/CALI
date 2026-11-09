@@ -4,7 +4,7 @@ using Cali.Api.RateLimiting;
 using Cali.Application.Abstractions;
 using Cali.Application.Plans;
 using Cali.Domain.Plans;
-using Microsoft.Net.Http.Headers;
+using static Cali.Api.Endpoints.RequestBody;
 
 namespace Cali.Api.Endpoints;
 
@@ -14,9 +14,6 @@ public sealed record PlanPageResponse(IReadOnlyList<TrainingPlan> Items, string?
 public static class PlanEndpoints
 {
     internal const string IdempotencyKeyHeader = "Idempotency-Key";
-
-    /// <summary>Request body cap for plan writes; a full 7-day plan is far below this.</summary>
-    internal const int MaxBodyBytes = 1024 * 1024;
 
     private static readonly JsonSerializerOptions RequestJson = new(JsonSerializerDefaults.Web);
 
@@ -60,7 +57,7 @@ public static class PlanEndpoints
 
         if (!IsJson(request.ContentType))
         {
-            return Problem(StatusCodes.Status415UnsupportedMediaType, "Content-Type must be application/json.", ProblemCodes.UnsupportedMediaType);
+            return UnsupportedMediaType();
         }
 
         if (request.ContentLength > MaxBodyBytes)
@@ -68,7 +65,7 @@ public static class PlanEndpoints
             return TooLarge();
         }
 
-        var body = await ReadBodyAsync(request.Body, cancellationToken).ConfigureAwait(false);
+        var body = await ReadAsync(request.Body, cancellationToken).ConfigureAwait(false);
         if (body is null)
         {
             return TooLarge();
@@ -126,49 +123,4 @@ public static class PlanEndpoints
             };
         }
     }
-
-    private static bool IsJson(string? contentType) =>
-        MediaTypeHeaderValue.TryParse(contentType, out var media)
-        && (media.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
-            || (media.MediaType.StartsWith("application/", StringComparison.OrdinalIgnoreCase)
-                && media.MediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)))
-        && (media.Charset.Length == 0 || media.Charset.Equals("utf-8", StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>Reads at most <see cref="MaxBodyBytes"/>; null when the body is larger (chunked uploads have no Content-Length).</summary>
-    private static async Task<byte[]?> ReadBodyAsync(Stream body, CancellationToken cancellationToken)
-    {
-        using var buffer = new MemoryStream();
-        var chunk = new byte[16 * 1024];
-        int read;
-        while ((read = await body.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
-        {
-            if (buffer.Length + read > MaxBodyBytes)
-            {
-                return null;
-            }
-
-            buffer.Write(chunk, 0, read);
-        }
-
-        return buffer.ToArray();
-    }
-
-    private static IResult ValidationFailed(IReadOnlyDictionary<string, string[]> errors) =>
-        Results.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: "Request validation failed.",
-            extensions: new Dictionary<string, object?>
-            {
-                [ProblemDetailsEnricher.CodeKey] = ProblemCodes.ValidationFailed,
-                ["errors"] = errors,
-            });
-
-    private static IResult TooLarge() =>
-        Problem(StatusCodes.Status413PayloadTooLarge, "Request body must be at most 1 MiB.", ProblemCodes.PayloadTooLarge);
-
-    private static IResult Problem(int status, string title, string code) =>
-        Results.Problem(statusCode: status, title: title, extensions: new Dictionary<string, object?> { [ProblemDetailsEnricher.CodeKey] = code });
-
-    private static IResult BadRequest(string title) =>
-        Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: title);
 }
