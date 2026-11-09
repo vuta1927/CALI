@@ -171,7 +171,9 @@ public enum WorkoutReducer {
             key: c.key,
             status: c.status,
             prescribed: PrescribedSnapshot(spec),
-            actual: SetActuals(reps: c.actualReps, holdMs: c.actualHoldMs, workMs: c.actualWorkMs, restMs: c.actualRestMs, rpe: c.rpe, note: c.note, loadKg: c.actualLoadKg),
+            actual: SetActuals(reps: c.actualReps, holdMs: c.actualHoldMs, workMs: c.actualWorkMs, restMs: c.actualRestMs, rpe: c.rpe, note: c.note, loadKg: c.actualLoadKg,
+                               distanceMeters: c.actualDistanceMeters, durationSeconds: c.actualDurationSeconds,
+                               source: spec.target.running == nil ? nil : .manual),
             endReason: draft.endReason,
             skipReason: nil,
             confirmedAt: now,
@@ -297,6 +299,16 @@ public enum WorkoutReducer {
             }
         }
 
+        // CON-004 (docs/03 §3.1): running values only for a running target; bounds and the completed rules
+        // (distance needs both > 0 so pace exists, duration needs time > 0) live in `RunningResult`.
+        let running = RunningResult(distanceMeters: c.actualDistanceMeters, durationSeconds: c.actualDurationSeconds)
+        if target.running != nil || running.distanceMeters != nil || running.durationSeconds != nil {
+            for issue in running.validate(snapshotTargetKind: target.type.rawValue, isCompleted: c.status == .completed) {
+                issues.append(ValidationIssue(field: "actual" + issue.field.prefix(1).uppercased() + issue.field.dropFirst(),
+                                              reason: issue.reason, detail: issue.detail))
+            }
+        }
+
         func require(_ present: Bool, _ field: String) {
             if !present { issues.append(ValidationIssue(field: field, reason: .missing, detail: "required for \(target.type.rawValue)")) }
         }
@@ -312,6 +324,7 @@ public enum WorkoutReducer {
         case .load:
             require(c.actualReps != nil, "actualReps")
             require(c.actualLoadKg != nil, "actualLoadKg")
+        case .distance, .duration: break // checked by `RunningResult` above
         }
         return issues
     }

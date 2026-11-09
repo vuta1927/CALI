@@ -12,6 +12,8 @@ struct ResultFormView: View {
     @State private var seconds: Double?
     /// CON-006: kilograms for a load set, kept exactly as entered (never rounded).
     @State private var loadKg: Decimal?
+    /// CON-004: running segment typed by hand (km + h:mm:ss); pace is shown, never stored.
+    @State private var run = RunEntry()
     @State private var rpe: Int?
     @State private var note = ""
     @State private var showSkipReasons = false
@@ -115,6 +117,16 @@ struct ResultFormView: View {
         case .load(let lo, let kg):
             KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, focused: $focused)
             RepsInput(title: "Số lần thực tế", value: $reps, hint: "Mục tiêu \(lo) lần", focused: $focused)
+        case .distance, .duration:
+            if durationUnknown {
+                Label("COAMI không đo được chính xác thời gian chặng này. Hãy nhập thời gian bạn thực sự chạy.", systemImage: "exclamationmark.triangle")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.caliWarning)
+            }
+            RunEntryFields(entry: $run, distanceOptional: target.type == .duration, focused: $focused)
+            Label("Nhập tay", systemImage: "pencil")
+                .font(.caption)
+                .foregroundStyle(Color.caliSecondary)
         }
     }
 
@@ -215,8 +227,16 @@ struct ResultFormView: View {
         }
     }
 
+    private var isRunning: Bool { target?.running != nil }
+
     private var canSave: Bool {
-        (!needsReps || reps != nil) && (!needsDuration || seconds != nil) && (!needsLoad || loadKg != nil)
+        if isRunning {
+            // Completed needs what pace (distance) or the segment (duration) requires; the domain re-checks bounds.
+            guard !run.hasInvalidTime else { return false }
+            if status == .failed { return true }
+            return (run.durationSeconds ?? 0) > 0 && (target?.type == .duration || (run.distanceMeters ?? 0) > 0)
+        }
+        return (!needsReps || reps != nil) && (!needsDuration || seconds != nil) && (!needsLoad || loadKg != nil)
     }
 
     private func prefill() {
@@ -229,6 +249,14 @@ struct ResultFormView: View {
         if case .load(let r, let kg)? = target {
             reps = r
             loadKg = kg
+        }
+        // Running: time from the measured segment, distance from the plan; both stay editable and nothing
+        // is saved until "Lưu".
+        if isRunning {
+            // Under a second measured (stopped right away) is not a time worth suggesting.
+            let measured = draft.suggestedActualMs.map { Int(($0 + 500) / 1000) }.flatMap { $0 > 0 ? $0 : nil }
+            if case .distance(let meters, _)? = target { run = RunEntry(distanceMeters: meters, durationSeconds: measured) }
+            else { run = RunEntry(distanceMeters: nil, durationSeconds: measured) }
         }
         if case .staticHold(let hold)? = target, let s = seconds, s + 0.05 < Double(hold) {
             status = .failed
@@ -245,7 +273,9 @@ struct ResultFormView: View {
             workMs: (target?.type == .timedReps || target?.type == .interval) ? ms : nil,
             rpe: rpe,
             note: note,
-            loadKg: needsLoad ? loadKg : nil
+            loadKg: needsLoad ? loadKg : nil,
+            distanceMeters: isRunning ? run.distanceMeters : nil,
+            durationSeconds: isRunning ? run.durationSeconds : nil
         )
     }
 

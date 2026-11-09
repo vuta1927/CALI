@@ -41,7 +41,21 @@ enum Fmt {
         case .interval(let work, let rest): "\(work) giây tập / \(rest) giây nghỉ"
         case .skillAttempt(let n): "\(n) lần thử"
         case .load(let reps, let kg): "\(reps) lần @ \(loadKg(kg))"
+        case .distance(let meters, let seconds):
+            seconds.map { "\(km(meters)) trong \(duration($0))" } ?? km(meters)
+        case .duration(let s): "chạy \(seconds(s))"
         }
+    }
+
+    /// "5 km", "8,25 km" (ADR-055: kilometres only, `vi` decimal comma, at most 2 decimals).
+    static func km(_ meters: Int) -> String {
+        RunningFormat.kilometers(distanceMeters: meters).replacingOccurrences(of: ",00 km", with: " km")
+    }
+
+    /// "29:00", "1:58:40" (h:mm:ss; minutes and seconds only under an hour).
+    static func duration(_ seconds: Int) -> String {
+        let s = max(seconds, 0)
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
 
     /// Kilograms with the `vi` decimal comma: "60 kg", "57,5 kg" (docs/18 §4). Display only, always kg
@@ -159,6 +173,10 @@ enum Fmt {
         case .load:
             if let r = set.reps { parts.append("\(r) lần") }
             if let kg = set.loadKg { parts.append("@ \(loadKg(kg))") }
+        case .distance, .duration:
+            if let meters = set.distanceMeters { parts.append(km(meters)) }
+            if let seconds = set.durationSeconds { parts.append(duration(seconds)) }
+            if let pace = set.pace { parts.append("· \(pace.formatted)") }
         }
         if set.status == .failed, set.target.type != .skillAttempt {
             parts.append("(chưa đạt)")
@@ -176,6 +194,8 @@ extension ExerciseType {
         case .interval: "Interval"
         case .skillAttempt: "Kỹ năng"
         case .load: "Tạ"
+        case .distance: "Quãng đường"
+        case .duration: "Thời gian chạy"
         }
     }
 
@@ -187,6 +207,8 @@ extension ExerciseType {
         case .interval: "repeat.circle"
         case .skillAttempt: "star.circle"
         case .load: "dumbbell"
+        case .distance: "figure.run"
+        case .duration: "stopwatch"
         }
     }
 
@@ -200,32 +222,43 @@ extension ExerciseType {
         case .skillAttempt: .skillAttempt(attempts: 3)
         // Conservative starting point; the plan editor steps kg by 2.5 (docs/18 §4).
         case .load: .load(reps: 5, loadKg: 20)
+        case .distance: .distance(distanceMeters: 5000, durationSeconds: nil)
+        case .duration: .duration(durationSeconds: 1200)
         }
     }
 }
 
-/// Training discipline shown as a chip (mockup `pchip`). Derived from exercise types: `load` is Gym,
-/// everything else Calisthenics. Running has no exercise type yet (IOS-016).
+/// Training discipline shown as a chip (mockup `pchip`). Derived from exercise types like db/006:
+/// `load` is Gym, `distance`/`duration` Running, everything else Calisthenics; several is Mixed.
 enum Discipline: Equatable {
-    case calisthenics, gym, mixed
+    case calisthenics, gym, running, mixed
 
     init(types: [ExerciseType]) {
-        let load = types.filter { $0 == .load }.count
-        self = load == 0 ? .calisthenics : (load == types.count ? .gym : .mixed)
+        let kinds = Set(types.map { type -> Discipline in
+            switch type {
+            case .load: .gym
+            case .distance, .duration: .running
+            default: .calisthenics
+            }
+        })
+        self = kinds.count > 1 ? .mixed : (kinds.first ?? .calisthenics)
     }
 
     var label: String {
         switch self {
         case .calisthenics: "Calisthenics"
         case .gym: "Gym"
-        case .mixed: "Calisthenics + Gym"
+        case .running: "Chạy bộ"
+        case .mixed: "Kết hợp"
         }
     }
 
     var systemImage: String {
         switch self {
         case .calisthenics: "figure.strengthtraining.functional"
-        case .gym, .mixed: "dumbbell"
+        case .gym: "dumbbell"
+        case .running: "figure.run"
+        case .mixed: "square.stack.3d.up"
         }
     }
 }

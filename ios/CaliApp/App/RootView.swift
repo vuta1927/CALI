@@ -26,6 +26,7 @@ enum AppTab: String, Hashable {
 struct RootView: View {
     @Environment(AppStore.self) private var store
     @State private var tab: AppTab = AppTab.launchTab
+    @State private var debugRacePlan: UUID?
 
     var body: some View {
         @Bindable var store = store
@@ -56,6 +57,16 @@ struct RootView: View {
                     .environment(store)
             }
         }
+        #if DEBUG
+        .task {
+            if let scenario = DebugScenario.launch { debugRacePlan = scenario.apply(to: store) }
+        }
+        .sheet(isPresented: Binding(get: { debugRacePlan != nil }, set: { if !$0 { debugRacePlan = nil } })) {
+            if let id = debugRacePlan, let plan = store.plan(id) {
+                RaceResultSheet(plan: plan, plannedDistance: 10_000).environment(store)
+            }
+        }
+        #endif
         .sheet(isPresented: welcomeBinding) {
             WelcomeView { store.updateSettings { $0.hasSeenWelcome = true } }
                 .interactiveDismissDisabled()

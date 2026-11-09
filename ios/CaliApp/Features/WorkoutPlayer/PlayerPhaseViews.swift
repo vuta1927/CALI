@@ -121,6 +121,7 @@ struct ActivePhaseView: View {
     private var openEndedHint: String {
         switch model.currentExecution?.target {
         case .skillAttempt: "Thực hiện lần thử, bấm Xong set khi kết thúc."
+        case .distance: "Chạy hết chặng rồi bấm Xong set. Thời gian chỉ để tham khảo; bạn nhập quãng đường và thời gian ở bước sau."
         default: "Bấm Xong set khi bạn hoàn thành số lần."
         }
     }

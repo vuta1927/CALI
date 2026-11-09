@@ -176,6 +176,72 @@ final class ValidationTests: XCTestCase {
         XCTAssertEqual(issues.map(\.reason), [.notAllowed])
     }
 
+    /// IOS-014 (CON-004): running segments take distance/time by hand, `source = manual`, pace derived.
+    func testRunningActuals() {
+        let h = Harness()
+        let spec = ExecutionSpec(id: uuid(9400), exerciseId: uuid(7400), catalogVersion: 1, setCount: 1,
+                                 target: .distance(distanceMeters: 1000, durationSeconds: 290), restSeconds: 120)
+        h.send(h.create([spec]))
+        h.send(h.startSet(countdown: 0))
+        XCTAssertNil(h.s.phaseDeadlineAt, "a distance segment ends when the user stops")
+        h.send(h.stopSet())
+        let key = h.s.currentSetKey!
+        func confirm(_ meters: Int?, _ seconds: Int?, status: SetStatus = .completed) -> [String] {
+            let c = ConfirmSet(commandId: h.freshId(), setResultId: h.freshId(), executionId: key.executionId, setIndex: key.setIndex,
+                               status: status, actualDistanceMeters: meters, actualDurationSeconds: seconds)
+            guard case .validationFailed(let issues)? = h.reject(.confirmSet(c)) else { return [] }
+            return fields(issues)
+        }
+        XCTAssertEqual(confirm(0, 290), ["actualDistanceMeters"], "pace needs a distance")
+        XCTAssertEqual(confirm(1000, 0), ["actualDurationSeconds"], "pace needs a time")
+        XCTAssertEqual(confirm(1000, nil), ["actualDurationSeconds"])
+        XCTAssertEqual(confirm(1000, 86_401), ["actualDurationSeconds"], "over 24 h is rejected")
+        XCTAssertEqual(confirm(1_000_001, 290), ["actualDistanceMeters"])
+        XCTAssertEqual(h.s.phase, .awaitingResult)
+        let t = h.send(.confirmSet(ConfirmSet(commandId: h.freshId(), setResultId: h.freshId(), executionId: key.executionId, setIndex: key.setIndex,
+                                              actualDistanceMeters: 1000, actualDurationSeconds: 86_400)))
+        let actual = t.setRecords.first?.actual
+        XCTAssertEqual(actual?.distanceMeters, 1000)
+        XCTAssertEqual(actual?.durationSeconds, 86_400)
+        XCTAssertEqual(actual?.source, .manual)
+        XCTAssertEqual(actual?.pace?.formatted, "24:00:00/km")
+
+        let timed = Harness()
+        let segment = ExecutionSpec(id: uuid(9401), exerciseId: uuid(7401), catalogVersion: 1, setCount: 1,
+                                    target: .duration(durationSeconds: 300), restSeconds: 120)
+        timed.send(timed.create([segment]))
+        timed.send(timed.startSet(countdown: 0))
+        XCTAssertNotNil(timed.s.phaseDeadlineAt, "a timed segment gets an end prompt, never an automatic result")
+        timed.send(timed.stopSet())
+        let k = timed.s.currentSetKey!
+        let noTime = ConfirmSet(commandId: timed.freshId(), setResultId: timed.freshId(), executionId: k.executionId, setIndex: k.setIndex,
+                                actualDistanceMeters: 1200)
+        guard case .validationFailed(let missing)? = timed.reject(.confirmSet(noTime)) else { return XCTFail("duration needs a time") }
+        XCTAssertEqual(fields(missing), ["actualDurationSeconds"])
+        let ok = timed.send(.confirmSet(ConfirmSet(commandId: timed.freshId(), setResultId: timed.freshId(), executionId: k.executionId,
+                                                   setIndex: k.setIndex, actualDurationSeconds: 300)))
+        XCTAssertNil(ok.setRecords.first?.actual.pace, "distance is optional for a timed segment")
+
+        let other = Harness()
+        other.toAwaitingResult()
+        let hold = other.s.currentSetKey!
+        let wrong = ConfirmSet(commandId: other.freshId(), setResultId: other.freshId(), executionId: hold.executionId, setIndex: hold.setIndex,
+                               actualHoldMs: 10_000, actualDistanceMeters: 500)
+        guard case .validationFailed(let issues)? = other.reject(.confirmSet(wrong)) else { return XCTFail("distance on a hold set") }
+        XCTAssertEqual(issues.map(\.field), ["actualDistanceMeters"])
+        XCTAssertEqual(issues.map(\.reason), [.notAllowed])
+    }
+
+    func testRunningPrescriptionRoundTripsWithContractKeys() throws {
+        let target = Prescription.distance(distanceMeters: 5000, durationSeconds: nil)
+        let json = String(decoding: try DomainJSON.makeEncoder().encode(target), as: UTF8.self)
+        XCTAssertTrue(json.contains("\"kind\":\"distance\""), json)
+        XCTAssertFalse(json.contains("durationSeconds"), json)
+        XCTAssertEqual(try DomainJSON.makeDecoder().decode(Prescription.self, from: Data(json.utf8)), target)
+        XCTAssertEqual(Prescription.duration(durationSeconds: 0).validate().map(\.field), ["target.durationSeconds"])
+        XCTAssertEqual(Prescription.distance(distanceMeters: 500_001, durationSeconds: nil).validate().map(\.field), ["target.distanceMeters"])
+    }
+
     func testReasonLengthLimit() {
         let h = Harness()
         h.toReady()

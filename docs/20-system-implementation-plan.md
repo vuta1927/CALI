@@ -167,6 +167,12 @@ flowchart TB
 > - **Hoãn:** lịch nhắc MP-13 (contract chưa có giờ nhắc cho từng buổi). Độ dài lộ trình, bắt đầu muộn và phase chờ CON-005/IOS-015, nên giáo án theo tuần chưa có "Tuần x/y" và không tự hết lộ trình. Kết quả thi chờ IOS-014. Bộ lọc lịch sử theo giáo án chờ IOS-017. "Từ mẫu" chỉ có giáo án mẫu đi kèm app.
 > - **Bằng chứng:** `evidence/IOS-013/README.md`. CaliCore 43/43, app XCTest 35/35 trên iPhone 15.
 
+> **Trạng thái IOS-014 (2026-11-09):** code và test xong, chờ review.
+> - **P6 bài chạy:** nhập km + giờ/phút/giây, pace tự tính và không lưu; kết quả lưu với `source = manual`. Biên CON-004: 0 hoặc hơn 24 giờ bị từ chối.
+> - **MP-07 "Ghi kết quả thi":** có từ ngày sự kiện. Lưu thành một buổi `distance` đã hoàn thành, gắn với buổi của ngày thi, trong một transaction kèm audit; lặp lệnh không ghi thêm.
+> - **Hoãn:** ghi lùi ngày (ADR-054 chưa có field trong contract nên kết quả mang ngày nhập), đánh dấu mục tiêu đạt (IOS-015), nhập từ Apple Health.
+> - **Bằng chứng:** `evidence/IOS-014/README.md`.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

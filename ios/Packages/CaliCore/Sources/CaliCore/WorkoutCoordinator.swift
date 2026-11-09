@@ -115,6 +115,40 @@ public final class WorkoutCoordinator: Sendable {
         }
     }
 
+    /// A whole session entered by hand (IOS-014 race result, MP-07): `commands` must create, run and finish
+    /// one session. They run in one transaction with `audit`; if any is refused nothing is written and
+    /// the refusing result is returned. Repeating the call (same first commandId) replays its outcome.
+    public func recordSession(_ commands: [Command], sessionTitle: String, audit: AuditEntry? = nil) throws -> HandleResult {
+        guard let first = commands.first, case .createSession = first else {
+            preconditionFailure("recordSession needs createSession first")
+        }
+        do {
+            return try writer.immediateTransaction { db in
+                if let replay = try self.replay(db, commandId: first.commandId) { return replay }
+                var state = try Self.loadActive(db)
+                var last: HandleResult?
+                let now = self.clock.now()
+                for command in commands {
+                    let result = try self.apply(db, state: state, command: command, now: now, sessionTitle: sessionTitle)
+                    guard result.outcome.status == .applied else { throw ManualSessionRefused(result: result) }
+                    state = result.state
+                    last = result
+                }
+                guard let last, last.state?.phase.isTerminal == true else {
+                    preconditionFailure("recordSession commands must end the session")
+                }
+                if let audit { try ContentStore.insertAudit(db, audit) }
+                return last
+            }
+        } catch let refused as ManualSessionRefused {
+            return refused.result
+        }
+    }
+
+    private struct ManualSessionRefused: Error {
+        let result: HandleResult
+    }
+
     /// Entry point for Live Activity buttons. The `commandId` is derived from (session, rendered revision,
     /// action), so taps on the same rendered snapshot deduplicate; a snapshot older than the durable state
     /// is rejected as `stale_view` instead of acting on a set the user is no longer looking at.
@@ -324,7 +358,8 @@ public final class WorkoutCoordinator: Sendable {
             case .staticHold: confirm.actualHoldMs = suggested
             case .interval: confirm.actualWorkMs = suggested
             // Load (CON-006) needs the user's reps and kg: never filled in from the Lock Screen.
-            case .reps, .timedReps, .skillAttempt, .load: return .failure(Refusal(code: "needs_app"))
+            // Running (CON-004) is entered by hand in the app: distance and time are never inferred.
+            case .reps, .timedReps, .skillAttempt, .load, .distance, .duration: return .failure(Refusal(code: "needs_app"))
             }
             return .success(.confirmSet(confirm))
         }

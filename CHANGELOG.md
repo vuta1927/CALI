@@ -1,6 +1,27 @@
 # Changelog
 
 ## Unreleased
+- IOS-014 running results (iOS only; CON-004 is already accepted, no API/contract change).
+  - **Domain:**
+    - `ExerciseType`/`Prescription` gain `distance` (1..500000 m, optional goal time) and `duration` (1..86400 s), with the contract keys.
+    - `ConfirmSet` and `SetActuals` carry `distanceMeters` and `durationSeconds`, checked by `RunningResult.validate` (0..1000000 m, 0..86400 s; a completed set needs values > 0).
+    - Running actuals are stored with `source = manual`. Pace is derived, never stored.
+    - A duration segment has a countdown prompt; a distance segment is open-ended. Live Activity confirm refuses running sets (`needs_app`).
+  - **CaliCore:**
+    - `WorkoutCoordinator.recordSession` writes a whole hand-entered session plus its audit row in one transaction; any refused step rolls everything back.
+    - `ContentStore.insertMissingExercises` adds new bundled exercises to existing installs without touching edited rows.
+  - **UI:**
+    - P6 running form (`RunEntryFields`): km with a decimal comma or point, giờ/phút/giây, live "Pace (tự tính)", a "Nhập tay" chip. The time is prefilled from the measured segment; nothing is saved before Lưu.
+    - The workout editor edits km, goal time and duration.
+    - MP-07 "Ghi kết quả thi" from the event day on: km is locked to the event distance. It creates one completed `distance` session linked to the event-day workout, and the plan stays as it is.
+    - Session detail shows km, time and pace.
+    - Bundled exercises "Chạy nhẹ" (easy-run) and "Chạy theo thời gian" (timed-run).
+    - DEBUG-only `-uiScenario run|race` (in-memory store) for screenshots.
+  - **Deferred:**
+    - Backfill dates for a race result (ADR-054 has no contract fields; the result is dated the day it is entered).
+    - Marking the goal as reached (IOS-015).
+    - Apple Health import.
+  - **Tests:** CaliDomain 93/93, CaliCore 46/46 (new `ManualRunningTests`), app XCTest 40/40 on the iPhone 15 and the simulator (new `RunningResultTests`). Evidence is in `evidence/IOS-014/`.
 - IOS-013 multi-plan local (iOS only, no API/contract change).
   - **Store:** `AppStore` holds every plan lineage (`plans`). New `AppStore+Plans.swift` holds the lifecycle commands: create (blank, bundled template or clone), start/resume, pause, end with reason and note, extend, archive/unarchive, soft delete, rename, plus per-plan workout edits. Each command carries a `commandId` (a repeat is a no-op) and writes one audit row.
   - **Rules:**

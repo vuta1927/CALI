@@ -32,6 +32,9 @@ enum MockData {
     static let mountainClimber = id("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6")
     static let plank = id("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb7")
     static let australianRow = id("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb8")
+    // IOS-014 running (ids and slugs from fixtures/exercise_catalog.json).
+    static let easyRun = id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7")
+    static let timedRun = id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8")
 
     static let catalog: [Exercise] = [
         Exercise(
@@ -131,6 +134,20 @@ enum MockData {
             cues: ["Ngực chạm xà", "Thân thẳng"],
             mistakes: ["Hông chảy xuống", "Kéo bằng cổ"],
             catalogVersion: catalogVersion, symbol: "figure.rower", paletteIndex: 0
+        ),
+        Exercise(
+            id: easyRun, slug: "easy-run", name: "Chạy nhẹ", type: .distance, level: .beginner,
+            equipment: [], muscles: ["Tim mạch", "Bắp chân", "Đùi"],
+            cues: ["Giữ nhịp thở đều", "Bước ngắn, tiếp đất nhẹ"],
+            mistakes: ["Chạy quá nhanh ngay từ đầu", "Sải bước quá dài"],
+            catalogVersion: catalogVersion, symbol: "figure.run", paletteIndex: 1
+        ),
+        Exercise(
+            id: timedRun, slug: "timed-run", name: "Chạy theo thời gian", type: .duration, level: .beginner,
+            equipment: [], muscles: ["Tim mạch", "Bắp chân", "Đùi"],
+            cues: ["Chạy ở mức nói chuyện được", "Thả lỏng vai"],
+            mistakes: ["Gồng vai", "Nín thở khi tăng tốc"],
+            catalogVersion: catalogVersion, symbol: "figure.run.circle", paletteIndex: 4
         ),
     ]
 
@@ -253,6 +270,12 @@ enum MockData {
                     // Exhaustiveness only: the sample plan has no load exercise, so no load history is generated.
                     set.reps = r
                     set.loadKg = kg
+                case .distance(let meters, let seconds):
+                    // Exhaustiveness only: the sample plan has no running exercise.
+                    set.distanceMeters = meters
+                    set.durationSeconds = seconds ?? 1800
+                case .duration(let seconds):
+                    set.durationSeconds = seconds
                 }
                 if variant == 1, exerciseIndex == 0, setIndex == item.setCount {
                     set.status = .skipped

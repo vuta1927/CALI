@@ -48,6 +48,7 @@ final class AppStore {
         let loaded: LocalContent
         do {
             try self.database.content.seedIfEmpty(AppDatabase.seed(now: now), now: now)
+            try self.database.content.insertMissingExercises(MockData.catalog, now: now)
             loaded = try self.database.content.load()
         } catch {
             openError = "Không đọc được dữ liệu trên máy (\(error.localizedDescription))."
@@ -168,6 +169,11 @@ final class AppStore {
             alertMessage = "Không lưu được thao tác trên máy. Hãy thử lại. (\(error.localizedDescription))"
             return nil
         }
+    }
+
+    /// A whole session entered by hand, written in one transaction with its audit row (race result).
+    func recordSession(_ commands: [Command], sessionTitle: String, audit: AuditEntry) throws -> HandleResult {
+        try database.coordinator.recordSession(commands, sessionTitle: sessionTitle, audit: audit)
     }
 
     /// Persists deadline-derived transitions (countdown over, target reached, rest over). Called from the
@@ -293,7 +299,7 @@ final class AppStore {
         }
     }
 
-    private func reloadContent() {
+    func reloadContent() {
         guard let loaded = try? database.content.load() else { return }
         catalog = loaded.catalog
         plans = loaded.plans

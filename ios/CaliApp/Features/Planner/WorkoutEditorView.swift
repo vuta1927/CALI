@@ -142,6 +142,24 @@ private struct PlannedExerciseEditor: View {
                     onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + 2.5)) },
                     onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - 2.5)) })
             Stepper("Số lần: \(reps)", value: binding(reps) { .load(reps: $0, loadKg: kg) }, in: 1...50)
+        case .distance(let meters, let goal):
+            // CON-004: 1..500 km per segment in 0,5 km steps; goal time optional (pace is shown, never stored).
+            Stepper("Quãng đường: \(Fmt.km(meters))", value: binding(meters) { .distance(distanceMeters: $0, durationSeconds: goal) },
+                    in: 500...500_000, step: 500)
+            Toggle("Thời gian mục tiêu", isOn: Binding(
+                get: { goal != nil },
+                set: { item.target = .distance(distanceMeters: meters, durationSeconds: $0 ? max(60, meters * 6 / 10) : nil) }
+            ))
+            if let goal {
+                Stepper("Mục tiêu: \(Fmt.duration(goal))", value: binding(goal) { .distance(distanceMeters: meters, durationSeconds: $0) },
+                        in: 30...86_400, step: 30)
+                if case .success(let pace) = Pace.derive(distanceMeters: meters, durationSeconds: goal) {
+                    Text("Pace mục tiêu \(pace.formatted)").font(.caption).foregroundStyle(Color.caliSecondary)
+                }
+            }
+        case .duration(let seconds):
+            Stepper("Thời gian: \(Fmt.duration(seconds))", value: binding(seconds) { .duration(durationSeconds: $0) },
+                    in: 60...86_400, step: 60)
         }
     }
 

@@ -128,7 +128,12 @@ public struct PlannedWorkout: Identifiable, Codable, Hashable, Sendable {
     /// Rough duration: work + rest + ~20 s setup per set.
     public var estimatedMinutes: Int {
         let seconds = exercises.reduce(0) { total, item in
-            let work = item.target.targetDurationSeconds ?? 40
+            let work: Int
+            switch item.target {
+            // A distance segment: its goal time, else an easy 6:00/km (estimate only, shown with "~").
+            case .distance(let meters, let goal): work = goal ?? meters * 360 / 1000
+            default: work = item.target.targetDurationSeconds ?? 40
+            }
             return total + item.setCount * (work + 20) + max(item.setCount - 1, 0) * item.restSeconds
         }
         return max(1, Int((Double(seconds) / 60).rounded()))
@@ -270,11 +275,14 @@ public struct LoggedSet: Identifiable, Codable, Hashable, Sendable {
     public var skipReason: String?
     /// CON-006 (ADR-046/062): kilograms lifted for a load set; nil otherwise and for older snapshots.
     public var loadKg: Decimal? = nil
+    /// CON-004: running segment entered by hand; pace is derived (`pace`), never stored.
+    public var distanceMeters: Int? = nil
+    public var durationSeconds: Int? = nil
 
     public init(
         id: UUID, exerciseId: UUID, setIndex: Int, status: SetStatus, target: Prescription, reps: Int? = nil,
         holdMs: Int64? = nil, workMs: Int64? = nil, rpe: Int? = nil, note: String? = nil, skipReason: String? = nil,
-        loadKg: Decimal? = nil
+        loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil
     ) {
         self.id = id
         self.exerciseId = exerciseId
@@ -288,6 +296,12 @@ public struct LoggedSet: Identifiable, Codable, Hashable, Sendable {
         self.note = note
         self.skipReason = skipReason
         self.loadKg = loadKg
+        self.distanceMeters = distanceMeters
+        self.durationSeconds = durationSeconds
+    }
+
+    public var pace: Pace? {
+        SetActuals(distanceMeters: distanceMeters, durationSeconds: durationSeconds).pace
     }
 }
 
@@ -305,7 +319,9 @@ extension LoggedSet {
             rpe: record.actual.rpe,
             note: record.actual.note,
             skipReason: record.skipReason,
-            loadKg: record.actual.loadKg
+            loadKg: record.actual.loadKg,
+            distanceMeters: record.actual.distanceMeters,
+            durationSeconds: record.actual.durationSeconds
         )
     }
 }

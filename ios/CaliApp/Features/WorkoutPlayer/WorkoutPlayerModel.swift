@@ -119,7 +119,8 @@ final class WorkoutPlayerModel {
         send(.abandonSession(AbandonSession(commandId: UUID(), reason: reason)))
     }
 
-    func confirm(status: SetStatus, reps: Int?, holdMs: Int64?, workMs: Int64?, rpe: Int?, note: String?, loadKg: Decimal? = nil) {
+    func confirm(status: SetStatus, reps: Int?, holdMs: Int64?, workMs: Int64?, rpe: Int?, note: String?, loadKg: Decimal? = nil,
+                 distanceMeters: Int? = nil, durationSeconds: Int? = nil) {
         guard let key = state.pendingResult?.key else { return }
         let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         send(.confirmSet(ConfirmSet(
@@ -133,7 +134,9 @@ final class WorkoutPlayerModel {
             actualWorkMs: workMs,
             rpe: rpe,
             note: (trimmed?.isEmpty ?? true) ? nil : trimmed,
-            actualLoadKg: loadKg
+            actualLoadKg: loadKg,
+            actualDistanceMeters: distanceMeters,
+            actualDurationSeconds: durationSeconds
         )))
     }
 
@@ -286,6 +289,8 @@ final class WorkoutPlayerModel {
         case "actualHoldMs": "cần nhập thời gian giữ"
         case "actualWorkMs": "cần nhập thời gian tập"
         case "actualLoadKg": "cần nhập mức tạ từ 0 đến 1000 kg, tối đa 2 chữ số thập phân"
+        case "actualDistanceMeters": "cần nhập quãng đường lớn hơn 0, tối đa 1000 km"
+        case "actualDurationSeconds": "cần nhập thời gian lớn hơn 0, tối đa 24 giờ"
         case "rpe": "RPE phải từ 1 đến 10"
         case "note": "ghi chú quá dài"
         case "seconds": "thời gian nghỉ vượt giới hạn"

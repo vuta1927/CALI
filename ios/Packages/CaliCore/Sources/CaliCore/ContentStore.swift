@@ -119,6 +119,20 @@ public final class ContentStore: Sendable {
         }
     }
 
+    /// Adds bundled exercises that this database has never had (a newer app version ships more), so an
+    /// existing install gets them without a reset. Rows that exist, including the user's edits, are never
+    /// touched. Returns how many were added.
+    @discardableResult
+    public func insertMissingExercises(_ exercises: [Exercise], now: Date = Date()) throws -> Int {
+        try writer.immediateTransaction { db in
+            guard try Self.isInitialized(db) else { return 0 }
+            let existing = Set(try String.fetchAll(db, sql: "SELECT id FROM exercises"))
+            let missing = exercises.filter { !existing.contains(DBText.id($0.id)) }
+            if !missing.isEmpty { try Self.write(db, ContentChange(exercises: missing), now: now, timeZone: .current) }
+            return missing.count
+        }
+    }
+
     /// Writes the seed when the database has no content yet. Returns `false` (and writes nothing) otherwise.
     @discardableResult
     public func seedIfEmpty(_ seed: ContentSeed, now: Date = Date(), timeZone: TimeZone = .current) throws -> Bool {
@@ -313,6 +327,7 @@ public final class ContentStore: Sendable {
     static func discipline(for type: ExerciseType) -> String {
         switch type {
         case .load: "gym"
+        case .distance, .duration: "running"
         case .staticHold, .reps, .timedReps, .interval, .skillAttempt: "calisthenics"
         }
     }

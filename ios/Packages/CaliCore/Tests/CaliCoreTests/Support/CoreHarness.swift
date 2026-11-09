@@ -100,6 +100,10 @@ final class CoreFixture {
         case .load(_, let kg):
             c.actualReps = reps
             c.actualLoadKg = kg
+        case .distance(let meters, _):
+            c.actualDistanceMeters = meters
+            c.actualDurationSeconds = 300
+        case .duration(let seconds): c.actualDurationSeconds = seconds
         }
         return .confirmSet(c)
     }

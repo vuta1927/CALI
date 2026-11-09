@@ -18,6 +18,7 @@ struct PlanDetailView: View {
     @State private var newWorkout: PlannedWorkout?
     @State private var starting = false
     @State private var cloning: PlanDraft?
+    @State private var recordingRace = false
 
     var body: some View {
         if let plan = store.plan(lineageId), plan.deletedAt == nil {
@@ -40,6 +41,9 @@ struct PlanDetailView: View {
                 } else {
                     statusCard(plan, status: status)
                 }
+                if store.canRecordRaceResult(plan, now: now) || !store.raceResults(of: plan).isEmpty {
+                    RaceResultCard(plan: plan, canRecord: store.canRecordRaceResult(plan, now: now)) { recordingRace = true }
+                }
                 if status == .active { weekSection(plan, now: now) }
                 schedule(plan, now: now, editable: editable)
                 SampleFooter(showsSample: store.showsSampleData)
@@ -57,6 +61,11 @@ struct PlanDetailView: View {
         .sheet(isPresented: $ending) { EndPlanSheet(plan: plan) }
         .sheet(item: $newWorkout) { WorkoutEditorView(workout: $0, lineageId: plan.lineageId) }
         .sheet(item: $cloning) { draft in PlanCreateView(initial: draft) }
+        .sheet(isPresented: $recordingRace) {
+            RaceResultSheet(plan: plan, plannedDistance: store.raceWorkout(of: plan).flatMap { pair in
+                if case .distance(let meters, _) = pair.item.target { meters } else { nil }
+            })
+        }
         .navigationDestination(isPresented: $starting) { PlanStartView(lineageId: plan.lineageId) }
         .confirmationDialog("Xoá \"\(plan.title)\"?", isPresented: $deleting, titleVisibility: .visible) {
             Button("Xoá giáo án", role: .destructive) { if store.deletePlan(plan.lineageId) { dismiss() } }
@@ -273,7 +282,6 @@ struct PlanStatusChip: View {
 }
 
 /// MP-07: the event day has passed (or the program is over). Nothing changes until the user chooses.
-// TODO(IOS-014): "Ghi kết quả thi" for event plans once running results exist.
 struct FinishedPlanCard: View {
     @Environment(AppStore.self) private var store
     let plan: WorkoutPlan
@@ -305,6 +313,52 @@ struct FinishedPlanCard: View {
                 Button("Lặp lại", action: onRepeat)
                     .buttonStyle(.caliSecondary)
                     .accessibilityHint("Tạo giáo án mới từ giáo án này")
+            }
+        }
+        .caliCard()
+    }
+}
+
+/// MP-07 (IOS-014): the event day has come; record the official result, entered by hand.
+struct RaceResultCard: View {
+    @Environment(AppStore.self) private var store
+    let plan: WorkoutPlan
+    let canRecord: Bool
+    let onRecord: () -> Void
+
+    var body: some View {
+        let results = store.raceResults(of: plan)
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            Label("Kết quả thi", systemImage: "medal")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
+            if results.isEmpty {
+                Text("Nhập quãng đường và thời gian chính thức. Pace được tự tính.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.caliSecondary)
+            }
+            ForEach(results) { session in
+                if let set = session.sets.first(where: { $0.distanceMeters != nil }) {
+                    NavigationLink { SessionDetailView(session: session) } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(Fmt.actual(set)).font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(Color.caliText)
+                                Text(Fmt.fullDate(session.finishedAt)).font(.caption).foregroundStyle(Color.caliSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(Color.caliSecondary)
+                        }
+                        .frame(minHeight: minTapTarget)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if canRecord && results.isEmpty {
+                Button("Ghi kết quả thi", systemImage: "square.and.pencil", action: onRecord)
+                    .buttonStyle(.caliPrimary)
+            } else if canRecord {
+                Button("Ghi thêm kết quả", systemImage: "square.and.pencil", action: onRecord)
+                    .buttonStyle(.caliSecondary)
             }
         }
         .caliCard()

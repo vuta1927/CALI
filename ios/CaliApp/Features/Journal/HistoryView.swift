@@ -426,8 +426,14 @@ struct SessionDetailView: View {
                 }
                 HStack(spacing: Spacing.m) {
                     StatTile(value: "\(session.completedSetCount)/\(session.plannedSetCount)", label: "Set đạt", systemImage: "checkmark.circle", tint: .caliAccent)
-                    StatTile(value: "\(session.skippedSetCount)", label: "Bỏ qua", systemImage: "forward")
-                    StatTile(value: "\(session.durationMinutes)", label: "Phút", systemImage: "clock")
+                    if let meters = runningMeters {
+                        // Running (CON-004): the distance and time the user entered, not the wall-clock span.
+                        StatTile(value: Fmt.km(meters), label: "Quãng đường", systemImage: "figure.run", tint: .caliAccent)
+                        StatTile(value: Fmt.duration(runningSeconds), label: "Thời gian chạy", systemImage: "stopwatch")
+                    } else {
+                        StatTile(value: "\(session.skippedSetCount)", label: "Bỏ qua", systemImage: "forward")
+                        StatTile(value: "\(session.durationMinutes)", label: "Phút", systemImage: "clock")
+                    }
                 }
                 ForEach(exerciseOrder, id: \.self) { exerciseId in
                     ExerciseResultCard(exercise: store.exercise(exerciseId),
@@ -444,10 +450,19 @@ struct SessionDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// "Thứ Sáu, 6/11/2026 · 07:30 – 08:28"
+    private var runningSets: [LoggedSet] { session.sets.filter { $0.status != .skipped && $0.target.running != nil } }
+    private var runningMeters: Int? {
+        let meters = runningSets.compactMap(\.distanceMeters)
+        return meters.isEmpty ? nil : meters.reduce(0, +)
+    }
+    private var runningSeconds: Int { runningSets.compactMap(\.durationSeconds).reduce(0, +) }
+
+    /// "Thứ Sáu, 6/11/2026 · 07:30 – 08:28"; a session entered by hand afterwards (race result) has no span.
     private var caption: String {
         let year = Calendar.current.component(.year, from: session.startedAt)
-        return "\(Fmt.weekdayLong(Fmt.isoWeekday(session.startedAt))), \(Fmt.dayMonthShort(session.startedAt))/\(String(year)) · \(Fmt.time(session.startedAt)) – \(Fmt.time(session.finishedAt))"
+        let day = "\(Fmt.weekdayLong(Fmt.isoWeekday(session.startedAt))), \(Fmt.dayMonthShort(session.startedAt))/\(String(year))"
+        guard session.finishedAt.timeIntervalSince(session.startedAt) >= 60 else { return day }
+        return "\(day) · \(Fmt.time(session.startedAt)) – \(Fmt.time(session.finishedAt))"
     }
 
     private var exerciseOrder: [UUID] {
@@ -481,6 +496,19 @@ struct ExerciseResultCard: View {
                 Text("Chưa có set nào")
                     .font(.footnote)
                     .foregroundStyle(Color.caliSecondary)
+            } else if sets.first?.target.running != nil {
+                // "8,25 km 42:18 · 5:08/km" does not fit a grid cell; one row per segment.
+                ForEach(sets) { set in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Set \(set.setIndex)").font(.caption).foregroundStyle(Color.caliSecondary)
+                        Text(Fmt.actual(set)).font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(Color.caliText)
+                        Spacer(minLength: 0)
+                        if let detail = detail(set) {
+                            Text(detail).font(.caption).foregroundStyle(Color.caliSecondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: Spacing.s)], spacing: Spacing.s) {
                     ForEach(sets) { set in

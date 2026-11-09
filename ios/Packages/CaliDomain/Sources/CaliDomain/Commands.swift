@@ -66,11 +66,15 @@ public struct ConfirmSet: Codable, Equatable, Sendable {
     public var note: String?
     /// CON-006 (ADR-062): kilograms lifted; only for a load target, required when it is one.
     public var actualLoadKg: Decimal?
+    /// CON-004: running segment values entered by hand (pace is derived, never sent).
+    public var actualDistanceMeters: Int?
+    public var actualDurationSeconds: Int?
 
     public init(
         commandId: UUID, setResultId: UUID, executionId: UUID, setIndex: Int, status: SetStatus = .completed,
         actualReps: Int? = nil, actualHoldMs: Int64? = nil, actualWorkMs: Int64? = nil, actualRestMs: Int64? = nil,
-        rpe: Int? = nil, note: String? = nil, actualLoadKg: Decimal? = nil
+        rpe: Int? = nil, note: String? = nil, actualLoadKg: Decimal? = nil,
+        actualDistanceMeters: Int? = nil, actualDurationSeconds: Int? = nil
     ) {
         self.commandId = commandId
         self.setResultId = setResultId
@@ -84,6 +88,8 @@ public struct ConfirmSet: Codable, Equatable, Sendable {
         self.rpe = rpe
         self.note = note
         self.actualLoadKg = actualLoadKg
+        self.actualDistanceMeters = actualDistanceMeters
+        self.actualDurationSeconds = actualDurationSeconds
     }
 
     public var key: SetKey { SetKey(executionId: executionId, setIndex: setIndex) }

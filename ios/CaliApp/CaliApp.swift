@@ -5,13 +5,21 @@ import SwiftUI
 // (tests use `@testable import CaliApp`).
 @main
 struct CaliAppMain: App {
-    @State private var store = AppStore(persists: !CaliAppMain.isRunningTests)
+    @State private var store = AppStore(persists: !CaliAppMain.isRunningTests && !CaliAppMain.isDebugScenario)
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(store)
         }
+    }
+
+    private static var isDebugScenario: Bool {
+        #if DEBUG
+        DebugScenario.launch != nil
+        #else
+        false
+        #endif
     }
 
     /// Unit tests are hosted in the app; keep them away from the user's local database.

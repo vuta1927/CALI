@@ -360,6 +360,79 @@ extension AppStore {
         return commitContent(ContentChange(plans: [plan]), action: "Sửa giáo án", detail: title, commandId: commandId, now: now)
     }
 
+    // MARK: Race result (IOS-014, MP-07)
+
+    /// "Ghi kết quả thi" is offered from the event day on, while the plan is followed or paused.
+    func canRecordRaceResult(_ plan: WorkoutPlan, now: Date = Date()) -> Bool {
+        guard plan.kind == .event, let days = daysUntilEvent(plan, now: now), days <= 0 else { return false }
+        return [.active, .paused].contains(status(of: plan, now: now))
+    }
+
+    /// The running workout planned on the event day, which the result is attached to (docs/19 MP-07).
+    func raceWorkout(of plan: WorkoutPlan) -> (workout: PlannedWorkout, item: PlannedExercise)? {
+        guard let eventDate = plan.eventDate,
+              let workout = plan.workouts.first(where: { $0.weekday == eventDate.isoWeekday && $0.exercises.contains { $0.target.type == .distance } }),
+              let item = workout.exercises.first(where: { $0.target.type == .distance }) else { return nil }
+        return (workout, item)
+    }
+
+    /// Saves the official result as one completed `distance` session entered by hand (`source = manual`):
+    /// the session, its set and the audit row are written in one transaction. Nothing else changes; the
+    /// plan stays as it is until the user ends, extends or repeats it (D6).
+    // TODO(IOS-015): offer to mark the milestone goal as reached, only when the user confirms.
+    @discardableResult
+    func recordRaceResult(_ lineageId: UUID, distanceMeters: Int, durationSeconds: Int, now: Date = Date(),
+                          commandId: UUID = UUID()) -> Bool {
+        if audit.contains(where: { $0.id == commandId }) { return true }
+        guard let plan = plan(lineageId), canRecordRaceResult(plan, now: now) else {
+            return refuse("Chỉ ghi kết quả thi từ ngày sự kiện, khi giáo án chưa kết thúc.")
+        }
+        if case .failure(let issue) = Pace.derive(distanceMeters: distanceMeters, durationSeconds: durationSeconds) {
+            return refuse(issue.field == "durationSeconds" ? "Thời gian phải lớn hơn 0 và tối đa 24 giờ." : "Quãng đường phải lớn hơn 0 và tối đa 1000 km.")
+        }
+        if let player, player.state.isActive {
+            return refuse("Bạn đang có buổi \"\(player.title)\" chưa kết thúc. Hãy kết thúc buổi đó trước.")
+        }
+        let linked = raceWorkout(of: plan)
+        let exerciseId = linked?.item.exerciseId ?? MockData.easyRun
+        let target = linked?.item.target ?? .distance(distanceMeters: distanceMeters, durationSeconds: nil)
+        let sessionId = UUID()
+        let execution = ExecutionSpec(id: UUID(), plannedExerciseId: linked?.item.id, exerciseId: exerciseId,
+                                      catalogVersion: exercise(exerciseId)?.catalogVersion ?? MockData.catalogVersion,
+                                      setCount: 1, target: target, restSeconds: 0)
+        let commands: [Command] = [
+            .createSession(CreateSession(commandId: commandId, sessionId: sessionId, plannedWorkoutId: linked?.workout.id, executions: [execution])),
+            .startSet(StartSet(commandId: UUID(), countdownSeconds: 0)),
+            .stopSet(SimpleCommand(commandId: UUID())),
+            .confirmSet(ConfirmSet(commandId: UUID(), setResultId: UUID(), executionId: execution.id, setIndex: 1,
+                                   actualDistanceMeters: distanceMeters, actualDurationSeconds: durationSeconds)),
+            .finishSession(SimpleCommand(commandId: UUID())),
+        ]
+        let title = "Kết quả thi · \(plan.eventName ?? plan.title)"
+        let entry = AuditEntry(id: commandId, at: now, action: "Ghi kết quả thi",
+                               detail: "\(plan.title) · \(Fmt.km(distanceMeters)) · \(Fmt.duration(durationSeconds))")
+        do {
+            let result = try recordSession(commands, sessionTitle: title, audit: entry)
+            guard result.outcome.status == .applied || result.replayed else {
+                return refuse("Không ghi được kết quả thi: \(result.error.map(WorkoutPlayerModel.message(for:)) ?? (result.outcome.errorCode ?? "-"))")
+            }
+        } catch {
+            return refuse("Không lưu được kết quả thi trên máy. Hãy thử lại. (\(error.localizedDescription))")
+        }
+        reloadContent()
+        return true
+    }
+
+    /// Race results already saved for this plan, newest first. A result is linked through the event-day
+    /// workout; without one the session has no plan link, so it is matched by the title it was saved with.
+    func raceResults(of plan: WorkoutPlan) -> [CompletedSession] {
+        let prefix = "Kết quả thi · "
+        return history.filter { session in
+            session.status == .completed && session.title.hasPrefix(prefix)
+                && (session.planLineageId == plan.lineageId || session.title == prefix + (plan.eventName ?? plan.title))
+        }
+    }
+
     // MARK: Helpers
 
     /// Pause / end preconditions plus the activation change (docs/19 §4.3).

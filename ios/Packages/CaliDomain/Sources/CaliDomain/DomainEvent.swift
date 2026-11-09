@@ -30,8 +30,14 @@ public struct SetActuals: Codable, Equatable, Hashable, Sendable {
     public var note: String?
     /// CON-006: `set_results.actual_load_kg` (kg).
     public var loadKg: Decimal?
+    /// CON-004: `set_results.distance_meters` / `duration_seconds`, entered by hand.
+    public var distanceMeters: Int?
+    public var durationSeconds: Int?
+    /// CON-004: where running values came from; only `manual` until Apple Health (ADR-043).
+    public var source: ResultSource?
 
-    public init(reps: Int? = nil, holdMs: Int64? = nil, workMs: Int64? = nil, restMs: Int64? = nil, rpe: Int? = nil, note: String? = nil, loadKg: Decimal? = nil) {
+    public init(reps: Int? = nil, holdMs: Int64? = nil, workMs: Int64? = nil, restMs: Int64? = nil, rpe: Int? = nil, note: String? = nil,
+                loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil, source: ResultSource? = nil) {
         self.reps = reps
         self.holdMs = holdMs
         self.workMs = workMs
@@ -39,9 +45,23 @@ public struct SetActuals: Codable, Equatable, Hashable, Sendable {
         self.rpe = rpe
         self.note = note
         self.loadKg = loadKg
+        self.distanceMeters = distanceMeters
+        self.durationSeconds = durationSeconds
+        self.source = source
     }
 
     public static let none = SetActuals()
+
+    /// Pace of a running result, when both values allow one (CON-004: derived, never stored).
+    public var pace: Pace? {
+        guard let distanceMeters, let durationSeconds else { return nil }
+        return try? Pace.derive(distanceMeters: distanceMeters, durationSeconds: durationSeconds).get()
+    }
+}
+
+/// `set_result.source` (CON-004). Omitted in a payload means `manual`.
+public enum ResultSource: String, Codable, Sendable {
+    case manual
 }
 
 /// Everything the coordinator needs to insert one `set_results` row + outbox mutation.

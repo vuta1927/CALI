@@ -130,6 +130,10 @@ final class Harness {
         case .load:
             c.actualReps = reps
             c.actualLoadKg = Decimal(string: "57.5")
+        case .distance:
+            c.actualDistanceMeters = 1000
+            c.actualDurationSeconds = 290
+        case .duration: c.actualDurationSeconds = 300
         }
         return .confirmSet(c)
     }
