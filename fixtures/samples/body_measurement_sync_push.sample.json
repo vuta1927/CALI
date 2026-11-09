@@ -1,0 +1,46 @@
+{
+  "_comment": "SAMPLE ONLY (CON-007) - not production data. Two morning weight entries in kilograms (ADR-046), the second with 2 decimals (displayed '72,35 kg' in vi), then a soft delete of the first. The unit is fixed by the kind; there is no unit field. Body data is sensitive: never part of AI input (ADR-064), never shown on the Lock Screen. Ids are illustrative.",
+  "deviceId": "d0000000-0000-4000-8000-000000000007",
+  "mutations": [
+    {
+      "mutationId": "b1000000-0000-4000-8000-000000000001",
+      "entityType": "body_measurement",
+      "entityId": "b2000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-08T06:50:00Z",
+      "payload": {
+        "id": "b2000000-0000-4000-8000-000000000001",
+        "kind": "weight",
+        "value": 72.6,
+        "measuredAt": "2026-11-08T06:45:00Z"
+      }
+    },
+    {
+      "mutationId": "b1000000-0000-4000-8000-000000000002",
+      "entityType": "body_measurement",
+      "entityId": "b2000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-09T06:52:00Z",
+      "payload": {
+        "id": "b2000000-0000-4000-8000-000000000002",
+        "kind": "weight",
+        "value": 72.35,
+        "measuredAt": "2026-11-09T06:40:00Z"
+      }
+    },
+    {
+      "mutationId": "b1000000-0000-4000-8000-000000000003",
+      "entityType": "body_measurement",
+      "entityId": "b2000000-0000-4000-8000-000000000001",
+      "action": "delete",
+      "baseVersion": 1,
+      "clientChangedAt": "2026-11-09T06:55:00Z",
+      "payload": {
+        "id": "b2000000-0000-4000-8000-000000000001",
+        "deletedAt": "2026-11-09T06:55:00Z"
+      }
+    }
+  ]
+}

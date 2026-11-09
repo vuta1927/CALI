@@ -17,6 +17,7 @@
 - Application secrets in server secret manager; LLM calls server-side only. Sanitize notes and bound prompt sizes.
 - Consent/setting for cloud sync and AI; user can use offline guest.
 - Privacy-preserving logs with pseudonymous IDs, no freeform notes or token/PII log payloads.
+- Số đo cơ thể (`body_measurement`, CON-007) là dữ liệu nhạy cảm: không ghi `value` vào log, metric hay trace (chỉ ID và entity type); không gửi cho nhà cung cấp AI (docs/09 §3, ADR-064).
 
 ## 3. Observability
 Common correlation: `traceId`, `mutationId`, `sessionId` (UUID only, no name). Metrics:
@@ -26,6 +27,7 @@ Common correlation: `traceId`, `mutationId`, `sessionId` (UUID only, no name). M
 
 ## 4. User data behavior
 - On app lock screen display no sensitive free-form notes, pain reports, account identifiers.
+- Số đo cơ thể (CON-007) không hiện trên Lock Screen, widget, Live Activity hay nội dung thông báo; không chia sẻ qua App Group cho widget (ADR-064). Dùng số đo cơ thể làm đầu vào AI chỉ có thể là một opt-in riêng, mặc định tắt, có audit, sau pilot.
 - Export, account deletion and retention policy to be finalized before public launch; pilot phase documentation must still describe handling.
 - Version and keep provenance of AI-generated recommendations, including source session revision and accepted plan revision.
 

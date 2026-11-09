@@ -361,6 +361,63 @@ public sealed class PayloadContractTests : IClassFixture<OpenApiContractTests.Sp
         names.ShouldNotContain(name => name.EndsWith("Lb", StringComparison.Ordinal) || name.EndsWith("Lbs", StringComparison.Ordinal));
     }
 
+    // ---- CON-007 body measurement ----
+
+    [Fact]
+    public void Body_measurement_is_a_sync_entity_in_every_contract()
+    {
+        Enum("SyncEntityType").ShouldContain("body_measurement");
+        Enum("ChangeEntityType").ShouldContain("body_measurement");
+        // Plan_activation_is_a_sync_entity_in_every_contract checks the entity-payloads oneOf equals SyncEntityType.
+        // tools/validate_handoff.py checks SyncChange x-payload-schemas maps it to body_measurement_payload.
+        Def("body_measurement_mutation").ValueKind.ShouldBe(JsonValueKind.Object);
+    }
+
+    [Fact]
+    public void Body_measurement_payload_is_closed_and_matches_openapi()
+    {
+        var payload = Def("body_measurement_payload");
+        var openApi = Schema("BodyMeasurement");
+
+        payload.GetProperty("additionalProperties").GetBoolean().ShouldBeFalse();
+        payload.GetProperty("properties").EnumerateObject().Select(p => p.Name)
+            .ShouldBe(["id", "kind", "value", "measuredAt"], ignoreOrder: true);
+        openApi.Properties!.Keys.Where(k => k != "version")
+            .ShouldBe(["id", "kind", "value", "measuredAt"], ignoreOrder: true);
+        payload.GetProperty("required").EnumerateArray().Select(e => e.GetString()!)
+            .ShouldBe(openApi.Required!.Where(k => k != "version"), ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Body_weight_is_kilograms_only_with_one_range_and_no_unit_field()
+    {
+        // ADR-063: v1 kind weight only; ADR-046: kilograms, the unit is fixed by the kind.
+        var entityKinds = Def("body_measurement_payload").GetProperty("properties").GetProperty("kind").GetProperty("enum")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+        Enum("BodyMeasurementKind").ShouldBe(["weight"], ignoreOrder: true);
+        entityKinds.ShouldBe(Enum("BodyMeasurementKind"), ignoreOrder: true);
+
+        var openApiValue = Schema("BodyMeasurement").Properties!["value"];
+        openApiValue.Minimum.ShouldBe("20");
+        openApiValue.Maximum.ShouldBe("500");
+        var entityValue = Def("body_measurement_payload").GetProperty("properties").GetProperty("value");
+        entityValue.GetProperty("minimum").GetInt32().ShouldBe(20);
+        entityValue.GetProperty("maximum").GetInt32().ShouldBe(500);
+
+        Def("body_measurement_payload").GetProperty("properties").EnumerateObject()
+            .ShouldNotContain(p => p.Name.Contains("unit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Body_data_is_never_part_of_ai_input()
+    {
+        // ADR-064 / docs/09 §3: an analysis request names one session; it never carries body data.
+        Schema("AnalysisRequest").Properties!.Keys.ShouldBe(["sessionId", "sessionVersion"], ignoreOrder: true);
+        Schema("AnalysisRequest").Properties!.Keys
+            .ShouldNotContain(k => k.Contains("body", StringComparison.OrdinalIgnoreCase)
+                || k.Contains("weight", StringComparison.OrdinalIgnoreCase));
+    }
+
     private HashSet<string> Enum(string schema) => Values(Schema(schema));
 
     // Microsoft.OpenApi reads a YAML `null` enum member as a sentinel string; nullable enums keep only real values.

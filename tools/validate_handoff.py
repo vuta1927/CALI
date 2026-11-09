@@ -197,7 +197,8 @@ try:
         for code in ('pinned_goal_limit', 'goal_unlock_cycle'):
             if code not in error_codes:
                 errors.append(f'MutationError.code is missing {code} (CON-005)')
-        for oas_name, def_name in (('PlanGoal', 'plan_goal_payload'), ('PlanPhase', 'plan_phase_payload')):
+        for oas_name, def_name in (('PlanGoal', 'plan_goal_payload'), ('PlanPhase', 'plan_phase_payload'),
+                                   ('BodyMeasurement', 'body_measurement_payload')):
             oas_props = set(schemas[oas_name]['properties']) - {'version'}
             def_props = set(schema['$defs'][def_name]['properties'])
             if oas_props != def_props:
@@ -232,6 +233,27 @@ try:
                 sync_check = (migration.name, set(re.findall(r"'([a-z_]+)'", found[-1])))
         if sync_check is None or sync_check[1] != sync_types:
             errors.append(f'SQL ck_sync_mutations_entity_type {sync_check} != SyncEntityType {sorted(sync_types)}')
+        # CON-007: one body measurement kind vocabulary and one value range (OpenAPI, entity-payloads, db/007).
+        body_kinds_oas = set(schemas['BodyMeasurementKind']['enum'])
+        body_payload = schema['$defs']['body_measurement_payload']
+        body_kinds_entity = set(body_payload['properties']['kind']['enum'])
+        body_sql = (ROOT / 'db/007_body_measurement.sql').read_text(encoding='utf-8')
+        body_kinds_match = re.search(r"ck_body_measurements_kind CHECK \(kind IN \(([^)]*)\)\)", body_sql)
+        body_kinds_sql = set(re.findall(r"'([a-z_]+)'", body_kinds_match.group(1))) if body_kinds_match else set()
+        if not body_kinds_oas == body_kinds_entity == body_kinds_sql:
+            errors.append(f'BodyMeasurementKind drift: OpenAPI {sorted(body_kinds_oas)} vs entity schema '
+                          f'{sorted(body_kinds_entity)} vs db/007 {sorted(body_kinds_sql)}')
+        oas_value = schemas['BodyMeasurement']['properties']['value']
+        entity_value = body_payload['properties']['value']
+        sql_range = re.search(r"ck_body_measurements_value CHECK \(value >= (\d+) AND value <= (\d+) AND value = round\(value, 2\)\)",
+                              body_sql)
+        ranges = {
+            'OpenAPI': (oas_value.get('minimum'), oas_value.get('maximum')),
+            'entity schema': (entity_value.get('minimum'), entity_value.get('maximum')),
+            'db/007': (int(sql_range.group(1)), int(sql_range.group(2))) if sql_range else None,
+        }
+        if len(set(ranges.values())) != 1:
+            errors.append(f'BodyMeasurement value range drift: {ranges}')
         goal_payloads = [(f"fixtures/validation case {case['name']}", case['mutation']) for case in rules['cases']]
         goal_payloads += [(f'{path.relative_to(ROOT).as_posix()} mutation', mutation) for path in sample_pushes
                           for mutation in json.loads(path.read_text(encoding='utf-8'))['mutations']]

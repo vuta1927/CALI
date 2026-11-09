@@ -13,7 +13,8 @@
     {"$ref": "#/$defs/workout_note_mutation"},
     {"$ref": "#/$defs/plan_activation_mutation"},
     {"$ref": "#/$defs/plan_phase_mutation"},
-    {"$ref": "#/$defs/plan_goal_mutation"}
+    {"$ref": "#/$defs/plan_goal_mutation"},
+    {"$ref": "#/$defs/body_measurement_mutation"}
   ],
   "$defs": {
     "uuid": {"type": "string", "format": "uuid"},
@@ -108,6 +109,16 @@
         "name": {"type": "string", "minLength": 1, "maxLength": 120},
         "weeks": {"type": "integer", "minimum": 1, "maximum": 52},
         "description": {"type": ["string", "null"], "maxLength": 500}
+      }, "additionalProperties": false
+    },
+    "body_measurement_payload": {
+      "$comment": "CON-007 (ADR-063, ADR-064): sensitive user-entered body data, never part of AI input and never shown on the Lock Screen (docs/11). v1 kind 'weight' only, in kilograms (ADR-046); the unit is fixed by the kind, so there is no unit field. value has at most 2 decimals and measuredAt is not after clientChangedAt (both enforced by backend/CaliDomain, ADR-020; excess decimals are rejected, never rounded).",
+      "type": "object", "required": ["id", "kind", "value", "measuredAt"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "kind": {"enum": ["weight"]},
+        "value": {"type": "number", "minimum": 20, "maximum": 500},
+        "measuredAt": {"$ref": "#/$defs/dateTime"}
       }, "additionalProperties": false
     },
     "plan_goal_payload": {
@@ -233,6 +244,8 @@
     "plan_phase_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_phase"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_phase"}]}]},
     "plan_goal_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "plan_goal"}}, "allOf": [{"$ref": "#/$defs/payload_switch_plan_goal"}]}]},
     "payload_switch_plan_phase": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_phase_payload"}}}},
-    "payload_switch_plan_goal": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_goal_payload"}}}}
+    "payload_switch_plan_goal": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/plan_goal_payload"}}}},
+    "body_measurement_mutation": {"allOf": [{"$ref": "#/$defs/mutation_common"}, {"type": "object", "properties": {"entityType": {"const": "body_measurement"}}, "allOf": [{"$ref": "#/$defs/payload_switch_body_measurement"}]}]},
+    "payload_switch_body_measurement": {"if": {"properties": {"action": {"const": "delete"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/delete_payload"}}}, "else": {"properties": {"payload": {"$ref": "#/$defs/body_measurement_payload"}}}}
   }
 }

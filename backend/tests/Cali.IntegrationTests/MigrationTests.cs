@@ -40,6 +40,9 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
         // CON-005
         result.AppliedScripts.ShouldContain("005_plan_goals_phases.sql");
         (await PublicTablesAsync(connectionString)).ShouldContain("plan_goals");
+        // CON-007
+        result.AppliedScripts.ShouldContain("007_body_measurement.sql");
+        (await PublicTablesAsync(connectionString)).ShouldContain("body_measurements");
 
         var expected = TablesDeclaredIn001();
         expected.Length.ShouldBeGreaterThanOrEqualTo(17);

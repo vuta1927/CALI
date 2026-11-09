@@ -758,6 +758,30 @@ components:
         note: {type: [string, 'null'], maxLength: 500}
         version: {type: integer, minimum: 1, format: int64}
     # CON-005 end
+    # CON-007 begin
+    BodyMeasurementKind:
+      type: string
+      enum: [weight]
+      description: >-
+        CON-007 (ADR-063). v1: `weight` only, in kilograms (ADR-046). The unit is fixed by the kind;
+        there is no unit field. New kinds need a contract change (OpenAPI, entity-payloads, SQL CHECK).
+    BodyMeasurement:
+      type: object
+      description: >-
+        CON-007 (docs/07, docs/11; ADR-063, ADR-064). A user-entered body measurement; synced as entity
+        `body_measurement` (device-writable, soft delete, several per day allowed). Sensitive data:
+        never part of AI input (AnalysisRequest carries a session only), never shown on the Lock
+        Screen, Live Activity or notifications. `value`: kilograms for `weight`, at most 2 decimals
+        (excess decimals are rejected with validation_failed, never rounded). `measuredAt` must not
+        be after the mutation's `clientChangedAt` (validation_failed).
+      required: [id, kind, value, measuredAt, version]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {$ref: '#/components/schemas/BodyMeasurementKind'}
+        value: {type: number, minimum: 20, maximum: 500}
+        measuredAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 1, format: int64}
+    # CON-007 end
     PlanPage:
       type: object
       required: [items, hasMore]
@@ -769,7 +793,7 @@ components:
         hasMore: {type: boolean}
     SyncEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal, body_measurement]
     SyncMutation:
       type: object
       description: >-
@@ -845,7 +869,7 @@ components:
           items: {$ref: '#/components/schemas/SyncMutationResult'}
     ChangeEntityType:
       type: string
-      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal, ai_analysis, ai_recommendation]
+      enum: [training_plan, planned_workout, planned_exercise, workout_session, exercise_execution, set_result, workout_note, plan_activation, plan_phase, plan_goal, body_measurement, ai_analysis, ai_recommendation]
     SyncChange:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
@@ -874,6 +898,7 @@ components:
             plan_activation: entity-payloads.schema.json#/$defs/plan_activation_payload
             plan_phase: entity-payloads.schema.json#/$defs/plan_phase_payload
             plan_goal: entity-payloads.schema.json#/$defs/plan_goal_payload
+            body_measurement: entity-payloads.schema.json#/$defs/body_measurement_payload
             ai_analysis: 'components/schemas/Analysis'
             ai_recommendation: 'components/schemas/AnalysisRecommendation'
             delete: entity-payloads.schema.json#/$defs/delete_payload
