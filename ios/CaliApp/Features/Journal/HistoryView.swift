@@ -172,8 +172,8 @@ struct HistoryView: View {
         if onDay.contains(where: { $0.status == .completed }) { return .done }
         if !onDay.isEmpty { return .partial }
         let today = calendar.startOfDay(for: Date())
-        let weekday = Fmt.isoWeekday(day, calendar: calendar)
-        if day >= today, store.plan.deletedAt == nil, store.plan.workouts.contains(where: { $0.weekday == weekday }) { return .planned }
+        let local = LocalDate.today(at: day, in: calendar.timeZone)
+        if day >= today, !store.scheduledItems(on: local).isEmpty { return .planned }
         return .none
     }
 
@@ -380,6 +380,12 @@ private struct HistoryRow: View {
                         if session.status != .completed { TagChip(text: "Dừng sớm", tint: .caliWarning) }
                         if session.isSample { MockBadge() }
                     }
+                    if let plan = store.planLabel(for: session) {
+                        Label(plan, systemImage: "calendar")
+                            .font(.caption)
+                            .foregroundStyle(Color.caliSecondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -410,6 +416,12 @@ struct SessionDetailView: View {
                     HStack(spacing: 6) {
                         if session.status != .completed { TagChip(text: "Dừng sớm", tint: .caliWarning) }
                         if session.isSample { MockBadge() }
+                    }
+                    if let plan = store.planLabel(for: session) {
+                        Label(plan, systemImage: "calendar")
+                            .font(.caption)
+                            .foregroundStyle(Color.caliSecondary)
+                            .lineLimit(1)
                     }
                 }
                 HStack(spacing: Spacing.m) {

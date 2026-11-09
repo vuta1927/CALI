@@ -1,3 +1,4 @@
+import CaliDomain
 import SwiftUI
 
 /// "Cá nhân" tab (UX-10, mockup `profile`): this week, AI + audit entries, workout settings, data, app.
@@ -94,7 +95,8 @@ struct ProfileView: View {
     private var weekCard: some View {
         let now = Date()
         let done = store.sessionsThisWeek(now: now)
-        let scheduled = store.plan.deletedAt == nil ? store.plan.workouts.filter { (1...7).contains($0.weekday) }.count : 0
+        let monday = store.monday(of: store.today(now))
+        let scheduled = store.scheduledItems(from: monday, through: monday.adding(days: 6), now: now).count
         var calendar = Calendar.current
         calendar.firstWeekday = 2
         let week = calendar.dateInterval(of: .weekOfYear, for: now)

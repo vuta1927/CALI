@@ -34,7 +34,7 @@ struct RootView: View {
                 NavigationStack { TodayView(tab: $tab) }
             }
             Tab("Giáo án", systemImage: "calendar.badge.clock", value: AppTab.plan) {
-                NavigationStack { PlanView() }
+                NavigationStack { PlansListView() }
             }
             Tab("Bài tập", systemImage: "figure.strengthtraining.functional", value: AppTab.catalog) {
                 NavigationStack { CatalogView() }

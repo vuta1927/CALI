@@ -135,18 +135,122 @@ public struct PlannedWorkout: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-public struct WorkoutPlan: Codable, Hashable, Sendable {
-    /// Soft delete (tombstone); historical sessions keep their original IDs.
+/// docs/19 D3 / CON-003 `training_plan.kind`.
+public enum PlanKind: String, Codable, Sendable, CaseIterable {
+    case weekly, event
+}
+
+/// docs/19 D2 / CON-003 `training_plan.primaryDiscipline`.
+public enum PlanDiscipline: String, Codable, Sendable, CaseIterable {
+    case calisthenics, running, gym, mixed
+}
+
+/// CON-003 `training_plan.endReason`.
+public enum PlanEndReason: String, Codable, Sendable {
+    case completed, stopped
+}
+
+/// The current revision of one plan lineage (CON-003), with its activations. The user-facing status is
+/// never stored; it is computed from `activations`, `endedAt`, `archivedAt` and `deletedAt` (docs/19 §4.2).
+public struct WorkoutPlan: Codable, Hashable, Sendable, Identifiable {
+    /// Soft delete (tombstone, ADR-040); historical sessions keep their original IDs.
     public var deletedAt: Date? = nil
+    /// Revision id (`training_plan.id`).
     public var id: UUID
     public var title: String
     public var workouts: [PlannedWorkout]
+    /// The plan the user sees (docs/19 D4). A root revision has `lineageId == id`.
+    public var lineageId: UUID
+    public var revision: Int
+    public var kind: PlanKind
+    /// Required when `kind == .event`.
+    public var eventDate: LocalDate?
+    public var eventName: String?
+    /// `nil` = derive from the exercises when writing (BR-10).
+    public var primaryDiscipline: PlanDiscipline?
+    public var endedAt: Date?
+    public var endReason: PlanEndReason?
+    /// At most 500 characters.
+    public var endNote: String?
+    public var archivedAt: Date?
+    public var createdAt: Date?
+    /// Live (not cancelled) activations of the lineage, oldest first.
+    public var activations: [PlanActivation]
 
-    public init(deletedAt: Date? = nil, id: UUID, title: String, workouts: [PlannedWorkout]) {
+    public init(
+        deletedAt: Date? = nil, id: UUID, title: String, workouts: [PlannedWorkout], lineageId: UUID? = nil, revision: Int = 1,
+        kind: PlanKind = .weekly, eventDate: LocalDate? = nil, eventName: String? = nil, primaryDiscipline: PlanDiscipline? = nil,
+        endedAt: Date? = nil, endReason: PlanEndReason? = nil, endNote: String? = nil, archivedAt: Date? = nil,
+        createdAt: Date? = nil, activations: [PlanActivation] = []
+    ) {
         self.deletedAt = deletedAt
         self.id = id
         self.title = title
         self.workouts = workouts
+        self.lineageId = lineageId ?? id
+        self.revision = revision
+        self.kind = kind
+        self.eventDate = eventDate
+        self.eventName = eventName
+        self.primaryDiscipline = primaryDiscipline
+        self.endedAt = endedAt
+        self.endReason = endReason
+        self.endNote = endNote
+        self.archivedAt = archivedAt
+        self.createdAt = createdAt
+        self.activations = activations
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case deletedAt, id, title, workouts, lineageId, revision, kind, eventDate, eventName, primaryDiscipline,
+             endedAt, endReason, endNote, archivedAt, createdAt, activations
+    }
+
+    /// Snapshots written before IOS-013 only have `id`, `title`, `workouts` and `deletedAt`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        workouts = try c.decode([PlannedWorkout].self, forKey: .workouts)
+        deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
+        lineageId = try c.decodeIfPresent(UUID.self, forKey: .lineageId) ?? id
+        revision = try c.decodeIfPresent(Int.self, forKey: .revision) ?? 1
+        kind = try c.decodeIfPresent(PlanKind.self, forKey: .kind) ?? .weekly
+        eventDate = try c.decodeIfPresent(LocalDate.self, forKey: .eventDate)
+        eventName = try c.decodeIfPresent(String.self, forKey: .eventName)
+        primaryDiscipline = try c.decodeIfPresent(PlanDiscipline.self, forKey: .primaryDiscipline)
+        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
+        endReason = try c.decodeIfPresent(PlanEndReason.self, forKey: .endReason)
+        endNote = try c.decodeIfPresent(String.self, forKey: .endNote)
+        archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        activations = try c.decodeIfPresent([PlanActivation].self, forKey: .activations) ?? []
+    }
+
+    public var lineageState: PlanLineageState {
+        PlanLineageState(lineageId: lineageId, endedAt: endedAt, archivedAt: archivedAt, deletedAt: deletedAt, activations: activations)
+    }
+
+    /// docs/19 §4.2.
+    public func status(today: LocalDate) -> PlanStatus {
+        PlanLifecycle.status(of: lineageState, today: today)
+    }
+
+    // TODO(IOS-015): weekly program length comes from plan phases (CON-005); until then a weekly plan never
+    // finishes on its own.
+    public var program: PlanProgram {
+        if kind == .event, let eventDate { return .event(eventDate: eventDate) }
+        return .weekly(totalWeeks: nil)
+    }
+
+    /// Workouts tied to a weekday, as schedule slots.
+    public var slots: [WeeklySlot] {
+        workouts.filter { (1...7).contains($0.weekday) }.map { WeeklySlot(plannedWorkoutId: $0.id, weekday: $0.weekday) }
+    }
+
+    /// The activation that is open on or after `today` (the one pause / end / delete close).
+    public func openActivation(today: LocalDate) -> PlanActivation? {
+        activations.first { $0.toDate.map { $0 >= today } ?? true }
     }
 }
 
@@ -219,10 +323,14 @@ public struct CompletedSession: Identifiable, Codable, Hashable, Sendable {
     public var sets: [LoggedSet]
     /// True for generated demo history (always shown with a "Dữ liệu mẫu" badge).
     public var isSample: Bool
+    /// The plan lineage the planned workout belonged to when the session finished (MP-10). Kept on the
+    /// session so it stays attributable after the workout is removed or the plan is deleted. `nil` for free
+    /// sessions; older rows are resolved from `planned_workouts` when loaded.
+    public var planLineageId: UUID? = nil
 
     public init(
         id: UUID, title: String, plannedWorkoutId: UUID?, startedAt: Date, finishedAt: Date, status: SessionStatus,
-        exerciseIds: [UUID], plannedSetCount: Int, sets: [LoggedSet], isSample: Bool
+        exerciseIds: [UUID], plannedSetCount: Int, sets: [LoggedSet], isSample: Bool, planLineageId: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -234,6 +342,7 @@ public struct CompletedSession: Identifiable, Codable, Hashable, Sendable {
         self.plannedSetCount = plannedSetCount
         self.sets = sets
         self.isSample = isSample
+        self.planLineageId = planLineageId
     }
 
     public var durationMinutes: Int { max(1, Int(finishedAt.timeIntervalSince(startedAt) / 60)) }

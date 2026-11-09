@@ -3,7 +3,7 @@ import CaliDomain
 import Foundation
 import Observation
 
-/// App-wide state. Owns the plan, history, recommendations and the active workout. Every change is
+/// App-wide state. Owns the plans, history, recommendations and the active workout. Every change is
 /// committed to the local GRDB database first (`AppDatabase`, offline-first) and only then published to
 /// the UI; workout commands go through the single-writer `WorkoutCoordinator`.
 @Observable
@@ -12,7 +12,9 @@ final class AppStore {
     // MARK: State
 
     private(set) var catalog: [Exercise]
-    private(set) var plan: WorkoutPlan
+    /// Current revision of every plan lineage, oldest first, soft-deleted ones included (history labels).
+    /// Multi-plan lookups and lifecycle commands live in `AppStore+Plans.swift`.
+    private(set) var plans: [WorkoutPlan]
     private(set) var history: [CompletedSession]
     private(set) var recommendations: [Recommendation]
     private(set) var audit: [AuditEntry]
@@ -49,10 +51,10 @@ final class AppStore {
             loaded = try self.database.content.load()
         } catch {
             openError = "Không đọc được dữ liệu trên máy (\(error.localizedDescription))."
-            loaded = LocalContent(catalog: MockData.catalog, plan: MockData.plan, history: [], recommendations: [], audit: [], settings: AppSettings())
+            loaded = LocalContent(catalog: MockData.catalog, plans: [MockData.plan], history: [], recommendations: [], audit: [], settings: AppSettings())
         }
         catalog = loaded.catalog
-        plan = loaded.plan ?? MockData.plan
+        plans = loaded.plans
         history = loaded.history
         recommendations = loaded.recommendations
         audit = loaded.audit
@@ -87,23 +89,7 @@ final class AppStore {
 
     func workout(_ id: UUID) -> PlannedWorkout? {
         if id == MockData.quickTestId { return MockData.quickTest }
-        return plan.workouts.first { $0.id == id }
-    }
-
-    /// Workout scheduled for the given day (ISO weekday), if any.
-    func workout(on date: Date) -> PlannedWorkout? {
-        let weekday = Fmt.isoWeekday(date)
-        return plan.workouts.first { $0.weekday == weekday }
-    }
-
-    /// Next scheduled workout strictly after `date` (within the coming week).
-    func nextWorkout(after date: Date) -> (workout: PlannedWorkout, date: Date)? {
-        let calendar = Calendar.current
-        for offset in 1...7 {
-            guard let day = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
-            if let workout = workout(on: day) { return (workout, day) }
-        }
-        return nil
+        return plan(containing: id)?.workouts.first { $0.id == id }
     }
 
     var activeSessionInProgress: Bool {
@@ -243,7 +229,7 @@ final class AppStore {
             return false
         }
         if let previous = self.exercise(exercise.id), previous.type != exercise.type {
-            let referenced = plan.workouts.contains { $0.exercises.contains { $0.exerciseId == exercise.id } }
+            let referenced = plans.contains { $0.workouts.contains { $0.exercises.contains { $0.exerciseId == exercise.id } } }
                 || MockData.quickTest.exercises.contains { $0.exerciseId == exercise.id }
                 || history.contains { $0.exerciseIds.contains(exercise.id) }
                 || (player?.state.executions.contains { $0.exerciseId == exercise.id } ?? false)
@@ -255,9 +241,11 @@ final class AppStore {
         return commitContent(ContentChange(exercises: [exercise]), action: "Lưu bài tập", detail: exercise.name, commandId: commandId)
     }
 
+    /// Adds or replaces a workout of plan `lineageId` (one workout per weekday per plan).
     @discardableResult
-    func updateWorkout(_ workout: PlannedWorkout, commandId: UUID = UUID()) -> Bool {
+    func updateWorkout(_ workout: PlannedWorkout, in lineageId: UUID, commandId: UUID = UUID()) -> Bool {
         if audit.contains(where: { $0.id == commandId }) { return true }
+        guard var plan = plan(lineageId), isEditable(plan) else { return refuse("Giáo án này chỉ xem được.") }
         guard !workout.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               (1...7).contains(workout.weekday), !workout.exercises.isEmpty,
               workout.exercises.allSatisfy({ item in
@@ -268,56 +256,35 @@ final class AppStore {
             alertMessage = "Kiểm tra tên, ngày tập, bài tập và mục tiêu; mỗi ngày chỉ có một buổi."
             return false
         }
-        var copy = plan
-        copy.deletedAt = nil
-        if let index = copy.workouts.firstIndex(where: { $0.id == workout.id }) { copy.workouts[index] = workout }
-        else { copy.workouts.append(workout) }
-        return commitContent(ContentChange(plan: copy), action: "Lưu buổi tập", detail: workout.title, commandId: commandId)
-    }
-
-    @discardableResult
-    func renamePlan(_ title: String, commandId: UUID = UUID()) -> Bool {
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return false }
-        var copy = plan
-        if copy.deletedAt != nil { copy.id = UUID() }
-        copy.title = title
-        copy.deletedAt = nil
-        return commitContent(ContentChange(plan: copy), action: "Sửa giáo án", detail: title, commandId: commandId)
+        if let index = plan.workouts.firstIndex(where: { $0.id == workout.id }) { plan.workouts[index] = workout }
+        else { plan.workouts.append(workout) }
+        return commitContent(ContentChange(plans: [plan]), action: "Lưu buổi tập", detail: "\(workout.title) · \(plan.title)", commandId: commandId)
     }
 
     @discardableResult
     func deleteWorkout(_ id: UUID, commandId: UUID = UUID()) -> Bool {
         if audit.contains(where: { $0.id == commandId }) { return true }
-        guard let workout = plan.workouts.first(where: { $0.id == id }) else {
+        guard var plan = plan(containing: id), let workout = plan.workouts.first(where: { $0.id == id }) else {
             alertMessage = "Buổi tập này không còn trong giáo án."
             return false
         }
-        var copy = plan
-        copy.workouts.removeAll { $0.id == id }
-        return commitContent(ContentChange(plan: copy), action: "Xóa buổi tập", detail: workout.title, commandId: commandId)
-    }
-
-    @discardableResult
-    func deletePlan(commandId: UUID = UUID()) -> Bool {
-        var copy = plan
-        copy.workouts = []
-        copy.deletedAt = Date()
-        return commitContent(ContentChange(plan: copy), action: "Xóa giáo án", detail: plan.title, commandId: commandId)
+        guard isEditable(plan) else { return refuse("Giáo án này chỉ xem được.") }
+        plan.workouts.removeAll { $0.id == id }
+        return commitContent(ContentChange(plans: [plan]), action: "Xóa buổi tập", detail: "\(workout.title) · \(plan.title)", commandId: commandId)
     }
 
     /// Commits the change and its audit row in one transaction before publishing it; a failed write leaves
     /// state untouched. A repeated `commandId` is a no-op that reports success.
-    private func commitContent(_ change: ContentChange, action: String, detail: String, commandId: UUID) -> Bool {
+    func commitContent(_ change: ContentChange, action: String, detail: String, commandId: UUID, now: Date = Date()) -> Bool {
         var change = change
-        change.audit = AuditEntry(id: commandId, at: Date(), action: action, detail: detail)
-        return commit(change)
+        change.audit = AuditEntry(id: commandId, at: now, action: action, detail: detail)
+        return commit(change, now: now)
     }
 
     @discardableResult
-    private func commit(_ change: ContentChange) -> Bool {
+    func commit(_ change: ContentChange, now: Date = Date()) -> Bool {
         do {
-            try database.content.apply(change)
+            try database.content.apply(change, now: now)
             reloadContent()
             return true
         } catch {
@@ -329,7 +296,7 @@ final class AppStore {
     private func reloadContent() {
         guard let loaded = try? database.content.load() else { return }
         catalog = loaded.catalog
-        if let loadedPlan = loaded.plan { plan = loadedPlan }
+        plans = loaded.plans
         history = loaded.history
         recommendations = loaded.recommendations
         audit = loaded.audit
@@ -348,12 +315,13 @@ final class AppStore {
         var change = ContentChange(recommendations: [decided])
         if !accept {
             change.audit = AuditEntry(id: commandId, at: now, action: "Từ chối đề xuất", detail: summary)
-        } else if let planChange = recommendation.change, let edited = applying(planChange, to: plan) {
-            change.plan = edited
+        } else if let planChange = recommendation.change, let target = plan(containing: planChange.plannedWorkoutId),
+                  isEditable(target, now: now), let edited = applying(planChange, to: target) {
+            change.plans = [edited]
             change.audit = AuditEntry(id: commandId, at: now, action: "Chấp nhận đề xuất", detail: "\(summary) — đã cập nhật giáo án")
         } else {
             change.audit = AuditEntry(id: commandId, at: now, action: "Chấp nhận đề xuất",
-                                      detail: "\(summary) — không áp dụng được: bài tập không còn trong giáo án")
+                                      detail: "\(summary) — không áp dụng được: bài tập không còn trong giáo án đang sửa được")
         }
         commit(change)
     }
@@ -391,7 +359,6 @@ final class AppStore {
         do {
             try database.content.resetAll(to: AppDatabase.seed(now: now, settings: fresh), now: now)
             reloadContent()
-            if let seededPlan = try database.content.load().plan { plan = seededPlan }
         } catch {
             alertMessage = "Không đặt lại được dữ liệu trên máy. (\(error.localizedDescription))"
         }

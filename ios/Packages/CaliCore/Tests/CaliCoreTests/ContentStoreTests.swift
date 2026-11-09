@@ -41,7 +41,7 @@ final class ContentStoreTests: XCTestCase {
 
         let content = try store.load()
         XCTAssertEqual(content.catalog.map(\.id), Content.catalog.map(\.id), "catalog keeps its order")
-        XCTAssertEqual(content.plan, Content.plan())
+        XCTAssertEqual(content.plans.map { $0.stripped() }, [Content.plan()])
         XCTAssertEqual(content.history.map(\.id), [uuid(400)])
         XCTAssertEqual(content.recommendations, [Content.recommendation(500)])
         XCTAssertEqual(content.settings, AppSettings())
@@ -62,14 +62,14 @@ final class ContentStoreTests: XCTestCase {
         try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
         var plan = Content.plan()
         plan.title = "Đổi tên"
-        let change = ContentChange(plan: plan, audit: AuditEntry(id: uuid(900), at: t0, action: "rename_plan", detail: "Đổi tên"))
+        let change = ContentChange(plans: [plan], audit: AuditEntry(id: uuid(900), at: t0, action: "rename_plan", detail: "Đổi tên"))
         XCTAssertEqual(try store.apply(change, now: t0), .applied)
 
         plan.title = "Lần hai"
-        let repeated = ContentChange(plan: plan, audit: AuditEntry(id: uuid(900), at: t0, action: "rename_plan", detail: "Lần hai"))
+        let repeated = ContentChange(plans: [plan], audit: AuditEntry(id: uuid(900), at: t0, action: "rename_plan", detail: "Lần hai"))
         XCTAssertEqual(try store.apply(repeated, now: t0), .duplicate)
         let content = try store.load()
-        XCTAssertEqual(content.plan?.title, "Đổi tên")
+        XCTAssertEqual(content.plans.first?.title, "Đổi tên")
         XCTAssertEqual(content.audit.map(\.id), [uuid(900)])
     }
 
@@ -82,15 +82,15 @@ final class ContentStoreTests: XCTestCase {
         plan.workouts.append(PlannedWorkout(id: uuid(201), weekday: 3, title: "Thứ 4", focus: "", exercises: [
             PlannedExercise(id: uuid(310), exerciseId: uuid(7003), setCount: 2, target: .load(reps: 5, loadKg: 60), restSeconds: 150),
         ]))
-        try store.apply(ContentChange(plan: plan), now: t0)
-        XCTAssertEqual(try store.load().plan, plan)
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+        XCTAssertEqual(try store.load().plans.map { $0.stripped() }, [plan])
 
         let discipline = try store.writer.read { try String.fetchOne($0, sql: "SELECT primary_discipline FROM training_plans") }
         XCTAssertEqual(discipline, "mixed", "calisthenics + load exercises ⇒ mixed (BR-10)")
 
         plan.workouts.removeLast()
-        try store.apply(ContentChange(plan: plan), now: t0)
-        XCTAssertEqual(try store.load().plan, plan)
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+        XCTAssertEqual(try store.load().plans.map { $0.stripped() }, [plan])
         XCTAssertEqual(try store.writer.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM planned_exercises") }, 1, "cascade removed orphans")
     }
 
@@ -100,26 +100,103 @@ final class ContentStoreTests: XCTestCase {
         var plan = Content.plan()
         plan.title = "Không được lưu"
         plan.workouts[0].exercises[0].exerciseId = uuid(9999) // not in the catalog ⇒ FK failure
-        let change = ContentChange(plan: plan, settings: AppSettings(countdownSeconds: 10),
+        let change = ContentChange(plans: [plan], settings: AppSettings(countdownSeconds: 10),
                                    audit: AuditEntry(id: uuid(901), at: t0, action: "edit", detail: ""))
         XCTAssertThrowsError(try store.apply(change, now: t0))
 
         let content = try store.load()
-        XCTAssertEqual(content.plan, Content.plan())
+        XCTAssertEqual(content.plans.map { $0.stripped() }, [Content.plan()])
         XCTAssertEqual(content.settings.countdownSeconds, 3)
         XCTAssertTrue(content.audit.isEmpty)
     }
 
-    func testDeletingThePlanClosesItsActivation() throws {
+    // MARK: IOS-013 multi-plan
+
+    func testClosingAnActivationStoresItsEndReasonAndDeletedPlanKeepsItsWorkouts() throws {
         let store = ContentStore(writer: try CaliDatabase.openInMemory())
         try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
         let later = t0.addingTimeInterval(3 * 86_400)
-        try store.apply(ContentChange(plan: Content.plan(deletedAt: later)), now: later, timeZone: utc)
+        var plan = try XCTUnwrap(store.load().plans.first)
+        let activation = try XCTUnwrap(plan.activations.first)
+        plan.activations[0].toDate = LocalDate("2026-11-10")
+        plan.deletedAt = later
+        try store.apply(ContentChange(plans: [plan], activationEndReasons: [activation.id: .deleted]), now: later)
 
-        XCTAssertNotNil(try store.load().plan?.deletedAt)
-        let activation = try store.writer.read { try Row.fetchOne($0, sql: "SELECT to_date, end_reason FROM plan_activations") }
-        XCTAssertEqual(activation?["to_date"], "2026-11-10")
-        XCTAssertEqual(activation?["end_reason"], "deleted")
+        let loaded = try XCTUnwrap(store.load().plans.first)
+        XCTAssertNotNil(loaded.deletedAt)
+        XCTAssertEqual(loaded.workouts, Content.plan().workouts, "soft delete keeps the workouts so history stays attributable")
+        XCTAssertEqual(loaded.activations.map(\.toDate), [LocalDate("2026-11-10")])
+        let row = try store.writer.read { try Row.fetchOne($0, sql: "SELECT to_date, end_reason FROM plan_activations") }
+        XCTAssertEqual(row?["to_date"], "2026-11-10")
+        XCTAssertEqual(row?["end_reason"], "deleted")
+    }
+
+    func testAnActivationNoLongerListedIsCancelledNotDeleted() throws {
+        let store = ContentStore(writer: try CaliDatabase.openInMemory())
+        try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
+        var plan = try XCTUnwrap(store.load().plans.first)
+        plan.activations = []
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+
+        XCTAssertEqual(try store.load().plans.first?.activations, [])
+        let row = try store.writer.read { try Row.fetchOne($0, sql: "SELECT deleted_at, dirty FROM plan_activations") }
+        XCTAssertNotNil(row?["deleted_at"] as String?, "the tombstone stays for sync")
+        XCTAssertEqual(row?["dirty"], 1)
+    }
+
+    func testReopeningAClosedActivationClearsItsEndReason() throws {
+        let store = ContentStore(writer: try CaliDatabase.openInMemory())
+        try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
+        var plan = try XCTUnwrap(store.load().plans.first)
+        let id = try XCTUnwrap(plan.activations.first?.id)
+        plan.activations[0].toDate = LocalDate("2026-11-08")
+        try store.apply(ContentChange(plans: [plan], activationEndReasons: [id: .paused]), now: t0)
+        plan.activations[0].toDate = nil
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+        XCTAssertNil(try store.writer.read { try String.fetchOne($0, sql: "SELECT end_reason FROM plan_activations") })
+    }
+
+    func testSeveralPlansRoundTripInCreationOrderWithAllLifecycleFields() throws {
+        let store = ContentStore(writer: try CaliDatabase.openInMemory())
+        try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
+        let event = WorkoutPlan(
+            id: uuid(110), title: "Chạy 10 km", workouts: [], kind: .event, eventDate: LocalDate("2027-03-14"), eventName: "Giải mùa xuân",
+            primaryDiscipline: .running, endedAt: t0, endReason: .stopped, endNote: "Đau gối", archivedAt: t0,
+            createdAt: t0.addingTimeInterval(60),
+            activations: [PlanActivation(id: uuid(111), fromDate: LocalDate("2026-11-09")!, toDate: LocalDate("2026-11-20"), timezone: "Asia/Ho_Chi_Minh")]
+        )
+        try store.apply(ContentChange(plans: [event]), now: t0)
+
+        let plans = try store.load().plans
+        XCTAssertEqual(plans.map(\.id), [uuid(100), uuid(110)])
+        XCTAssertEqual(plans[1], event)
+        XCTAssertEqual(plans[1].lineageId, uuid(110), "a root revision is its own lineage")
+        XCTAssertEqual(plans[1].status(today: LocalDate("2026-11-10")!), .archived)
+    }
+
+    func testHistoryIsAttributedToThePlanEvenAfterTheWorkoutIsRemoved() throws {
+        let db = try CaliDatabase.openInMemory()
+        let store = ContentStore(writer: db)
+        try store.seedIfEmpty(Content.seed(), now: t0, timeZone: utc)
+        XCTAssertEqual(try store.load().history.first?.planLineageId, uuid(100), "older rows resolve through planned_workouts")
+
+        // A live session stores the lineage on the row itself (the harness plans workout 6000).
+        var plan = try XCTUnwrap(store.load().plans.first)
+        plan.workouts[0].id = uuid(6000)
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+        let f = CoreFixture(writer: db)
+        _ = try f.coordinator.handle(f.create([Specs.hold(sets: 1)]), sessionTitle: "Buổi")
+        try f.send(f.startSet())
+        f.clock.advance(by: 5)
+        try f.send(f.stopSet())
+        try f.send(f.confirm(holdMs: 5_000))
+        try f.send(.finishSession(SimpleCommand(commandId: f.freshId())))
+        plan = try XCTUnwrap(store.load().plans.first)
+        plan.workouts = []
+        try store.apply(ContentChange(plans: [plan]), now: t0)
+
+        let live = try XCTUnwrap(store.load().history.first { $0.id == sessionA })
+        XCTAssertEqual(live.planLineageId, uuid(100))
     }
 
     func testFinishingASessionWritesHistoryInTheSameTransaction() throws {

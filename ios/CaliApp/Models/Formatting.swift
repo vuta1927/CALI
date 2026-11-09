@@ -245,3 +245,64 @@ extension Phase {
         }
     }
 }
+
+// MARK: - Multi-plan (IOS-013)
+
+extension PlanDiscipline {
+    var label: String {
+        switch self {
+        case .calisthenics: "Calisthenics"
+        case .running: "Chạy bộ"
+        case .gym: "Gym"
+        case .mixed: "Kết hợp"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .calisthenics: "figure.strengthtraining.functional"
+        case .running: "figure.run"
+        case .gym: "dumbbell"
+        case .mixed: "square.stack.3d.up"
+        }
+    }
+}
+
+extension PlanStatus {
+    /// docs/19 §4.2 labels; `scheduled` gets its date from the caller ("Bắt đầu từ dd/mm").
+    var label: String {
+        switch self {
+        case .draft: "Nháp"
+        case .scheduled: "Đã lên lịch"
+        case .active: "Đang theo"
+        case .paused: "Tạm dừng"
+        case .ended: "Đã kết thúc"
+        case .archived: "Lưu trữ"
+        case .deleted: "Đã xoá"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .draft: "pencil"
+        case .scheduled: "calendar"
+        case .active: "play.circle"
+        case .paused: "pause.circle"
+        case .ended: "flag.checkered"
+        case .archived: "archivebox"
+        case .deleted: "trash"
+        }
+    }
+}
+
+extension Fmt {
+    /// "Thứ Hai, 9/11" for a local date.
+    static func day(_ day: LocalDate) -> String {
+        "\(weekdayLong(day.isoWeekday)), \(day.day)/\(day.month)"
+    }
+
+    /// "9/11", or "14/3/2027" outside the current year.
+    static func shortDate(_ day: LocalDate, currentYear: Int = Calendar.current.component(.year, from: Date())) -> String {
+        day.year == currentYear ? "\(day.day)/\(day.month)" : "\(day.day)/\(day.month)/\(day.year)"
+    }
+}

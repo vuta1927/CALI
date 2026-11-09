@@ -5,9 +5,9 @@ import GRDB
 /// Everything the app shows outside the workout player, read in one consistent snapshot.
 public struct LocalContent: Equatable, Sendable {
     public var catalog: [Exercise]
-    /// The plan the app edits today (single-plan UI until IOS-013): the most recently updated `current`
-    /// revision, including a soft-deleted one so the "deleted" state survives a relaunch.
-    public var plan: WorkoutPlan?
+    /// The `current` revision of every plan lineage, oldest first, including soft-deleted ones so history
+    /// can still name them ("X (đã xoá)", MP-10).
+    public var plans: [WorkoutPlan]
     /// Newest first.
     public var history: [CompletedSession]
     public var recommendations: [Recommendation]
@@ -16,11 +16,11 @@ public struct LocalContent: Equatable, Sendable {
     public var settings: AppSettings
 
     public init(
-        catalog: [Exercise], plan: WorkoutPlan?, history: [CompletedSession], recommendations: [Recommendation],
+        catalog: [Exercise], plans: [WorkoutPlan], history: [CompletedSession], recommendations: [Recommendation],
         audit: [AuditEntry], settings: AppSettings
     ) {
         self.catalog = catalog
-        self.plan = plan
+        self.plans = plans
         self.history = history
         self.recommendations = recommendations
         self.audit = audit
@@ -32,25 +32,35 @@ public struct LocalContent: Equatable, Sendable {
 public struct ContentChange: Sendable {
     /// Upserted by id (exercises are never deleted: sessions and plans reference them).
     public var exercises: [Exercise]
-    /// Upserts the plan and replaces its workouts / planned exercises with exactly these.
-    public var plan: WorkoutPlan?
+    /// Each plan is upserted with its workouts / planned exercises replaced by exactly these, and its
+    /// activation rows made to match `activations` (see `upsertPlan`).
+    public var plans: [WorkoutPlan]
     /// Upserted by id.
     public var recommendations: [Recommendation]
     public var settings: AppSettings?
+    /// `end_reason` of activations this change closes (CON-003: a closed activation records the lifecycle
+    /// command that closed it). Written after the plans.
+    public var activationEndReasons: [UUID: ActivationEndReason]
     /// The audit row of a user command. Its `id` is the `commandId`: when it already exists the whole
     /// change is skipped and `apply` returns `.duplicate` (repeat calls are safe, AGENTS rule 5).
     public var audit: AuditEntry?
 
     public init(
-        exercises: [Exercise] = [], plan: WorkoutPlan? = nil, recommendations: [Recommendation] = [],
-        settings: AppSettings? = nil, audit: AuditEntry? = nil
+        exercises: [Exercise] = [], plans: [WorkoutPlan] = [], recommendations: [Recommendation] = [],
+        settings: AppSettings? = nil, activationEndReasons: [UUID: ActivationEndReason] = [:], audit: AuditEntry? = nil
     ) {
         self.exercises = exercises
-        self.plan = plan
+        self.plans = plans
+        self.activationEndReasons = activationEndReasons
         self.recommendations = recommendations
         self.settings = settings
         self.audit = audit
     }
+}
+
+/// CON-003 `plan_activation.endReason`.
+public enum ActivationEndReason: String, Codable, Sendable {
+    case paused, completed, stopped, deleted
 }
 
 public enum ContentApplyResult: Equatable, Sendable {
@@ -144,8 +154,14 @@ public final class ContentStore: Sendable {
         try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM audit_log WHERE id = ?)", arguments: [DBText.id(id)]) ?? false
     }
 
+    /// The seed's starter plan is followed from today unless it brings its own activations (BR-10).
     static func writeSeed(_ db: Database, _ seed: ContentSeed, now: Date, timeZone: TimeZone) throws {
-        try write(db, ContentChange(exercises: seed.catalog, plan: seed.plan, recommendations: seed.sampleRecommendations, settings: seed.settings),
+        var plan = seed.plan
+        if plan.activations.isEmpty, plan.deletedAt == nil {
+            plan.activations = [PlanActivation(id: UUID(), fromDate: LocalDate.today(at: now, in: timeZone), timezone: timeZone.identifier)]
+        }
+        if plan.createdAt == nil { plan.createdAt = now }
+        try write(db, ContentChange(exercises: seed.catalog, plans: [plan], recommendations: seed.sampleRecommendations, settings: seed.settings),
                   now: now, timeZone: timeZone)
         for session in seed.sampleHistory {
             try insertHistory(db, session, source: "sample")
@@ -154,8 +170,12 @@ public final class ContentStore: Sendable {
 
     static func write(_ db: Database, _ change: ContentChange, now: Date, timeZone: TimeZone) throws {
         try upsertExercises(db, change.exercises, now: now)
-        if let plan = change.plan {
-            try upsertPlan(db, plan, now: now, timeZone: timeZone)
+        for plan in change.plans {
+            try upsertPlan(db, plan, now: now)
+        }
+        for (id, reason) in change.activationEndReasons {
+            try db.execute(sql: "UPDATE plan_activations SET end_reason = ?, dirty = 1 WHERE id = ? AND to_date IS NOT NULL",
+                           arguments: [reason.rawValue, DBText.id(id)])
         }
         try upsertRecommendations(db, change.recommendations)
         if let settings = change.settings {
@@ -189,47 +209,56 @@ public final class ContentStore: Sendable {
 
     /// Upserts the plan row and makes its workouts / planned exercises match `plan` exactly.
     ///
-    /// Single-plan UI rules until IOS-013 (docs/19 BR-10, ADR-040): a new, non-deleted plan is followed from
-    /// today (one open activation); soft-deleting a plan closes its open activation with `deleted`.
-    static func upsertPlan(_ db: Database, _ plan: WorkoutPlan, now: Date, timeZone: TimeZone, activationFrom: LocalDate? = nil) throws {
+    /// Activations: each one in `plan.activations` is upserted by id; a live row of the lineage that is not
+    /// listed any more is cancelled (`deleted_at`, the tombstone sync sends as a delete). Lifecycle rules
+    /// (which activation to open or close, I1/I2) are the caller's; the database only stores the result.
+    static func upsertPlan(_ db: Database, _ plan: WorkoutPlan, now: Date) throws {
         let planId = DBText.id(plan.id)
+        let lineageId = DBText.id(plan.lineageId)
         let exists = try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM training_plans WHERE id = ?)", arguments: [planId]) ?? false
-        let discipline = try primaryDiscipline(db, plan)
-        let today = LocalDate.today(at: now, in: timeZone)
+        let discipline = try plan.primaryDiscipline?.rawValue ?? primaryDiscipline(db, plan)
+        let fields: [(String, (any DatabaseValueConvertible)?)] = [
+            ("title", plan.title), ("revision", plan.revision), ("kind", plan.kind.rawValue),
+            ("event_date", plan.eventDate.map(DBText.date)), ("event_name", plan.eventName), ("primary_discipline", discipline),
+            ("ended_at", plan.endedAt.map(DBText.time)), ("end_reason", plan.endReason?.rawValue), ("end_note", plan.endNote),
+            ("archived_at", plan.archivedAt.map(DBText.time)), ("deleted_at", plan.deletedAt.map(DBText.time)),
+        ]
         if exists {
             try db.execute(
-                sql: """
-                    UPDATE training_plans SET title = ?, primary_discipline = ?, deleted_at = ?, updated_at = ?, dirty = 1
-                    WHERE id = ?
-                    """,
-                arguments: [plan.title, discipline, plan.deletedAt.map(DBText.time), DBText.time(now), planId]
+                sql: "UPDATE training_plans SET \(fields.map { "\($0.0) = ?" }.joined(separator: ", ")), updated_at = ?, dirty = 1 WHERE id = ?",
+                arguments: StatementArguments(fields.map(\.1) + [DBText.time(now), planId])
             )
         } else {
+            let columns = ["id", "lineage_id", "status"] + fields.map(\.0) + ["created_at", "updated_at"]
+            let values: [(any DatabaseValueConvertible)?] = [planId, lineageId, "current"] + fields.map(\.1)
+                + [DBText.time(plan.createdAt ?? now), DBText.time(now)]
             try db.execute(
-                sql: """
-                    INSERT INTO training_plans (id, lineage_id, title, revision, status, kind, primary_discipline, deleted_at, created_at, updated_at)
-                    VALUES (?, ?, ?, 1, 'current', 'weekly', ?, ?, ?, ?)
-                    """,
-                arguments: [planId, planId, plan.title, discipline, plan.deletedAt.map(DBText.time), DBText.time(now), DBText.time(now)]
+                sql: "INSERT INTO training_plans (\(columns.joined(separator: ", "))) VALUES (\(columns.map { _ in "?" }.joined(separator: ", ")))",
+                arguments: StatementArguments(values)
             )
-            if plan.deletedAt == nil {
-                try db.execute(
-                    sql: """
-                        INSERT INTO plan_activations (id, plan_lineage_id, from_date, timezone, created_at)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                    arguments: [DBText.id(UUID()), planId, DBText.date(activationFrom ?? today), timeZone.identifier, DBText.time(now)]
-                )
-            }
         }
-        if plan.deletedAt != nil {
-            // Close the open activation; never before it started.
+
+        let keepActivations = plan.activations.map { DBText.id($0.id) }
+        try db.execute(
+            sql: """
+                UPDATE plan_activations SET deleted_at = ?, dirty = 1
+                WHERE plan_lineage_id = ? AND deleted_at IS NULL AND id NOT IN (SELECT value FROM json_each(?))
+                """,
+            arguments: [DBText.time(now), lineageId, try DBJSON.encode(keepActivations)]
+        )
+        for activation in plan.activations {
             try db.execute(
                 sql: """
-                    UPDATE plan_activations SET to_date = MAX(from_date, ?), end_reason = 'deleted', dirty = 1
-                    WHERE plan_lineage_id = (SELECT lineage_id FROM training_plans WHERE id = ?) AND to_date IS NULL AND deleted_at IS NULL
+                    INSERT INTO plan_activations (id, plan_lineage_id, from_date, to_date, timezone, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET from_date = excluded.from_date, to_date = excluded.to_date,
+                        timezone = excluded.timezone, deleted_at = NULL,
+                        end_reason = CASE WHEN excluded.to_date IS NULL THEN NULL ELSE plan_activations.end_reason END,
+                        dirty = CASE WHEN plan_activations.from_date IS excluded.from_date AND plan_activations.to_date IS excluded.to_date
+                                     THEN plan_activations.dirty ELSE 1 END
                     """,
-                arguments: [DBText.date(today), planId]
+                arguments: [DBText.id(activation.id), lineageId, DBText.date(activation.fromDate), activation.toDate.map(DBText.date),
+                            activation.timezone, DBText.time(now)]
             )
         }
 
@@ -337,32 +366,54 @@ public final class ContentStore: Sendable {
         }
         let settings = try String.fetchOne(db, sql: "SELECT json FROM app_settings WHERE id = 1")
             .map { try DBJSON.decode(AppSettings.self, $0) } ?? AppSettings()
-        return LocalContent(catalog: catalog, plan: try loadPlan(db), history: history, recommendations: recommendations,
+        let plans = try loadPlans(db)
+        var lineageOfWorkout: [UUID: UUID] = [:]
+        for plan in plans { for workout in plan.workouts { lineageOfWorkout[workout.id] = plan.lineageId } }
+        let attributed = history.map { session -> CompletedSession in
+            guard session.planLineageId == nil, let workoutId = session.plannedWorkoutId else { return session }
+            var copy = session
+            copy.planLineageId = lineageOfWorkout[workoutId]
+            return copy
+        }
+        return LocalContent(catalog: catalog, plans: plans, history: attributed, recommendations: recommendations,
                             audit: audit, settings: settings)
     }
 
-    static func loadPlan(_ db: Database) throws -> WorkoutPlan? {
-        guard let row = try Row.fetchOne(db, sql: """
-            SELECT id, title, deleted_at FROM training_plans WHERE status = 'current'
-            ORDER BY updated_at DESC, rowid DESC LIMIT 1
-            """) else { return nil }
-        let planId: String = row["id"]
-        let workouts = try Row.fetchAll(db, sql: "SELECT * FROM planned_workouts WHERE plan_id = ? ORDER BY order_index, rowid", arguments: [planId])
-            .map { workout -> PlannedWorkout in
-                let workoutId: String = workout["id"]
-                let exercises = try Row.fetchAll(
-                    db, sql: "SELECT * FROM planned_exercises WHERE planned_workout_id = ? ORDER BY order_index, rowid", arguments: [workoutId]
-                ).map { item in
-                    PlannedExercise(
-                        id: DBText.uuid(item["id"]) ?? UUID(), exerciseId: DBText.uuid(item["exercise_id"]) ?? UUID(),
-                        setCount: item["set_count"], target: try DBJSON.decode(Prescription.self, item["target_json"]), restSeconds: item["rest_seconds"]
-                    )
+    static func loadPlans(_ db: Database) throws -> [WorkoutPlan] {
+        try Row.fetchAll(db, sql: "SELECT * FROM training_plans WHERE status = 'current' ORDER BY created_at, rowid").map { row in
+            let planId: String = row["id"]
+            let lineageId: String = row["lineage_id"]
+            let workouts = try Row.fetchAll(db, sql: "SELECT * FROM planned_workouts WHERE plan_id = ? ORDER BY order_index, rowid", arguments: [planId])
+                .map { workout -> PlannedWorkout in
+                    let workoutId: String = workout["id"]
+                    let exercises = try Row.fetchAll(
+                        db, sql: "SELECT * FROM planned_exercises WHERE planned_workout_id = ? ORDER BY order_index, rowid", arguments: [workoutId]
+                    ).map { item in
+                        PlannedExercise(
+                            id: DBText.uuid(item["id"]) ?? UUID(), exerciseId: DBText.uuid(item["exercise_id"]) ?? UUID(),
+                            setCount: item["set_count"], target: try DBJSON.decode(Prescription.self, item["target_json"]), restSeconds: item["rest_seconds"]
+                        )
+                    }
+                    return PlannedWorkout(id: DBText.uuid(workoutId) ?? UUID(), weekday: workout["weekday"], title: workout["title"],
+                                          focus: workout["focus"], exercises: exercises)
                 }
-                return PlannedWorkout(id: DBText.uuid(workoutId) ?? UUID(), weekday: workout["weekday"], title: workout["title"],
-                                      focus: workout["focus"], exercises: exercises)
-            }
-        let deletedAt: String? = row["deleted_at"]
-        return WorkoutPlan(deletedAt: try deletedAt.map(parseTime), id: DBText.uuid(planId) ?? UUID(), title: row["title"], workouts: workouts)
+            let activations = try Row.fetchAll(db, sql: """
+                SELECT id, from_date, to_date, timezone FROM plan_activations
+                WHERE plan_lineage_id = ? AND deleted_at IS NULL ORDER BY from_date, rowid
+                """, arguments: [lineageId]).compactMap { a -> PlanActivation? in
+                    guard let id = DBText.uuid(a["id"]), let from = LocalDate(a["from_date"] as String) else { return nil }
+                    return PlanActivation(id: id, fromDate: from, toDate: (a["to_date"] as String?).flatMap(LocalDate.init), timezone: a["timezone"])
+                }
+            func time(_ column: String) throws -> Date? { try (row[column] as String?).map(parseTime) }
+            return WorkoutPlan(
+                deletedAt: try time("deleted_at"), id: DBText.uuid(planId) ?? UUID(), title: row["title"], workouts: workouts,
+                lineageId: DBText.uuid(lineageId), revision: row["revision"], kind: PlanKind(rawValue: row["kind"]) ?? .weekly,
+                eventDate: (row["event_date"] as String?).flatMap(LocalDate.init), eventName: row["event_name"],
+                primaryDiscipline: PlanDiscipline(rawValue: row["primary_discipline"]), endedAt: try time("ended_at"),
+                endReason: (row["end_reason"] as String?).flatMap(PlanEndReason.init), endNote: row["end_note"],
+                archivedAt: try time("archived_at"), createdAt: try time("created_at"), activations: activations
+            )
+        }
     }
 
     static func parseTime(_ text: String) throws -> Date {

@@ -1,6 +1,28 @@
 # Changelog
 
 ## Unreleased
+- IOS-013 multi-plan local (iOS only, no API/contract change).
+  - **Store:** `AppStore` holds every plan lineage (`plans`). New `AppStore+Plans.swift` holds the lifecycle commands: create (blank, bundled template or clone), start/resume, pause, end with reason and note, extend, archive/unarchive, soft delete, rename, plus per-plan workout edits. Each command carries a `commandId` (a repeat is a no-op) and writes one audit row.
+  - **Rules:**
+    - The 3-plan limit (I2) can free a slot by pausing or ending another plan in the same command.
+    - Pause, end and delete are blocked while that plan has a workout in progress.
+    - Ended and archived plans are read-only.
+    - Delete keeps workouts, so history still names the plan.
+    - AI changes apply only to an editable plan.
+  - **CaliCore:**
+    - `LocalContent.plans` and `ContentChange.plans` replace the single plan; `ContentChange.activationEndReasons` is new.
+    - `upsertPlan` writes every lifecycle field and cancels activations that are no longer listed.
+    - Sessions record `planLineageId`.
+  - **UI:**
+    - New screens: `PlansListView` (the Giáo án tab root), `PlanDetailView` (replaces `PlanView`; status card, MP-07 card, lifecycle menu), `PlanCreateView`, `PlanStartView` and `MyWeekView`.
+    - Today merges plans, adds plan chips, an event countdown, a no-plan empty state and the next scheduled day.
+    - History rows show the plan, with "(đã xoá)" for a deleted plan.
+  - **Deferred:**
+    - Reminders (MP-13).
+    - Program length, late start and phases (CON-005/IOS-015).
+    - Race results (IOS-014).
+    - The history plan filter (IOS-017).
+  - **Tests:** CaliCore 43/43. App XCTest 35/35 on the iPhone 15 and the simulator, with the new `PlanLifecycleTests`. Evidence is in `evidence/IOS-013/`.
 - iOS UI aligned with `docs/design/mockups/plan-module.html` (iOS only, no contract change). Rebuilt screens: Today, Plan + weekly schedule, workout detail and editor, Catalog + detail + editor, History week/month + session detail, Profile, AI review, audit log, player phases, set-result form, Welcome. All screens use existing data only. Mockup blocks that need features not built yet are hidden, never filled with sample numbers. Hidden blocks: race countdown and running card (IOS-016), multi-plan "Tuần của tôi" (IOS-015), phases and goals (IOS-013/014), CON-008 criteria (IOS-017), missed days, and the per-discipline breakdown. The catalog type filter was removed to match the mockup (level filter only). Large nav titles no longer get an opaque forced bar background. The long plan title wraps as an in-content heading. `tools/validate_coami_ui_copy.py` now matches `CALI`/`Cali` as whole words only, so "Calisthenics" passes, and accepts `COAMIWordmark(` as the brand header. DEBUG-only launch arguments `-uiTab <tab>` and `-uiSkipWelcome YES` were added for simulator screenshots. Evidence: app XCTest 24/24 on iPhone 15; simulator screenshots compared against the mockup.
 - IOS-001 CaliCore GRDB store (iOS + docs, no API/contract change). The PO approved CON-002 and waived the POC-002 gate for IOS-001 only on 2026-11-09 (ADR-069). POC-002 is still required before IOS-005 and REL-001.
   - **Database:** the app now stores everything in `Application Support/cali.sqlite` through CaliCore. `LocalStore` and `TODO(POC-003)` are removed. App content models (`Exercise`, `WorkoutPlan`, `CompletedSession`, `Recommendation`, `AppSettings`, ...) and the legacy `PersistedSnapshot` move into CaliCore as public types.

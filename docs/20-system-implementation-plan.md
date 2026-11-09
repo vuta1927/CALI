@@ -162,6 +162,11 @@ flowchart TB
 > - **Test:** CaliCore `swift test` 39/39 trên macOS. XCTest app 24/24 trên iPhone (thêm `AppDatabaseTests`: mở lại app khôi phục buổi đang tập, lịch sử sau khi bỏ buổi, quyết định đề xuất nguyên tử, đặt lại dữ liệu).
 > - **Còn lại:** đẩy nội dung `dirty` lên server (`TODO(IOS-007)`), rồi tới IOS-013.
 
+> **Trạng thái IOS-013 (2026-11-09):** code và test xong, chờ review.
+> - **Đã làm:** danh sách giáo án (MP-01), tạo / nhân bản / lặp lại (MP-02/03), bắt đầu theo với chọn ngày, sheet giới hạn 3 và lựa chọn tạm dừng hoặc kết thúc giáo án khác trong cùng lệnh (MP-04/05), chi tiết giáo án với tạm dừng / kết thúc (lý do + ghi chú) / lưu trữ / xoá mềm, thẻ MP-07 (kết thúc / kéo dài / lặp lại), Tuần của tôi (MP-06), Hôm nay gộp các giáo án và đếm ngược sự kiện (MP-09), nhãn giáo án trên Lịch sử. Mỗi lệnh có `commandId` và một dòng audit (I5).
+> - **Hoãn:** lịch nhắc MP-13 (contract chưa có giờ nhắc cho từng buổi). Độ dài lộ trình, bắt đầu muộn và phase chờ CON-005/IOS-015, nên giáo án theo tuần chưa có "Tuần x/y" và không tự hết lộ trình. Kết quả thi chờ IOS-014. Bộ lọc lịch sử theo giáo án chờ IOS-017. "Từ mẫu" chỉ có giáo án mẫu đi kèm app.
+> - **Bằng chứng:** `evidence/IOS-013/README.md`. CaliCore 43/43, app XCTest 35/35 trên iPhone 15.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

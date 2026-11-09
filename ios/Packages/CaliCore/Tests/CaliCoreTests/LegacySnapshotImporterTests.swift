@@ -50,7 +50,7 @@ final class LegacySnapshotImporterTests: XCTestCase {
 
         let content = try ContentStore(writer: db).load()
         XCTAssertEqual(content.catalog.map(\.id), Content.catalog.map(\.id))
-        XCTAssertEqual(content.plan, Content.plan())
+        XCTAssertEqual(content.plans.map { $0.stripped() }, [Content.plan()])
         XCTAssertEqual(Set(content.history.map(\.id)), [uuid(401), uuid(402)])
         XCTAssertEqual(content.recommendations.count, 1)
         XCTAssertEqual(content.audit.map(\.id), [uuid(900)])
@@ -97,7 +97,7 @@ final class LegacySnapshotImporterTests: XCTestCase {
         let db = try CaliDatabase.openInMemory()
         guard case .imported(let summary) = try importNow(db) else { return XCTFail("expected import") }
         XCTAssertTrue(summary.planDeleted)
-        XCTAssertNotNil(try ContentStore(writer: db).load().plan?.deletedAt)
+        XCTAssertNotNil(try ContentStore(writer: db).load().plans.first?.deletedAt)
         XCTAssertEqual(try db.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM plan_activations") }, 0)
     }
 

@@ -363,7 +363,12 @@ public final class WorkoutCoordinator: Sendable {
             id: s.sessionId, title: title, plannedWorkoutId: s.plannedWorkoutId, startedAt: s.startedAt,
             finishedAt: s.finishedAt ?? s.abandonedAt ?? s.updatedAt, status: s.status,
             exerciseIds: s.executions.map(\.exerciseId), plannedSetCount: s.totalPlannedSets,
-            sets: records.map(LoggedSet.init(record:)), isSample: false
+            sets: records.map(LoggedSet.init(record:)), isSample: false,
+            planLineageId: try s.plannedWorkoutId.flatMap { workoutId in
+                try String.fetchOne(db, sql: """
+                    SELECT p.lineage_id FROM planned_workouts w JOIN training_plans p ON p.id = w.plan_id WHERE w.id = ?
+                    """, arguments: [DBText.id(workoutId)]).flatMap(DBText.uuid)
+            }
         )
         try ContentStore.insertHistory(db, session, source: "live")
     }

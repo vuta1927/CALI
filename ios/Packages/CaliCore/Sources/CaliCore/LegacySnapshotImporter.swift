@@ -84,7 +84,12 @@ public enum LegacySnapshotImporter {
         let firstSessionDay = (snapshot.history.filter { !$0.isSample }.map(\.startedAt) + [snapshot.active?.state.startedAt].compactMap { $0 })
             .min().map { LocalDate.today(at: $0, in: timeZone) }
         let activationFrom = firstSessionDay ?? LocalDate.today(at: snapshot.createdAt, in: timeZone)
-        try ContentStore.upsertPlan(db, snapshot.plan, now: now, timeZone: timeZone, activationFrom: activationFrom)
+        var plan = snapshot.plan
+        if plan.deletedAt == nil, plan.activations.isEmpty {
+            plan.activations = [PlanActivation(id: UUID(), fromDate: activationFrom, timezone: timeZone.identifier)]
+        }
+        if plan.createdAt == nil { plan.createdAt = snapshot.createdAt }
+        try ContentStore.upsertPlan(db, plan, now: now)
 
         for session in snapshot.history {
             try ContentStore.insertHistory(db, session, source: session.isSample ? "sample" : "imported")

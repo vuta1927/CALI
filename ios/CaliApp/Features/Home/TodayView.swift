@@ -1,11 +1,11 @@
 import CaliDomain
 import SwiftUI
 
-/// "Hôm nay" tab (UX-02, mockup `today`): resume banner, today's workout, this week, quick test, AI.
+/// "Hôm nay" tab (UX-02, MP-09): resume banner, event countdowns, today's workouts from every followed
+/// plan, this week, quick test, AI.
 ///
 /// Mockup blocks that need features not built yet are left out rather than filled with sample
-/// numbers: race countdown and running card (IOS-016), "Tuần của tôi" across plans (IOS-015),
-/// plan week/phase caption (IOS-013).
+/// numbers: running card (IOS-016), phase caption (IOS-015).
 struct TodayView: View {
     @Environment(AppStore.self) private var store
     @Binding var tab: AppTab
@@ -42,17 +42,53 @@ struct TodayView: View {
 
     @ViewBuilder
     private func todaySection(now: Date) -> some View {
+        let items = store.scheduledItems(on: store.today(now), now: now)
+        let followed = store.followedPlans(now: now)
+        let showsPlan = followed.count > 1
         VStack(alignment: .leading, spacing: Spacing.m) {
-            SectionHeader(title: "Buổi tập hôm nay")
-            if store.plan.deletedAt == nil, let workout = store.workout(on: now) {
-                let doneToday = store.history.contains {
-                    $0.plannedWorkoutId == workout.id && $0.status == .completed && Calendar.current.isDateInToday($0.startedAt)
-                }
-                WorkoutHeroCard(workout: workout, date: now, done: doneToday) { store.startWorkout(workout) }
+            SectionHeader(title: items.count > 1 ? "Hôm nay · \(items.count) buổi" : "Buổi tập hôm nay")
+            ForEach(countdowns(followed, now: now), id: \.lineageId) { plan in
+                EventCountdownRow(plan: plan, days: store.daysUntilEvent(plan, now: now) ?? 0)
+            }
+            if items.isEmpty {
+                if followed.isEmpty { noPlanCard } else { restCard(now: now) }
             } else {
-                restCard(now: now)
+                ForEach(items) { item in
+                    WorkoutHeroCard(workout: item.workout, date: now, done: item.isDone, planTitle: showsPlan ? item.plan.title : nil) {
+                        store.startWorkout(item.workout)
+                    }
+                }
+            }
+            if !followed.isEmpty {
+                NavigationLink {
+                    MyWeekView()
+                } label: {
+                    Label("Tuần của tôi", systemImage: "calendar.day.timeline.left")
+                }
+                .buttonStyle(.caliLink)
             }
         }
+    }
+
+    /// Event plans still ahead, nearest first.
+    private func countdowns(_ plans: [WorkoutPlan], now: Date) -> [WorkoutPlan] {
+        plans.filter { (store.daysUntilEvent($0, now: now) ?? -1) >= 0 }
+            .sorted { (store.daysUntilEvent($0, now: now) ?? 0) < (store.daysUntilEvent($1, now: now) ?? 0) }
+    }
+
+    /// MP-09 empty state: no active or scheduled plan.
+    private var noPlanCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            Label("Chưa theo giáo án nào", systemImage: "calendar.badge.plus")
+                .font(.title3.bold())
+                .foregroundStyle(Color.caliText)
+            Text("Bắt đầu theo một giáo án để các buổi tập hiện ở đây. Bạn vẫn có thể thử nhanh bên dưới.")
+                .font(.subheadline)
+                .foregroundStyle(Color.caliSecondary)
+            Button("Mở Giáo án", systemImage: "calendar") { tab = .plan }
+                .buttonStyle(.caliSecondary)
+        }
+        .caliCard()
     }
 
     private func restCard(now: Date) -> some View {
@@ -63,19 +99,19 @@ struct TodayView: View {
             Text("Nghỉ ngơi giúp cơ phục hồi. Bạn vẫn có thể tập buổi khác hoặc thử nhanh bên dưới.")
                 .font(.subheadline)
                 .foregroundStyle(Color.caliSecondary)
-            if store.plan.deletedAt == nil, let next = store.nextWorkout(after: now) {
+            if let next = store.nextScheduledDay(now: now), let item = next.items.first {
                 CardDivider()
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Buổi tiếp theo · \(Fmt.weekdayLong(next.workout.weekday))")
+                        Text("Buổi tiếp theo · \(Fmt.day(next.day))")
                             .font(.caption)
                             .foregroundStyle(Color.caliSecondary)
-                        Text(next.workout.title)
+                        Text(next.items.count > 1 ? "\(item.workout.title) +\(next.items.count - 1)" : item.workout.title)
                             .font(.headline)
                             .foregroundStyle(Color.caliText)
                     }
                     Spacer()
-                    Button("Tập luôn") { store.startWorkout(next.workout) }
+                    Button("Tập luôn") { store.startWorkout(item.workout) }
                         .buttonStyle(.caliSecondary)
                         .fixedSize()
                 }
@@ -86,22 +122,24 @@ struct TodayView: View {
 
     private func weekSection(now: Date) -> some View {
         let done = store.sessionsThisWeek(now: now)
-        let scheduled = store.plan.deletedAt == nil ? store.plan.workouts.filter { (1...7).contains($0.weekday) } : []
-        let doneWeekdays = Set(done.map { Fmt.isoWeekday($0.startedAt) })
-        let today = Fmt.isoWeekday(now)
+        let today = store.today(now)
+        let monday = store.monday(of: today)
+        let items = store.scheduledItems(from: monday, through: monday.adding(days: 6), now: now)
+        let doneWeekdays = Set(done.filter { $0.status == .completed }.map { Fmt.isoWeekday($0.startedAt) })
+        let doneCount = done.filter { $0.status == .completed }.count
         return VStack(alignment: .leading, spacing: Spacing.m) {
-            SectionHeader(title: "Tuần này", trailing: "\(done.count)/\(scheduled.count) buổi")
+            SectionHeader(title: "Tuần này", trailing: "\(doneCount)/\(items.count) buổi")
             VStack(alignment: .leading, spacing: Spacing.l) {
                 HStack(spacing: 0) {
                     ForEach(1...7, id: \.self) { day in
                         WeekDayDot(
-                            day: day, isToday: day == today, completed: doneWeekdays.contains(day),
-                            scheduled: scheduled.contains { $0.weekday == day }
+                            day: day, isToday: day == today.isoWeekday, completed: doneWeekdays.contains(day),
+                            scheduled: items.contains { $0.date.isoWeekday == day }
                         )
                     }
                 }
                 HStack(spacing: Spacing.m) {
-                    StatTile(value: "\(done.count)/\(scheduled.count)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
+                    StatTile(value: "\(doneCount)/\(items.count)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
                     StatTile(value: "\(done.reduce(0) { $0 + $1.completedSetCount })", label: "Set xong", systemImage: "square.stack.3d.up")
                     StatTile(value: "\(done.reduce(0) { $0 + $1.durationMinutes })", label: "Phút tập", systemImage: "clock")
                 }
@@ -165,6 +203,33 @@ struct TodayView: View {
 }
 
 // MARK: - Pieces
+
+/// MP-09: "Còn 125 ngày tới Giải 10 km" for an event plan.
+struct EventCountdownRow: View {
+    let plan: WorkoutPlan
+    let days: Int
+
+    var body: some View {
+        HStack(spacing: Spacing.m) {
+            Image(systemName: "flag.fill")
+                .foregroundStyle(Color.caliAccentInk)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(days == 0 ? "Hôm nay: \(plan.eventName ?? plan.title)" : "Còn \(days) ngày tới \(plan.eventName ?? plan.title)")
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
+                if let date = plan.eventDate {
+                    Text("\(plan.title) · \(Fmt.day(date))")
+                        .font(.footnote)
+                        .foregroundStyle(Color.caliSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .caliCard(padding: Spacing.m)
+        .accessibilityElement(children: .combine)
+    }
+}
 
 /// One day of the week strip: orange check when trained, ring around today.
 struct WeekDayDot: View {
@@ -258,6 +323,8 @@ struct WorkoutHeroCard: View {
     let workout: PlannedWorkout
     let date: Date
     var done = false
+    /// Shown when several plans are followed (MP-09 plan chip).
+    var planTitle: String?
     let onStart: () -> Void
 
     var body: some View {
@@ -269,7 +336,10 @@ struct WorkoutHeroCard: View {
                     TagChip(text: "Đã tập", systemImage: "checkmark", tint: .caliAccent, filled: true)
                 }
             }
-            DisciplineChip(discipline: store.discipline(of: workout))
+            HStack(spacing: Spacing.s) {
+                DisciplineChip(discipline: store.discipline(of: workout))
+                if let planTitle { TagChip(text: planTitle, systemImage: "calendar") }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(Fmt.weekdayLong(Fmt.isoWeekday(date)))
                     .font(.caption)

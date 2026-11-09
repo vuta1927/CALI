@@ -11,9 +11,12 @@ struct WorkoutEditorView: View {
     @State private var confirmDiscard = false
     @State private var saveError: String?
     private let original: PlannedWorkout
+    /// The plan the workout belongs to.
+    private let lineageId: UUID
 
-    init(workout: PlannedWorkout) {
+    init(workout: PlannedWorkout, lineageId: UUID) {
         original = workout
+        self.lineageId = lineageId
         _draft = State(initialValue: workout)
     }
 
@@ -56,7 +59,7 @@ struct WorkoutEditorView: View {
                 .listRowBackground(Color.caliSurface)
             }
             .caliScreen()
-            .navigationTitle(store.plan.workouts.contains { $0.id == draft.id } ? "Sửa buổi tập" : "Thêm buổi tập")
+            .navigationTitle(store.plan(lineageId)?.workouts.contains { $0.id == draft.id } == true ? "Sửa buổi tập" : "Thêm buổi tập")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -66,7 +69,7 @@ struct WorkoutEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Lưu") {
-                        if store.updateWorkout(draft) { dismiss() }
+                        if store.updateWorkout(draft, in: lineageId) { dismiss() }
                         else { saveError = store.alertMessage; store.alertMessage = nil }
                     }
                     .disabled(draft == original || draft.exercises.isEmpty || draft.title.trimmingCharacters(in: .whitespaces).isEmpty)

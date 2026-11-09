@@ -40,3 +40,15 @@ enum Content {
                     sampleRecommendations: [recommendation(500)])
     }
 }
+
+extension WorkoutPlan {
+    /// The plan without the fields the store fills in on write (activations, creation time, derived
+    /// discipline), for comparing a loaded plan with the fixture that was written.
+    func stripped() -> WorkoutPlan {
+        var copy = self
+        copy.activations = []
+        copy.createdAt = nil
+        copy.primaryDiscipline = nil
+        return copy
+    }
+}

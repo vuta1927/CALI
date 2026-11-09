@@ -16,20 +16,20 @@ final class AppDatabaseTests: XCTestCase {
     func testRelaunchRestoresActiveSessionAndContentEdits() throws {
         let database = try AppDatabase.inMemory()
         let first = makeStore(database)
-        XCTAssertTrue(first.renamePlan("Giáo án của tôi"))
-        first.startWorkout(first.plan.workouts[0])
+        XCTAssertTrue(first.renameStarterPlan("Giáo án của tôi"))
+        first.startWorkout(first.starterPlan.workouts[0])
         let player = try XCTUnwrap(first.player)
         player.startSet()
         XCTAssertEqual(player.state.phase, .exercising)
 
         let relaunched = AppStore(database: database)
-        XCTAssertEqual(relaunched.plan.title, "Giáo án của tôi")
+        XCTAssertEqual(relaunched.starterPlan.title, "Giáo án của tôi")
         XCTAssertEqual(relaunched.settings.countdownSeconds, 0)
         let restored = try XCTUnwrap(relaunched.player)
         // The database keeps instants to the millisecond; compare the stored (JSON) form.
         let encoder = DomainJSON.makeEncoder()
         XCTAssertEqual(try encoder.encode(restored.state), try encoder.encode(player.state))
-        XCTAssertEqual(restored.title, first.plan.workouts[0].title)
+        XCTAssertEqual(restored.title, first.starterPlan.workouts[0].title)
         XCTAssertTrue(relaunched.activeSessionInProgress)
     }
 
@@ -38,7 +38,7 @@ final class AppDatabaseTests: XCTestCase {
         let database = try AppDatabase.inMemory()
         let store = makeStore(database)
         let samples = store.history.count
-        store.startWorkout(store.plan.workouts[0])
+        store.startWorkout(store.starterPlan.workouts[0])
         let player = try XCTUnwrap(store.player)
         player.abandon(reason: "test")
         XCTAssertEqual(store.history.count, samples + 1)
@@ -52,9 +52,9 @@ final class AppDatabaseTests: XCTestCase {
     @MainActor
     func testSecondWorkoutIsRefusedWhileOneIsActive() throws {
         let store = makeStore(try AppDatabase.inMemory())
-        store.startWorkout(store.plan.workouts[0])
+        store.startWorkout(store.starterPlan.workouts[0])
         let session = store.player?.state.sessionId
-        store.startWorkout(store.plan.workouts[1])
+        store.startWorkout(store.starterPlan.workouts[1])
         XCTAssertNotNil(store.alertMessage)
         XCTAssertEqual(store.player?.state.sessionId, session)
     }
@@ -69,7 +69,7 @@ final class AppDatabaseTests: XCTestCase {
         XCTAssertEqual(store.audit.first?.action, "Chấp nhận đề xuất")
 
         let relaunched = AppStore(database: database)
-        XCTAssertEqual(relaunched.plan, store.plan)
+        XCTAssertEqual(relaunched.starterPlan, store.starterPlan)
         XCTAssertEqual(relaunched.recommendations.first { $0.id == recommendation.id }?.decision, .accepted)
         // A second decision on the same recommendation is ignored.
         relaunched.decide(recommendation, accept: false)
@@ -80,11 +80,11 @@ final class AppDatabaseTests: XCTestCase {
     func testResetKeepsWelcomeFlagAndEndsWorkout() throws {
         let store = makeStore(try AppDatabase.inMemory())
         store.updateSettings { $0.hasSeenWelcome = true }
-        XCTAssertTrue(store.renamePlan("Khác"))
-        store.startWorkout(store.plan.workouts[0])
+        XCTAssertTrue(store.renameStarterPlan("Khác"))
+        store.startWorkout(store.starterPlan.workouts[0])
         store.resetDemoData()
         XCTAssertNil(store.player)
-        XCTAssertEqual(store.plan.title, MockData.plan.title)
+        XCTAssertEqual(store.starterPlan.title, MockData.plan.title)
         XCTAssertTrue(store.settings.hasSeenWelcome)
         XCTAssertTrue(store.audit.isEmpty)
     }
