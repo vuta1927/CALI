@@ -536,6 +536,225 @@
           "measuredAt": "2026-11-09T06:45:00Z"
         }
       }
+    },
+    {
+      "name": "criteria_reserved_key_rpe",
+      "reason": "CON-008 / ADR-067: rpe is the rpe column (ADR-045), never a criteria key",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000045",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000045",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000045",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "rpe": 8
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_free_text_value",
+      "reason": "CON-008 / ADR-067: values are closed tokens, numbers or booleans; no free text",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000046",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000046",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000046",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "technique": "Form ổn nhưng hơi run"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_without_version",
+      "reason": "CON-008 / ADR-067: criteria requires criteriaVersion (dependentRequired)",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000047",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000047",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000047",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteria": {
+            "technique": "good"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_too_many_chips",
+      "reason": "CON-008 / ADR-067: at most 10 chips per criterion",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000048",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000048",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000048",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "condition": [
+              "c0",
+              "c1",
+              "c2",
+              "c3",
+              "c4",
+              "c5",
+              "c6",
+              "c7",
+              "c8",
+              "c9",
+              "c10"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_uppercase_key",
+      "reason": "CON-008 / ADR-067: criterion ids start with a lowercase letter",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000049",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000049",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000049",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "Technique": "good"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_null",
+      "reason": "CON-008 / ADR-067: criteria and criteriaVersion are omitted together, never null",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000050",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000050",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000050",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": null
+        }
+      }
     }
   ]
 }

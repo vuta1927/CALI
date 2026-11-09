@@ -1,0 +1,38 @@
+{
+  "_comment": "CON-008 (ADR-066). Wire sample of GET /v1/criteria-config right after db/008: criteria config version 1 (= db/008 seed = the config bundled in the iOS app) plus the db/005 indicator set (set version = sum of row versions = 6). tools/validate_handoff.py checks it against the OpenAPI CriteriaConfig schema (without this _comment key), the db/008 seed and the db/005 seed.",
+  "version": 1,
+  "publishedAt": "2026-11-09T00:00:00Z",
+  "supportedTypes": ["number", "choice", "scale", "chips", "toggle"],
+  "criteria": [
+    {"id": "technique", "type": "choice", "label": "Kỹ thuật (tự đánh giá)", "icon": "star",
+     "appliesTo": {"disciplines": ["*"]}, "required": false, "enabled": true,
+     "options": [{"v": "poor", "label": "Chưa ổn", "hint": "Form vỡ"},
+                 {"v": "ok", "label": "Ổn", "hint": "Vài lỗi nhỏ"},
+                 {"v": "good", "label": "Chuẩn", "hint": "Giữ form tốt"}]},
+    {"id": "rpe", "type": "scale", "label": "Mức gắng sức (RPE)", "icon": "chart", "hint": "10 = không thể thêm lần nào.",
+     "appliesTo": {"disciplines": ["gym"]}, "min": 6, "max": 10, "step": 1, "required": false, "enabled": true},
+    {"id": "condition", "type": "chips", "label": "Điều kiện tập", "icon": "swap",
+     "appliesTo": {"disciplines": ["calisthenics"]}, "prefill": "previousSet", "splitsTrend": true, "required": false, "enabled": true,
+     "options": [{"v": "same", "label": "Như set trước"}, {"v": "assist", "label": "Có trợ lực"},
+                 {"v": "variant", "label": "Đổi biến thể"}, {"v": "equip", "label": "Đổi dụng cụ"}]},
+    {"id": "equipment", "type": "chips", "label": "Dụng cụ", "icon": "barbell",
+     "appliesTo": {"disciplines": ["gym"]}, "prefill": "previousSet", "splitsTrend": true, "required": false, "enabled": true,
+     "options": [{"v": "barbell", "label": "Tạ đòn"}, {"v": "dumbbell", "label": "Tạ đơn"},
+                 {"v": "machine", "label": "Máy"}, {"v": "smith", "label": "Smith"}]},
+    {"id": "pain", "type": "toggle", "label": "Đau bất thường trong set", "icon": "alert",
+     "hint": "Chỉ ghi lại để bạn xem lại. Ứng dụng không chẩn đoán.",
+     "appliesTo": {"disciplines": ["*"]}, "required": false, "enabled": true}
+  ],
+  "indicators": {
+    "version": 6,
+    "publishedAt": "2026-11-09T00:00:00Z",
+    "indicators": [
+      {"id": "best_hold_seconds", "version": 1, "kind": "performance", "label": "Giữ lâu nhất", "unit": "giây", "step": 1, "aggregation": "max", "measurementTypes": ["hold"], "enabled": true},
+      {"id": "best_set_reps", "version": 1, "kind": "performance", "label": "Set tốt nhất", "unit": "lần", "step": 1, "aggregation": "max", "measurementTypes": ["reps"], "enabled": true},
+      {"id": "milestone_hold_seconds", "version": 1, "kind": "milestone", "label": "Lần đầu giữ được", "unit": "giây", "step": 1, "aggregation": "max", "measurementTypes": ["hold"], "enabled": true},
+      {"id": "milestone_reps", "version": 1, "kind": "milestone", "label": "Lần đầu làm được", "unit": "lần", "step": 1, "aggregation": "max", "measurementTypes": ["reps"], "enabled": true},
+      {"id": "weekly_total_reps", "version": 1, "kind": "volume", "label": "Tổng lần / tuần", "unit": "lần", "step": 1, "aggregation": "sum", "measurementTypes": ["reps"], "enabled": true},
+      {"id": "weekly_total_hold_seconds", "version": 1, "kind": "volume", "label": "Tổng thời gian giữ / tuần", "unit": "giây", "step": 1, "aggregation": "sum", "measurementTypes": ["hold"], "enabled": true}
+    ]
+  }
+}

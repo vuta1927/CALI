@@ -1,0 +1,109 @@
+{
+  "_comment": "SAMPLE ONLY (CON-008) - not production data. Sets entered with criteria config version 1 (fixtures/criteria_config.json). Pull-up (calisthenics): technique + condition chips in the criteria map, pain stays the painReported column. Back squat (gym): equipment chips in the map; RPE stays the rpe column (ADR-045). A legacy-style set without criteria omits both criteriaVersion and criteria. Ids are illustrative; parents must be synced before children.",
+  "deviceId": "d0000000-0000-4000-8000-000000000008",
+  "mutations": [
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000001",
+      "entityType": "set_result",
+      "entityId": "e4000000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-09T07:10:00Z",
+      "payload": {
+        "id": "e4000000-0000-4000-8000-000000000001",
+        "executionId": "e5000000-0000-4000-8000-000000000001",
+        "setIndex": 1,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "reps", "repMin": 5, "repMax": 8},
+          "setCount": 3,
+          "restSeconds": 90,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+        },
+        "actualReps": 7,
+        "painReported": false,
+        "criteriaVersion": 1,
+        "criteria": {"technique": "good", "condition": ["same"]},
+        "confirmedAt": "2026-11-09T07:10:00Z"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000002",
+      "entityType": "set_result",
+      "entityId": "e4000000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-09T07:13:00Z",
+      "payload": {
+        "id": "e4000000-0000-4000-8000-000000000002",
+        "executionId": "e5000000-0000-4000-8000-000000000001",
+        "setIndex": 2,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "reps", "repMin": 5, "repMax": 8},
+          "setCount": 3,
+          "restSeconds": 90,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+        },
+        "actualReps": 5,
+        "painReported": false,
+        "criteriaVersion": 1,
+        "criteria": {"technique": "ok", "condition": ["assist"]},
+        "confirmedAt": "2026-11-09T07:13:00Z"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000003",
+      "entityType": "set_result",
+      "entityId": "e4000000-0000-4000-8000-000000000003",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-09T07:40:00Z",
+      "payload": {
+        "id": "e4000000-0000-4000-8000-000000000003",
+        "executionId": "e5000000-0000-4000-8000-000000000002",
+        "setIndex": 1,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "load", "reps": 5, "loadKg": 60},
+          "setCount": 3,
+          "restSeconds": 150,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+        },
+        "actualReps": 5,
+        "actualLoadKg": 60,
+        "rpe": 8,
+        "criteriaVersion": 1,
+        "criteria": {"technique": "good", "equipment": ["barbell"]},
+        "confirmedAt": "2026-11-09T07:40:00Z"
+      }
+    },
+    {
+      "mutationId": "e1000000-0000-4000-8000-000000000004",
+      "entityType": "set_result",
+      "entityId": "e4000000-0000-4000-8000-000000000004",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-09T07:44:00Z",
+      "payload": {
+        "id": "e4000000-0000-4000-8000-000000000004",
+        "executionId": "e5000000-0000-4000-8000-000000000002",
+        "setIndex": 2,
+        "status": "completed",
+        "prescribedSnapshot": {
+          "target": {"kind": "load", "reps": 5, "loadKg": 60},
+          "setCount": 3,
+          "restSeconds": 150,
+          "catalogVersion": 1,
+          "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9"
+        },
+        "actualReps": 5,
+        "actualLoadKg": 60,
+        "confirmedAt": "2026-11-09T07:44:00Z"
+      }
+    }
+  ]
+}

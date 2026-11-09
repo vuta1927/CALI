@@ -80,10 +80,16 @@ This section describes the conceptual model. **Wire names are canonical**: OpenA
 - Mỗi bài trong catalog có `discipline` (bắt buộc, `calisthenics|gym|running`, dùng lại enum `Discipline`), `measurementType` và `focusTags`. `mixed` chỉ dùng cho giáo án (`PrimaryDiscipline`), không hợp lệ cho bài tập (ADR-061).
 - **`measurementType` luôn tính ra từ `type`, không lưu** (ADR-060): `static_hold`→`hold`; `reps`, `timed_reps`, `skill_attempt`→`reps`; `interval`, `duration`→`duration`; `distance`→`distance`; `load`→`load`. Catalog bundle kiểm tra cặp này bằng `if/then`; OpenAPI đánh dấu `readOnly`. Không có cột SQL `measurement_type`.
 - `discipline` độc lập với `type`: bài kéo xà đeo tạ là `calisthenics` + `load`. Khi nhập catalog không ghi `discipline`, SQL gán mặc định theo `type` (`distance`/`duration`→`running`, `load`→`gym`, còn lại→`calisthenics`), giống quy tắc backfill `primary_discipline` của db/004.
-- `focusTags`: slug tự do (ví dụ `push`, `core`), tối đa 10, không trùng, mặc định `[]`. Chưa có bộ từ vựng cố định; bộ lọc theo tag thuộc CON-008.
+- `focusTags`: slug tự do (ví dụ `push`, `core`), tối đa 10, không trùng, mặc định `[]`. Chưa có bộ từ vựng cố định. Bộ lọc tiêu chí theo tag **chưa làm** trong CON-008 (`appliesTo` có `disciplines`, `measurementTypes`, `exerciseIds`, ADR-066); để tới khi PO chốt bộ tag.
 - **Bài tạ `load`**: một set = `reps` lần với `loadKg` kg, ví dụ `3 × 5 lần @ 60 kg` = `setCount=3`, `target={kind:load, reps:5, loadKg:60}`. Mỗi set một mức tạ; không có khoảng tạ, %1RM hay pyramid trong slice này (ADR-062). Set kết thúc bằng thao tác dừng, không có deadline.
 - `loadKg` và `actualLoadKg` là kg, 0..1000, **tối đa 2 chữ số thập phân**. Giá trị nhiều chữ số hơn bị **từ chối**, không làm tròn. 0 kg hợp lệ (thanh rỗng hoặc chỉ khung). Bước 2,5 kg chỉ là gợi ý UI; lb chỉ là quy đổi hiển thị (ADR-046). Volume = reps × kg luôn tính ra, không nằm trong payload hay cột SQL.
 - Quy tắc chéo trường (backend + CaliDomain, ADR-020; vector ở `fixtures/validation/business_rules.json`): `actualLoadKg` chỉ được có khi `prescribedSnapshot.target.kind = load`; set `completed` loại load cần cả `actualReps` và `actualLoadKg`; `target.kind = load` phải khớp bài loại `load`. CaliDomain đã có prescription `load` và kiểm tra trên (fixture `fixtures/reducer/load_reps.json`); giao diện app chưa hỗ trợ (ios-agent).
+
+### 3.3 Tiêu chí đánh giá set (CON-008, docs/18 §5)
+- Ngoài trường đo chính (`actualHoldSec`, `actualReps`, `actualLoadKg`… theo `measurementType`), một set có thể có `criteriaVersion` + `criteria`: map `id tiêu chí → giá trị` theo bộ tiêu chí phiên bản đó. Có cái này thì phải có cái kia; cả hai đều không bắt buộc (ADR-067).
+- Giá trị: token trong `options[].v` (choice), danh sách token (chips), số (scale/number), boolean (toggle). Không có chữ tự do. `rpe` và đau vẫn là trường riêng (`rpe`, `painReported`, ADR-045); tiêu chí `rpe`/`pain` trong cấu hình chỉ quyết định có hiện ô đó hay không.
+- Buổi đang tập giữ phiên bản tiêu chí lúc bắt đầu buổi; phiên bản mới chỉ áp cho set ghi sau đó. Lịch sử đọc theo phiên bản đã ghi. Tất cả tiêu chí đều tuỳ chọn; ghi set không bao giờ bị chặn vì thiếu tiêu chí.
+- Luật theo phiên bản (backend + CaliDomain, ADR-020; vector `criteria_*` trong `fixtures/validation/business_rules.json`): phiên bản lạ, khoá không phải tiêu chí đang bật, giá trị ngoài `options` hoặc `min..max`, sai kiểu ⇒ `validation_failed`.
 
 Superset design can reuse grouped planned exercises later; MVP executes linear sequence.
 
