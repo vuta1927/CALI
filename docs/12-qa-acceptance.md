@@ -17,7 +17,7 @@
 | T-04 | result confirmation | double tap confirm | exactly one `set_result`, one outbox semantic mutation |
 | T-05 | rest 90s | add 30s, return foreground | deadline + reminder rescheduled, no duplicate cue |
 | T-06 | airplane mode | finish full workout | all data local; sync queued |
-| T-07 | online recovered | replay push same mutation 10x | 1 DB row, duplicate receipt consistent |
+| T-07 | online recovered | replay push same mutation 10x | 1 DB row, duplicate receipt consistent (backend: `SyncPushTests.Same_push_sent_ten_times_concurrently_writes_once_and_replays_the_receipt`, B2) |
 | T-08 | server returns 409 | modify same plan on 2 devices | no silent overwrite; conflict visible |
 | T-09 | app killed after confirm | relaunch | resume from durable state, no duplicate set |
 | T-10 | media never downloaded | open exercise offline | poster fallback and cues; workout continues |

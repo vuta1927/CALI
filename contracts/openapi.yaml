@@ -293,6 +293,9 @@ paths:
         change-log entry. Per-mutation conflicts do not fail unrelated mutations.
         The first push from a `deviceId` registers it for the caller (`devices` row
         upserted in the same transaction, `last_seen_at` refreshed); ADR-033.
+        The whole push is one transaction; each mutation runs in its own savepoint so a
+        rejected or conflicting mutation leaves the others applied. A malformed envelope
+        or batch fails the whole request with 400 before anything is written (ADR-069).
       requestBody:
         required: true
         content:
@@ -310,8 +313,23 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token is valid but its subject has no active user record (`code` = `user_not_found`); nothing is applied.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '409':
           description: '`deviceId` is already registered to another user (`code` = `device_owner_mismatch`); nothing is applied (ADR-033).'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '413':
+          description: Request body larger than 1 MiB (`code` = `payload_too_large`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not JSON (`code` = `unsupported_media_type`).
           content:
             application/problem+json:
               schema: {$ref: '#/components/schemas/Problem'}
@@ -1019,7 +1037,14 @@ components:
       required: [mutationId, entityType, entityId, action, baseVersion, clientChangedAt, payload]
       properties:
         mutationId: {type: string, format: uuid}
-        entityType: {$ref: '#/components/schemas/SyncEntityType'}
+        entityType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: >-
+            Writable types are listed in SyncEntityType. Any other value is accepted by the envelope
+            and answered with a `forbidden_entity` result, so a newer client never fails a whole batch
+            on an entity type this server does not accept (ADR-069).
         entityId: {type: string, format: uuid}
         action: {type: string, enum: [upsert, delete]}
         baseVersion: {type: integer, minimum: 0, format: int64}
@@ -1029,6 +1054,7 @@ components:
           additionalProperties: true
     SyncPushRequest:
       type: object
+      additionalProperties: false
       required: [deviceId, mutations]
       properties:
         deviceId: {type: string, format: uuid}
@@ -1051,7 +1077,9 @@ components:
       description: >-
         ADR-021. Results with `retryable: true` are never persisted as receipts, so the client may
         resend the same mutationId later (e.g. after the missing parent is applied). Non-retryable
-        results are persisted and replayed for the same mutationId (except mutation_id_reused).
+        results are persisted and replayed with status `duplicate` for the same mutationId, except
+        mutation_id_reused and forbidden_entity (ADR-069). The replay key is the mutation fingerprint
+        over entityType, entityId, action, baseVersion and payload; clientChangedAt is not part of it.
       required: [code, message, retryable]
       properties:
         code:
@@ -1061,7 +1089,7 @@ components:
             dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
             version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
             validation_failed (status rejected) - schema or business rule violation (ADR-020);
-            forbidden_entity (status rejected) - entityType not writable by devices;
+            forbidden_entity (status rejected, not persisted) - entityType not writable by devices;
             cross_user_reference (status rejected) - references an entity owned by another user;
             mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031);
             active_plan_limit (status rejected) - a plan_activation would make more than the server limit
