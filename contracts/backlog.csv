@@ -40,6 +40,7 @@ BE-002,M2,BE,BE-001,"PostgreSQL migration, seed catalog, per-user isolation test
 BE-003,M2,BE,BE-002,transactional sync push idempotent + receipts
 BE-004,M2,BE,BE-003,cursor pull/change-log + tombstones
 BE-005,M2,BE,BE-004,auth Apple + hardening (B4)
+BE-006,M2,BE,BE-002,object storage + signed media URLs for catalog
 CON-009,M2,Integrator/BE/iOS,BE-004,personal content sync
 IOS-007,M2,iOS,"IOS-001,BE-004",outbox push/pull/visible status/conflict inbox
 IOS-008,M2,iOS/BE,IOS-007,"Sign in with Apple, guest attach workflow"

@@ -4,7 +4,9 @@ using Cali.Api.Errors;
 using Cali.Api.Health;
 using Cali.Api.RateLimiting;
 using Cali.Api.Telemetry;
+using Cali.Application.Catalog;
 using Cali.Application.Identity;
+using Cali.Application.Plans;
 using Cali.Infrastructure;
 using Cali.Infrastructure.Persistence.Migrations;
 using Microsoft.AspNetCore.Diagnostics;
@@ -36,6 +38,11 @@ internal static class CaliApi
 
         services.AddCaliInfrastructure();
         services.AddScoped<GetCurrentUserProfile>();
+        services.AddScoped<ListExercises>();
+        services.AddScoped<GetExercise>();
+        services.AddScoped<GetCriteriaConfig>();
+        services.AddScoped<ListPlans>();
+        services.AddScoped<CreatePlan>();
         services.AddCaliAuthentication();
         services.AddCaliRateLimiting();
         services.AddCaliTelemetry(builder.Configuration);
@@ -65,6 +72,8 @@ internal static class CaliApi
             .AllowAnonymous().DisableRateLimiting();
 
         app.MapMeEndpoints();
+        app.MapCatalogEndpoints();
+        app.MapPlanEndpoints();
     }
 
     /// <summary>Development only, and only when <c>Migrations:ApplyOnStartup</c> is true.</summary>

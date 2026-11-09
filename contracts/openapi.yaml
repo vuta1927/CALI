@@ -102,10 +102,14 @@ paths:
           schema: {type: string, maxLength: 50}
         - name: cursor
           in: query
+          description: Opaque `nextCursor` from the previous page; ordering is (slug, id), stable under inserts.
           schema: {type: string}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      description: >-
+        BE-001. Only published exercises; media lists the newest public, reviewed version per kind.
+        `url` stays null until signed media URLs land (BE-006). Anonymous, rate limited per client IP.
       responses:
         '200':
           description: Page of approved exercises
@@ -113,6 +117,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExercisePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/exercises/{id}:
     get:
       tags: [Catalog]
@@ -130,6 +138,8 @@ paths:
                 $ref: '#/components/schemas/Exercise'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/criteria-config:
     get:
       tags: [Catalog]
@@ -190,10 +200,16 @@ paths:
       tags: [Plans]
       summary: List user's synced plan revisions
       operationId: listPlans
+      description: >-
+        BE-001: the caller's non-deleted plan revisions (all statuses, including superseded and
+        archived) ordered by creation time then id. The cursor is opaque; revisions created after a
+        page was read appear on later pages, none are skipped or repeated. Only the token subject's
+        plans are ever returned.
       parameters:
         - name: cursor
           in: query
-          schema: {type: string}
+          description: '`nextCursor` from the previous page. An unknown or malformed cursor is a 400.'
+          schema: {type: string, maxLength: 512}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 50}
@@ -204,12 +220,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlanPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     post:
       tags: [Plans]
       summary: Create a plan online (offline clients should prefer sync push)
       operationId: createPlan
+      description: >-
+        BE-002: creates a root revision (revision 1, status current, lineageId = id, no parent).
+        Validation is the same as for sync push (docs/06). Idempotent (ADR-068): a repeat with the
+        same Idempotency-Key and an equivalent body (same JSON after key ordering and number
+        normalization) returns the stored 201 body; the same key with a different body is 409
+        `idempotency_key_reused`. Only successful requests are stored, so a failed request can be
+        retried with the same key. Validation errors are 400 `validation_failed` with `errors`
+        keyed by field path (e.g. `workouts[0].exercises[1].target.repMax`). Exceeding the limit on
+        non-deleted plans (`plan_count_limit`, 50) is 409 `plan_count_limit`; an id already in use
+        is 409 `conflict`.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -227,8 +257,32 @@ paths:
                 $ref: '#/components/schemas/TrainingPlan'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token is valid but its subject has no active user record (`code` = `user_not_found`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >-
+            `code` = `idempotency_key_reused` (same key, different request), `plan_count_limit`
+            (non-deleted plan limit reached) or `conflict` (an id is already in use).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '413':
+          description: Request body larger than 1 MiB (`code` = `payload_too_large`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not JSON (`code` = `unsupported_media_type`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/sync/push:
     post:
       tags: [Sync]
