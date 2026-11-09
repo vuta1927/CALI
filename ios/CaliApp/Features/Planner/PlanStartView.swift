@@ -3,7 +3,7 @@ import SwiftUI
 
 /// MP-04 "Bắt đầu theo" / "Tiếp tục" and MP-05 (limit reached). The start date is today or later (D9);
 /// days before it are never counted as missed.
-// TODO(IOS-015): late start ("bắt đầu từ tuần x") once program length comes from phases (CON-005).
+// TODO(IOS-013): late start ("bắt đầu từ tuần x"); program length now comes from phases (IOS-015).
 struct PlanStartView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss

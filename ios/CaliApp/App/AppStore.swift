@@ -19,6 +19,8 @@ final class AppStore {
     private(set) var recommendations: [Recommendation]
     private(set) var audit: [AuditEntry]
     private(set) var settings: AppSettings
+    /// CON-005 goals of every plan lineage.
+    private(set) var goals: [PlanGoal] = []
 
     /// The in-flight (or just finished) workout. Kept after completion so the summary screen can
     /// render; removed when the player is closed.
@@ -60,8 +62,10 @@ final class AppStore {
         recommendations = loaded.recommendations
         audit = loaded.audit
         settings = loaded.settings
+        goals = loaded.goals
         alertMessage = openError
         restoreActiveSession()
+        closeEndedGoalScopes(now: now)
     }
 
     private static func open(now: Date, error: inout String?) -> AppDatabase? {
@@ -200,6 +204,7 @@ final class AppStore {
         if model.state.phase.isTerminal {
             // The coordinator wrote the history row in the same transaction as the terminal state.
             reloadContent()
+            if model.state.status == .completed { flagReachedGoals(after: model.state.sessionId) }
         }
         syncSideEffects()
     }
@@ -307,6 +312,7 @@ final class AppStore {
         recommendations = loaded.recommendations
         audit = loaded.audit
         settings = loaded.settings
+        goals = loaded.goals
     }
 
     // MARK: Recommendations (approval workflow + audit trail, AGENTS rule 5)

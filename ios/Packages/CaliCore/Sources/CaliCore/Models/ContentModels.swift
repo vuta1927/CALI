@@ -181,13 +181,16 @@ public struct WorkoutPlan: Codable, Hashable, Sendable, Identifiable {
     public var createdAt: Date?
     /// Live (not cancelled) activations of the lineage, oldest first.
     public var activations: [PlanActivation]
+    /// CON-005 phases of this revision, in order. Their total is the weekly program length.
+    public var phases: [PlanPhase] = []
 
     public init(
         deletedAt: Date? = nil, id: UUID, title: String, workouts: [PlannedWorkout], lineageId: UUID? = nil, revision: Int = 1,
         kind: PlanKind = .weekly, eventDate: LocalDate? = nil, eventName: String? = nil, primaryDiscipline: PlanDiscipline? = nil,
         endedAt: Date? = nil, endReason: PlanEndReason? = nil, endNote: String? = nil, archivedAt: Date? = nil,
-        createdAt: Date? = nil, activations: [PlanActivation] = []
+        createdAt: Date? = nil, activations: [PlanActivation] = [], phases: [PlanPhase] = []
     ) {
+        self.phases = phases
         self.deletedAt = deletedAt
         self.id = id
         self.title = title
@@ -208,7 +211,7 @@ public struct WorkoutPlan: Codable, Hashable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case deletedAt, id, title, workouts, lineageId, revision, kind, eventDate, eventName, primaryDiscipline,
-             endedAt, endReason, endNote, archivedAt, createdAt, activations
+             endedAt, endReason, endNote, archivedAt, createdAt, activations, phases
     }
 
     /// Snapshots written before IOS-013 only have `id`, `title`, `workouts` and `deletedAt`.
@@ -230,6 +233,7 @@ public struct WorkoutPlan: Codable, Hashable, Sendable, Identifiable {
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
         activations = try c.decodeIfPresent([PlanActivation].self, forKey: .activations) ?? []
+        phases = try c.decodeIfPresent([PlanPhase].self, forKey: .phases) ?? []
     }
 
     public var lineageState: PlanLineageState {
@@ -241,11 +245,10 @@ public struct WorkoutPlan: Codable, Hashable, Sendable, Identifiable {
         PlanLifecycle.status(of: lineageState, today: today)
     }
 
-    // TODO(IOS-015): weekly program length comes from plan phases (CON-005); until then a weekly plan never
-    // finishes on its own.
+    /// A weekly plan's length is the sum of its phases (CON-005); without phases it never finishes on its own.
     public var program: PlanProgram {
         if kind == .event, let eventDate { return .event(eventDate: eventDate) }
-        return .weekly(totalWeeks: nil)
+        return .weekly(totalWeeks: phases.isEmpty ? nil : PhaseTimeline.totalWeeks(phases))
     }
 
     /// Workouts tied to a weekday, as schedule slots.

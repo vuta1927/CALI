@@ -1,10 +1,8 @@
 import CaliDomain
 import SwiftUI
 
-/// One plan (MP-08 detail, mockup `overview`): status, schedule and lifecycle actions.
-///
-/// The Lộ trình / Tiến bộ segments, phase card and goals come with IOS-015; program length (and with it
-/// "Tuần x/y" and the late-start choice) comes from phases (CON-005).
+/// One plan (MP-08 detail, mockup `overview`): status, week/phase, pinned goals, schedule and lifecycle
+/// actions. Lộ trình, Mục tiêu and Tiến bộ open from the overview (IOS-015).
 struct PlanDetailView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -44,6 +42,7 @@ struct PlanDetailView: View {
                 if store.canRecordRaceResult(plan, now: now) || !store.raceResults(of: plan).isEmpty {
                     RaceResultCard(plan: plan, canRecord: store.canRecordRaceResult(plan, now: now)) { recordingRace = true }
                 }
+                PlanOverviewCard(plan: plan, now: now)
                 if status == .active { weekSection(plan, now: now) }
                 schedule(plan, now: now, editable: editable)
                 SampleFooter(showsSample: store.showsSampleData)

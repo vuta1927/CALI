@@ -90,6 +90,9 @@ public enum CaliDatabase {
         migrator.registerMigration("v2_content") { db in
             try db.execute(sql: contentSchemaV2)
         }
+        migrator.registerMigration("v3_goals") { db in
+            try db.execute(sql: goalsSchemaV3)
+        }
         return migrator
     }
 
@@ -102,6 +105,38 @@ public enum CaliDatabase {
     /// (1 = changed locally since the last acknowledged version).
     /// TODO(IOS-007): content edits do not enqueue `sync_outbox` mutations yet; sync push sends every dirty
     /// row first. Expires when IOS-007 implements push.
+    /// IOS-015: CON-005 phases (per revision) and goals (per lineage). Goals keep the full payload in `json`;
+    /// `current` is computed on the device and never stored. Same sync columns as v2.
+    static let goalsSchemaV3 = """
+        CREATE TABLE plan_phases (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_id TEXT NOT NULL REFERENCES training_plans(id) ON DELETE CASCADE,
+            order_index INTEGER NOT NULL CHECK (order_index >= 0),
+            name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 120),
+            weeks INTEGER NOT NULL CHECK (weeks BETWEEN 1 AND 52),
+            description TEXT CHECK (description IS NULL OR length(description) <= 500),
+            deleted_at TEXT,
+            updated_at TEXT NOT NULL,
+            server_version INTEGER,
+            dirty INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX plan_phases_plan ON plan_phases(plan_id, order_index);
+
+        CREATE TABLE plan_goals (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_lineage_id TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('active', 'reached', 'achieved', 'missed', 'archived')),
+            pinned INTEGER NOT NULL DEFAULT 0,
+            json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            server_version INTEGER,
+            dirty INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX plan_goals_lineage ON plan_goals(plan_lineage_id);
+        """
+
     static let contentSchemaV2 = """
         ALTER TABLE local_session_state ADD COLUMN title TEXT NOT NULL DEFAULT '';
 

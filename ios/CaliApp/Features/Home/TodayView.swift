@@ -5,7 +5,7 @@ import SwiftUI
 /// plan, this week, quick test, AI.
 ///
 /// Mockup blocks that need features not built yet are left out rather than filled with sample
-/// numbers: running card (IOS-016), phase caption (IOS-015).
+/// numbers: running card (IOS-016).
 struct TodayView: View {
     @Environment(AppStore.self) private var store
     @Binding var tab: AppTab
@@ -54,7 +54,8 @@ struct TodayView: View {
                 if followed.isEmpty { noPlanCard } else { restCard(now: now) }
             } else {
                 ForEach(items) { item in
-                    WorkoutHeroCard(workout: item.workout, date: now, done: item.isDone, planTitle: showsPlan ? item.plan.title : nil) {
+                    WorkoutHeroCard(workout: item.workout, date: now, done: item.isDone, planTitle: showsPlan ? item.plan.title : nil,
+                                    phaseCaption: store.phaseCaption(item.plan, now: now)) {
                         store.startWorkout(item.workout)
                     }
                 }
@@ -325,6 +326,8 @@ struct WorkoutHeroCard: View {
     var done = false
     /// Shown when several plans are followed (MP-09 plan chip).
     var planTitle: String?
+    /// "Tuần x/y · giai đoạn" when the plan has a roadmap (IOS-015).
+    var phaseCaption: String?
     let onStart: () -> Void
 
     var body: some View {
@@ -341,7 +344,7 @@ struct WorkoutHeroCard: View {
                 if let planTitle { TagChip(text: planTitle, systemImage: "calendar") }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(Fmt.weekdayLong(Fmt.isoWeekday(date)))
+                Text([Fmt.weekdayLong(Fmt.isoWeekday(date)), phaseCaption].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(Color.caliSecondary)
                 Text(workout.title)

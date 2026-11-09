@@ -63,7 +63,13 @@ struct RootView: View {
         }
         .sheet(isPresented: Binding(get: { debugRacePlan != nil }, set: { if !$0 { debugRacePlan = nil } })) {
             if let id = debugRacePlan, let plan = store.plan(id) {
-                RaceResultSheet(plan: plan, plannedDistance: 10_000).environment(store)
+                switch DebugScenario.launch {
+                case .overview: NavigationStack { PlanDetailView(lineageId: id) }.environment(store)
+                case .goals: NavigationStack { GoalsView(lineageId: id) }.environment(store)
+                case .roadmap: NavigationStack { RoadmapView(lineageId: id) }.environment(store)
+                case .progress: NavigationStack { PlanProgressView(lineageId: id) }.environment(store)
+                default: RaceResultSheet(plan: plan, plannedDistance: 10_000).environment(store)
+                }
             }
         }
         #endif

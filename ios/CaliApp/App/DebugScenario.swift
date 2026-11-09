@@ -3,7 +3,7 @@ import CaliCore
 import CaliDomain
 import Foundation
 
-/// DEBUG only: `-uiScenario run|race` opens a screen that needs several steps to reach, for simulator
+/// DEBUG only: `-uiScenario run|race|overview|goals|roadmap|progress` opens a screen that needs several steps to reach, for simulator
 /// screenshots. It runs on an in-memory store (nothing reaches the local database) through the normal
 /// store commands; the event plan it creates is the user's own kind of data, not a sample.
 enum DebugScenario: String {
@@ -11,6 +11,8 @@ enum DebugScenario: String {
     case run
     /// MP-07 race result sheet of an event plan whose event day is today.
     case race
+    /// IOS-015 screens of the starter plan with a roadmap, goals and one recorded session.
+    case overview, goals, roadmap, progress
 
     static var launch: DebugScenario? { UserDefaults.standard.string(forKey: "uiScenario").flatMap(Self.init(rawValue:)) }
 
@@ -22,6 +24,8 @@ enum DebugScenario: String {
                                   target: .distance(distanceMeters: self == .run ? 5_000 : 10_000, durationSeconds: self == .run ? nil : 3_000),
                                   restSeconds: 0)
         switch self {
+        case .overview, .goals, .roadmap, .progress:
+            return seedGoals(store)
         case .run:
             store.startWorkout(PlannedWorkout(id: UUID(), weekday: store.today().isoWeekday, title: "Chạy nhẹ 5 km", focus: "", exercises: [run]))
             store.player?.startSet()
@@ -34,6 +38,50 @@ enum DebugScenario: String {
             _ = store.startPlan(id, from: today)
             return id
         }
+    }
+
+    /// Phases, three goals (a pinned one that the recorded session reaches, a pinned one still pursued, a
+    /// locked milestone) and one completed session, all through the normal store commands.
+    @MainActor
+    private func seedGoals(_ store: AppStore) -> UUID? {
+        guard let plan = store.plans.first else { return nil }
+        let base = PlanPhase(id: UUID(), name: "Nền tảng", weeks: 4, description: "Giữ form, tăng dần thời gian giữ.")
+        _ = store.savePhases(plan.lineageId, [base, PlanPhase(id: UUID(), name: "Tăng sức", weeks: 3), PlanPhase(id: UUID(), name: "Kiểm tra", weeks: 1)])
+        let pairs = plan.workouts.flatMap { w in w.exercises.map { (workout: w, item: $0) } }
+        guard let reps = pairs.first(where: { store.exercise($0.item.exerciseId)?.type == .reps }),
+              let hold = pairs.first(where: { store.exercise($0.item.exerciseId)?.type == .staticHold }) else { return plan.lineageId }
+        func name(_ id: UUID) -> String { store.exercise(id)?.name ?? "" }
+        let first = PlanGoal(id: UUID(), planLineageId: plan.lineageId, title: "\(name(reps.item.exerciseId)) 10 lần một set",
+                             indicatorId: "best_set_reps", exerciseId: reps.item.exerciseId, baseline: 6, target: .value(10), pinned: true)
+        let second = PlanGoal(id: UUID(), planLineageId: plan.lineageId, title: "Giữ \(name(hold.item.exerciseId)) 30 giây",
+                              indicatorId: "best_hold_seconds", exerciseId: hold.item.exerciseId, baseline: 12, target: .value(30),
+                              scopePhaseId: base.id, pinned: true)
+        let milestone = PlanGoal(id: UUID(), planLineageId: plan.lineageId, title: "\(name(hold.item.exerciseId)) giữ 45 giây",
+                                 indicatorId: "milestone_hold_seconds", exerciseId: hold.item.exerciseId, target: .value(45))
+        var locked = PlanGoal(id: UUID(), planLineageId: plan.lineageId, title: "\(name(hold.item.exerciseId)) giữ 60 giây",
+                              indicatorId: "milestone_hold_seconds", exerciseId: hold.item.exerciseId, target: .value(60))
+        locked.unlockAfterGoalId = milestone.id
+        for goal in [first, second, milestone, locked] { _ = store.saveGoal(goal) }
+
+        let sessionId = UUID()
+        let specs = [(reps, 11, nil as Int64?), (hold, nil, 21_400 as Int64?)].map { pair, reps, holdMs in
+            (ExecutionSpec(id: UUID(), plannedExerciseId: pair.item.id, exerciseId: pair.item.exerciseId,
+                           catalogVersion: store.exercise(pair.item.exerciseId)?.catalogVersion ?? MockData.catalogVersion,
+                           setCount: 1, target: pair.item.target, restSeconds: 0), reps, holdMs)
+        }
+        var commands: [Command] = [.createSession(CreateSession(commandId: UUID(), sessionId: sessionId, plannedWorkoutId: reps.workout.id,
+                                                                executions: specs.map { $0.0 }))]
+        for (spec, reps, holdMs) in specs {
+            commands += [.startSet(StartSet(commandId: UUID(), countdownSeconds: 0)), .stopSet(SimpleCommand(commandId: UUID())),
+                         .confirmSet(ConfirmSet(commandId: UUID(), setResultId: UUID(), executionId: spec.id, setIndex: 1, status: .completed,
+                                                actualReps: reps, actualHoldMs: holdMs))]
+        }
+        commands.append(.finishSession(SimpleCommand(commandId: UUID())))
+        _ = try? store.recordSession(commands, sessionTitle: reps.workout.title,
+                                     audit: AuditEntry(id: UUID(), at: Date(), action: "Ghi buổi tập", detail: reps.workout.title))
+        store.reloadContent()
+        store.flagReachedGoals(after: sessionId)
+        return plan.lineageId
     }
 }
 #endif

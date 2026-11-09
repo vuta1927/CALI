@@ -14,11 +14,14 @@ public struct LocalContent: Equatable, Sendable {
     /// Newest first.
     public var audit: [AuditEntry]
     public var settings: AppSettings
+    /// CON-005 goals of every lineage, in creation order, without soft-deleted ones.
+    public var goals: [PlanGoal]
 
     public init(
         catalog: [Exercise], plans: [WorkoutPlan], history: [CompletedSession], recommendations: [Recommendation],
-        audit: [AuditEntry], settings: AppSettings
+        audit: [AuditEntry], settings: AppSettings, goals: [PlanGoal] = []
     ) {
+        self.goals = goals
         self.catalog = catalog
         self.plans = plans
         self.history = history
@@ -37,6 +40,8 @@ public struct ContentChange: Sendable {
     public var plans: [WorkoutPlan]
     /// Upserted by id.
     public var recommendations: [Recommendation]
+    /// CON-005 goals, upserted by id (a set `deletedAt` soft-deletes).
+    public var goals: [PlanGoal] = []
     public var settings: AppSettings?
     /// `end_reason` of activations this change closes (CON-003: a closed activation records the lifecycle
     /// command that closed it). Written after the plans.
@@ -47,8 +52,10 @@ public struct ContentChange: Sendable {
 
     public init(
         exercises: [Exercise] = [], plans: [WorkoutPlan] = [], recommendations: [Recommendation] = [],
-        settings: AppSettings? = nil, activationEndReasons: [UUID: ActivationEndReason] = [:], audit: AuditEntry? = nil
+        settings: AppSettings? = nil, activationEndReasons: [UUID: ActivationEndReason] = [:], goals: [PlanGoal] = [],
+        audit: AuditEntry? = nil
     ) {
+        self.goals = goals
         self.exercises = exercises
         self.plans = plans
         self.activationEndReasons = activationEndReasons
@@ -187,6 +194,7 @@ public final class ContentStore: Sendable {
         for plan in change.plans {
             try upsertPlan(db, plan, now: now)
         }
+        try upsertGoals(db, change.goals, now: now)
         for (id, reason) in change.activationEndReasons {
             try db.execute(sql: "UPDATE plan_activations SET end_reason = ?, dirty = 1 WHERE id = ? AND to_date IS NOT NULL",
                            arguments: [reason.rawValue, DBText.id(id)])
@@ -276,6 +284,8 @@ public final class ContentStore: Sendable {
             )
         }
 
+        try upsertPhases(db, planId: planId, plan.phases, now: now)
+
         let keepWorkouts = plan.workouts.map { DBText.id($0.id) }
         try db.execute(
             sql: "DELETE FROM planned_workouts WHERE plan_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
@@ -310,6 +320,46 @@ public final class ContentStore: Sendable {
                                 try DBJSON.encode(item.target), item.restSeconds]
                 )
             }
+        }
+    }
+
+    /// Phases of one revision: exactly `phases`, in order; rows no longer listed are soft-deleted.
+    static func upsertPhases(_ db: Database, planId: String, _ phases: [PlanPhase], now: Date) throws {
+        try db.execute(
+            sql: """
+                UPDATE plan_phases SET deleted_at = ?, dirty = 1
+                WHERE plan_id = ? AND deleted_at IS NULL AND id NOT IN (SELECT value FROM json_each(?))
+                """,
+            arguments: [DBText.time(now), planId, try DBJSON.encode(phases.map { DBText.id($0.id) })]
+        )
+        for (index, phase) in phases.enumerated() {
+            try db.execute(
+                sql: """
+                    INSERT INTO plan_phases (id, plan_id, order_index, name, weeks, description, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET plan_id = excluded.plan_id, order_index = excluded.order_index, name = excluded.name,
+                        weeks = excluded.weeks, description = excluded.description, deleted_at = NULL, updated_at = excluded.updated_at,
+                        dirty = CASE WHEN plan_phases.order_index IS excluded.order_index AND plan_phases.name IS excluded.name
+                                      AND plan_phases.weeks IS excluded.weeks AND plan_phases.description IS excluded.description
+                                      AND plan_phases.deleted_at IS NULL THEN plan_phases.dirty ELSE 1 END
+                    """,
+                arguments: [DBText.id(phase.id), planId, index, phase.name, phase.weeks, phase.description, DBText.time(now)]
+            )
+        }
+    }
+
+    static func upsertGoals(_ db: Database, _ goals: [PlanGoal], now: Date) throws {
+        for goal in goals {
+            try db.execute(
+                sql: """
+                    INSERT INTO plan_goals (id, plan_lineage_id, status, pinned, json, created_at, updated_at, deleted_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET status = excluded.status, pinned = excluded.pinned, json = excluded.json,
+                        updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, dirty = 1
+                    """,
+                arguments: [DBText.id(goal.id), DBText.id(goal.planLineageId), goal.status.rawValue, goal.pinned,
+                            try DBJSON.encode(goal), DBText.time(goal.createdAt ?? now), DBText.time(now), goal.deletedAt.map(DBText.time)]
+            )
         }
     }
 
@@ -390,8 +440,10 @@ public final class ContentStore: Sendable {
             copy.planLineageId = lineageOfWorkout[workoutId]
             return copy
         }
+        let goals = try String.fetchAll(db, sql: "SELECT json FROM plan_goals WHERE deleted_at IS NULL ORDER BY created_at, rowid")
+            .map { try DBJSON.decode(PlanGoal.self, $0) }
         return LocalContent(catalog: catalog, plans: plans, history: attributed, recommendations: recommendations,
-                            audit: audit, settings: settings)
+                            audit: audit, settings: settings, goals: goals)
     }
 
     static func loadPlans(_ db: Database) throws -> [WorkoutPlan] {
@@ -419,6 +471,12 @@ public final class ContentStore: Sendable {
                     guard let id = DBText.uuid(a["id"]), let from = LocalDate(a["from_date"] as String) else { return nil }
                     return PlanActivation(id: id, fromDate: from, toDate: (a["to_date"] as String?).flatMap(LocalDate.init), timezone: a["timezone"])
                 }
+            let phases = try Row.fetchAll(db, sql: """
+                SELECT id, name, weeks, description FROM plan_phases WHERE plan_id = ? AND deleted_at IS NULL ORDER BY order_index, id
+                """, arguments: [planId]).compactMap { p -> PlanPhase? in
+                    guard let id = DBText.uuid(p["id"]) else { return nil }
+                    return PlanPhase(id: id, name: p["name"], weeks: p["weeks"], description: p["description"])
+                }
             func time(_ column: String) throws -> Date? { try (row[column] as String?).map(parseTime) }
             return WorkoutPlan(
                 deletedAt: try time("deleted_at"), id: DBText.uuid(planId) ?? UUID(), title: row["title"], workouts: workouts,
@@ -426,7 +484,7 @@ public final class ContentStore: Sendable {
                 eventDate: (row["event_date"] as String?).flatMap(LocalDate.init), eventName: row["event_name"],
                 primaryDiscipline: PlanDiscipline(rawValue: row["primary_discipline"]), endedAt: try time("ended_at"),
                 endReason: (row["end_reason"] as String?).flatMap(PlanEndReason.init), endNote: row["end_note"],
-                archivedAt: try time("archived_at"), createdAt: try time("created_at"), activations: activations
+                archivedAt: try time("archived_at"), createdAt: try time("created_at"), activations: activations, phases: phases
             )
         }
     }

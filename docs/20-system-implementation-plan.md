@@ -170,8 +170,15 @@ flowchart TB
 > **Trạng thái IOS-014 (2026-11-09):** code và test xong, chờ review.
 > - **P6 bài chạy:** nhập km + giờ/phút/giây, pace tự tính và không lưu; kết quả lưu với `source = manual`. Biên CON-004: 0 hoặc hơn 24 giờ bị từ chối.
 > - **MP-07 "Ghi kết quả thi":** có từ ngày sự kiện. Lưu thành một buổi `distance` đã hoàn thành, gắn với buổi của ngày thi, trong một transaction kèm audit; lặp lệnh không ghi thêm.
-> - **Hoãn:** ghi lùi ngày (ADR-054 chưa có field trong contract nên kết quả mang ngày nhập), đánh dấu mục tiêu đạt (IOS-015), nhập từ Apple Health.
+> - **Hoãn:** ghi lùi ngày (ADR-054 chưa có field trong contract nên kết quả mang ngày nhập), xác nhận mục tiêu chạy (chưa có chỉ số chạy, `TODO(CON-008)`), nhập từ Apple Health.
 > - **Bằng chứng:** `evidence/IOS-014/README.md`.
+
+> **Trạng thái IOS-015 (2026-11-09):** code và test xong, chờ review. Không đổi API/contract (CON-005 đã có).
+> - **Mục tiêu:** nhiều mục tiêu nhỏ theo lineage, ghim tối đa 3, thang kỹ năng (`unlockAfterGoalId`, chặn vòng lặp), "Chưa mở" khi mục tiêu trước chưa được xác nhận. Chạm mức đích sau một buổi hoàn thành chỉ chuyển sang "Chờ xác nhận"; "Đã đạt" chỉ khi người dùng bấm "Xác nhận đạt". Đổi bài hoặc chỉ số bị từ chối (ADR-047). Kết thúc giáo án chuyển mục tiêu đang theo đuổi sang "Chưa đạt" (ADR-053), người dùng gia hạn hoặc lưu trữ.
+> - **Lộ trình:** sửa giai đoạn trên bản nháp, Lưu một lần kèm audit "Sửa lộ trình"; khoảng tuần và trạng thái tự tính; tổng tuần là độ dài giáo án theo tuần ("Tuần x/y"). Xoá giai đoạn hiện tại hoặc rút ngắn qua tuần hiện tại phải xác nhận; mục tiêu của giai đoạn bị xoá chuyển sang cả giáo án.
+> - **Tiến bộ:** mỗi bài trong giáo án có dữ liệu: hiện tại, mốc tuần đầu có dữ liệu, delta và % (chỉ khi có từ 2 tuần), xu hướng theo tuần; bám lịch theo tuần từ tuần 1, không tính hôm nay, bỏ lỡ không tô đỏ.
+> - **Hoãn:** mục tiêu bám lịch / cơ thể / chạy (db/005 chưa có chỉ số, `TODO(CON-008)`); bắt đầu muộn và "Kéo dài" giáo án theo tuần (`TODO(IOS-013)`); ghim KPI riêng.
+> - **Bằng chứng:** `evidence/IOS-015/README.md`.
 
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 

@@ -163,7 +163,7 @@ extension AppStore {
     }
 
     /// Completed sessions in I4 form: the local day they started and the plan they belong to.
-    private func completedRefs() -> [CompletedSessionRef] {
+    func completedRefs() -> [CompletedSessionRef] {
         history.filter { $0.status == .completed && !$0.isSample }.map {
             CompletedSessionRef(sessionId: $0.id, lineageId: $0.planLineageId, plannedWorkoutId: $0.plannedWorkoutId,
                                 date: LocalDate.today(at: $0.startedAt, in: calendar.timeZone))
@@ -209,6 +209,7 @@ extension AppStore {
         }
 
         var workouts: [PlannedWorkout] = []
+        var phases: [PlanPhase] = []
         var action = "Tạo giáo án"
         switch draft.method {
         case .blank: break
@@ -216,6 +217,8 @@ extension AppStore {
         case .clone(let source):
             guard let original = plan(source) else { refuse("Không tìm thấy giáo án để nhân bản."); return nil }
             workouts = original.workouts
+            // Phases belong to one revision, so the copy gets new ids (ADR-057); goals stay with their lineage.
+            phases = original.phases.map { PlanPhase(id: UUID(), name: $0.name, weeks: $0.weeks, description: $0.description) }
             action = "Nhân bản giáo án"
         }
         // New ids: the copy is a separate plan; sessions, activations and AI decisions are never copied (MP-03).
@@ -230,7 +233,7 @@ extension AppStore {
             id: id, title: title, workouts: workouts, kind: draft.kind,
             eventDate: draft.kind == .event ? draft.eventDate : nil,
             eventName: draft.kind == .event && !eventName.isEmpty ? eventName : nil,
-            primaryDiscipline: draft.discipline, createdAt: now
+            primaryDiscipline: draft.discipline, createdAt: now, phases: phases
         )
         return commitContent(ContentChange(plans: [plan]), action: action, detail: title, commandId: commandId, now: now) ? id : nil
     }
@@ -297,13 +300,20 @@ extension AppStore {
         ended.endedAt = now
         ended.endReason = reason
         ended.endNote = note.isEmpty ? nil : note
-        return commitContent(ContentChange(plans: [ended], activationEndReasons: closed.reasons),
+        // ADR-053: goals still pursued become "Chưa đạt"; nothing is marked achieved for the user.
+        let missed = goals(of: lineageId).filter(\.isLive).map { goal -> PlanGoal in
+            var copy = goal
+            copy.status = .missed
+            return copy
+        }
+        return commitContent(ContentChange(plans: [ended], activationEndReasons: closed.reasons, goals: missed),
                              action: "Kết thúc giáo án", detail: "\(plan.title) · \(reason == .completed ? "Hoàn thành" : "Dừng sớm")",
                              commandId: commandId, now: now)
     }
 
     /// MP-07 "Kéo dài" for an event plan past its event day: it becomes a weekly plan in a new revision.
-    // TODO(IOS-015): extending a weekly plan adds weeks or a phase once program length comes from phases.
+    // TODO(IOS-013): "Kéo dài" for a finished weekly plan (append a phase; length now comes from phases, IOS-015).
+    // Until then the user extends it by adding a phase in Lộ trình while the plan is still running.
     @discardableResult
     func extendPlan(_ lineageId: UUID, now: Date = Date(), commandId: UUID = UUID()) -> Bool {
         if audit.contains(where: { $0.id == commandId }) { return true }
@@ -379,7 +389,8 @@ extension AppStore {
     /// Saves the official result as one completed `distance` session entered by hand (`source = manual`):
     /// the session, its set and the audit row are written in one transaction. Nothing else changes; the
     /// plan stays as it is until the user ends, extends or repeats it (D6).
-    // TODO(IOS-015): offer to mark the milestone goal as reached, only when the user confirms.
+    // TODO(CON-008): offer the user to confirm a running milestone goal; db/005 seeds no distance/duration
+    // indicator yet, so no running goal can exist until the indicator config adds one.
     @discardableResult
     func recordRaceResult(_ lineageId: UUID, distanceMeters: Int, durationSeconds: Int, now: Date = Date(),
                           commandId: UUID = UUID()) -> Bool {

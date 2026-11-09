@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- IOS-015 goals, roadmap and progress (iOS only; CON-005 already accepted, no API/contract change).
+  - **Domain** (`Goals.swift`): `MeasurementType` (ADR-060), the 6 db/005 indicators bundled, `PlanGoal`/`GoalTarget` with contract keys, `PlanPhase` + `PhaseTimeline` (computed week ranges), `GoalRules` (validation, pin limit 3, unlock cycle, locked), `GoalProgress` (current value by scope, weekly summary, delta/%).
+  - **CaliCore:** migration `v3_goals` (`plan_phases`, `plan_goals`, soft delete + sync columns); `WorkoutPlan.phases` sets the weekly program length; `ContentChange.goals`.
+  - **App:** overview card (Tuần x/y + phase, pinned goals, "chạm mức đích" banner), Mục tiêu list + editor (poster grid, auto title), Lộ trình with draft edit, Tiến bộ (adherence by week, Swift Charts trend), Today phase caption. Goal commands carry a `commandId` and audit; reached → waits for "Xác nhận đạt", never auto-achieved; ending a plan marks pursued goals missed.
+  - **Tests:** CaliDomain 102, CaliCore 48, app 45 (simulator + iPhone 15).
 - IOS-014 running results (iOS only; CON-004 is already accepted, no API/contract change).
   - **Domain:**
     - `ExerciseType`/`Prescription` gain `distance` (1..500000 m, optional goal time) and `duration` (1..86400 s), with the contract keys.
