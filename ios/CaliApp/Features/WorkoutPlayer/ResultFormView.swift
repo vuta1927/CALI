@@ -10,11 +10,14 @@ struct ResultFormView: View {
     @State private var status: SetStatus = .completed
     @State private var reps: Int?
     @State private var seconds: Double?
-    /// CON-006: kilograms for a load set, kept exactly as entered (never rounded).
+    /// CON-006: the load as typed, in the display unit (kg or lb, ADR-046). Converted to kg on save; a kg value
+    /// is kept exactly as entered, never rounded.
     @State private var loadKg: Decimal?
     /// CON-004: running segment typed by hand (km + h:mm:ss); pace is shown, never stored.
     @State private var run = RunEntry()
     @State private var rpe: Int?
+    @State private var pain = false
+    @State private var criteriaValues: [String: CriteriaValue] = [:]
     @State private var note = ""
     @State private var showSkipReasons = false
     @State private var didPrefill = false
@@ -37,7 +40,7 @@ struct ResultFormView: View {
                 inputs(for: target)
                 statusPicker(for: target)
             }
-            rpePicker
+            CriteriaFields(criteria: applicableCriteria, rpe: $rpe, pain: $pain, values: $criteriaValues)
             noteField
             HStack(alignment: .top, spacing: Spacing.m) {
                 Image(systemName: "info.circle").foregroundStyle(Color.caliSecondary)
@@ -115,7 +118,7 @@ struct ResultFormView: View {
         case .skillAttempt:
             EmptyView()
         case .load(let lo, let kg):
-            KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, focused: $focused)
+            KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, unit: model.store?.settings.weightUnit ?? .kg, focused: $focused)
             RepsInput(title: "Số lần thực tế", value: $reps, hint: "Mục tiêu \(lo) lần", focused: $focused)
         case .distance, .duration:
             if durationUnknown {
@@ -157,37 +160,10 @@ struct ResultFormView: View {
         .caliCard()
     }
 
-    private var rpePicker: some View {
-        VStack(alignment: .leading, spacing: Spacing.s) {
-            HStack {
-                Label("Mức gắng sức (RPE)", systemImage: "flame")
-                    .font(.headline)
-                    .foregroundStyle(Color.caliText)
-                    .labelStyle(AccentIconLabelStyle())
-                Spacer()
-                Text(rpe.map(Self.rpeLabel) ?? "Không bắt buộc")
-                    .font(.caption)
-                    .foregroundStyle(Color.caliSecondary)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 5), spacing: Spacing.s) {
-                ForEach(1...10, id: \.self) { value in
-                    Button {
-                        rpe = rpe == value ? nil : value
-                    } label: {
-                        Text("\(value)")
-                            .font(.headline.monospacedDigit())
-                            .frame(maxWidth: .infinity, minHeight: minTapTarget)
-                            .foregroundStyle(rpe == value ? Color.caliOnAccent : Color.caliText)
-                            .background(rpe == value ? Color.caliAccent : Color.caliSurfaceRaised, in: RoundedRectangle(cornerRadius: Radius.chip))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("RPE \(value), \(Self.rpeLabel(value))")
-                    .accessibilityAddTraits(rpe == value ? .isSelected : [])
-                }
-            }
-            Text("Không bắt buộc.").font(.caption).foregroundStyle(Color.caliSecondary)
-        }
-        .caliCard()
+    /// Extra fields from the criteria config of this session (CON-008); none when no criterion applies.
+    private var applicableCriteria: [Criterion] {
+        guard let execution = model.currentExecution, let exercise = model.currentExercise else { return [] }
+        return model.criteriaConfig.applicable(exerciseId: execution.exerciseId, type: exercise.type)
     }
 
     private var noteField: some View {
@@ -248,7 +224,12 @@ struct ResultFormView: View {
         if case .reps(let lo, _)? = target { reps = lo }
         if case .load(let r, let kg)? = target {
             reps = r
-            loadKg = kg
+            loadKg = (model.store?.settings.weightUnit ?? .kg).display(kg: kg)
+        }
+        let applicable = applicableCriteria
+        if let execution = model.currentExecution, let index = Optional(draft.key.setIndex) {
+            let previous = model.records(for: execution).last { $0.key.setIndex < index && $0.status != .skipped }
+            criteriaValues = CriteriaFields.prefill(applicable, from: previous?.actual)
         }
         // Running: time from the measured segment, distance from the plan; both stay editable and nothing
         // is saved until "Lưu".
@@ -271,11 +252,13 @@ struct ResultFormView: View {
             reps: needsReps ? reps : nil,
             holdMs: target?.type == .staticHold ? ms : nil,
             workMs: (target?.type == .timedReps || target?.type == .interval) ? ms : nil,
-            rpe: rpe,
+            rpe: applicableCriteria.contains { $0.id == "rpe" } ? rpe : nil,
             note: note,
-            loadKg: needsLoad ? loadKg : nil,
+            loadKg: needsLoad ? loadKg.map { (model.store?.settings.weightUnit ?? .kg).kg(fromDisplayed: $0) } : nil,
             distanceMeters: isRunning ? run.distanceMeters : nil,
-            durationSeconds: isRunning ? run.durationSeconds : nil
+            durationSeconds: isRunning ? run.durationSeconds : nil,
+            painReported: applicableCriteria.contains { $0.id == "pain" } ? pain : nil,
+            criteria: criteriaValues.filter { key, _ in applicableCriteria.contains { $0.id == key } }
         )
     }
 
@@ -383,11 +366,16 @@ private struct RepsInput: View {
 /// with more than 2 decimals are rejected by the domain with a message, not silently fixed (ADR-062).
 private struct KgInput: View {
     let title: String
+    /// In the display unit.
     @Binding var value: Decimal?
     let targetKg: Decimal
+    let unit: WeightUnit
     var focused: FocusState<Bool>.Binding
 
-    private let step: Decimal = 2.5
+    private var step: Decimal { unit == .kg ? 2.5 : 5 }
+    private var target: Decimal { unit.display(kg: targetKg) }
+    private var unitLabel: String { unit.label }
+    private var stepText: String { Fmt.number(step) + " " + unitLabel }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
@@ -396,13 +384,13 @@ private struct KgInput: View {
                     .font(.headline)
                     .foregroundStyle(Color.caliText)
                 Spacer()
-                Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = targetKg }
+                Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = target }
                     .font(.caption.weight(.semibold))
                     .frame(minHeight: minTapTarget)
             }
             HStack(spacing: Spacing.m) {
-                CircleIconButton(systemImage: "minus", label: "Bớt 2,5 kg") {
-                    value = max(0, (value ?? targetKg) - step)
+                CircleIconButton(systemImage: "minus", label: "Bớt \(stepText)") {
+                    value = max(0, (value ?? target) - step)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
                     // Shows up to 4 decimals so an over-precise entry stays visible until the domain rejects it.
@@ -412,13 +400,13 @@ private struct KgInput: View {
                         .multilineTextAlignment(.center)
                         .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.caliText)
-                    Text("kg")
+                    Text(unitLabel)
                         .font(.headline)
                         .foregroundStyle(Color.caliSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                CircleIconButton(systemImage: "plus", label: "Thêm 2,5 kg") {
-                    value = min(1000, (value ?? targetKg - step) + step)
+                CircleIconButton(systemImage: "plus", label: "Thêm \(stepText)") {
+                    value = min(unit.display(kg: 1000), (value ?? target - step) + step)
                 }
             }
         }

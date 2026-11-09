@@ -180,6 +180,15 @@ flowchart TB
 > - **Hoãn:** mục tiêu bám lịch / cơ thể / chạy (db/005 chưa có chỉ số, `TODO(CON-008)`); bắt đầu muộn và "Kéo dài" giáo án theo tuần (`TODO(IOS-013)`); ghim KPI riêng.
 > - **Bằng chứng:** `evidence/IOS-015/README.md`.
 
+> **Trạng thái IOS-016 (2026-11-09):** code và test xong, chờ review. Không đổi API/contract (CON-006, CON-008 đã có).
+> - **Form P6 theo cấu hình:** tiêu chí dựng từ `criteria_config` v1 gói sẵn, lọc theo `appliesTo` (calisthenics: Kỹ thuật, Điều kiện, Đau; gym: Kỹ thuật, RPE 6–10, Dụng cụ, Đau). `choice` chọn một, `chips` chọn nhiều, `toggle`, `scale`; kiểu lạ bị bỏ qua. `rpe` và `pain` chỉ điều khiển hiển thị, ghi vào cột `rpe`, `painReported`, không vào map `criteria`. `prefill: previousSet` lấy từ set trước cùng bài. Mọi tiêu chí đều tuỳ chọn; đau chỉ ghi nhận, không diễn giải.
+> - **Lưu:** set lưu `criteriaVersion` + `criteria` (cùng có hoặc cùng không), ≤ 20 khoá, ≤ 8192 byte, giá trị là token đã biết; phiên đang chạy giữ phiên bản lúc bắt đầu. Lịch sử hiện nhãn tiêu chí và "Có ghi nhận đau".
+> - **Mức tạ:** lưu kg (0..1000, tối đa 2 số lẻ, quá chính xác thì từ chối chứ không làm tròn); cài đặt "Đơn vị mức tạ" kg/lb chỉ đổi hiển thị và nhập (bước 2,5 kg / 5 lb). Cài đặt cũ không có trường này vẫn đọc được (mặc định kg).
+> - **Cấu hình không đọc được:** `CriteriaConfig.resolve(cached:)` rơi về bản gói sẵn; bản gói sẵn bằng đúng `fixtures/criteria_config.json`.
+> - **Thay đổi hành vi:** bài calisthenics không còn bộ chọn RPE luôn bật, vì cấu hình v1 chỉ cho gym dùng RPE.
+> - **Hoãn:** tải cấu hình có ETag và cache (`TODO(IOS-007)`, backend chưa sẵn sàng); lọc theo `focusTags` chờ PO chốt bộ tag.
+> - **Bằng chứng:** `evidence/IOS-016/README.md`.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

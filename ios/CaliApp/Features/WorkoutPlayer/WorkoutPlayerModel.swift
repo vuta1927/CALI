@@ -32,6 +32,8 @@ final class WorkoutPlayerModel {
     var showRecoveryPrompt = false
 
     @ObservationIgnored weak var store: AppStore?
+    /// CON-008: a session keeps the criteria config it started with (docs/18 §5.3).
+    @ObservationIgnored var criteriaConfig = CriteriaConfig.bundled
     @ObservationIgnored private var lastTickWall: Date?
     @ObservationIgnored private var lastTickMono: UInt64?
     @ObservationIgnored private var recoveryPromptShown = false
@@ -120,8 +122,13 @@ final class WorkoutPlayerModel {
     }
 
     func confirm(status: SetStatus, reps: Int?, holdMs: Int64?, workMs: Int64?, rpe: Int?, note: String?, loadKg: Decimal? = nil,
-                 distanceMeters: Int? = nil, durationSeconds: Int? = nil) {
+                 distanceMeters: Int? = nil, durationSeconds: Int? = nil, painReported: Bool? = nil,
+                 criteria: [String: CriteriaValue] = [:]) {
         guard let key = state.pendingResult?.key else { return }
+        if let issue = CriteriaValidation.validate(criteria, config: criteriaConfig).first {
+            banner = .error("Tiêu chí chưa hợp lệ (\(issue.field)). Hãy chọn lại.")
+            return
+        }
         let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         send(.confirmSet(ConfirmSet(
             commandId: UUID(),
@@ -136,7 +143,10 @@ final class WorkoutPlayerModel {
             note: (trimmed?.isEmpty ?? true) ? nil : trimmed,
             actualLoadKg: loadKg,
             actualDistanceMeters: distanceMeters,
-            actualDurationSeconds: durationSeconds
+            actualDurationSeconds: durationSeconds,
+            painReported: painReported,
+            criteriaVersion: criteria.isEmpty ? nil : criteriaConfig.version,
+            criteria: criteria.isEmpty ? nil : criteria
         )))
     }
 

@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- IOS-016 gym load and dynamic set form (iOS only; CON-006 and CON-008 are already accepted, no API/contract change).
+  - **Domain** (`Criteria.swift`): `CriteriaConfig` (bundled v1 equals `fixtures/criteria_config.json`, `resolve(cached:)` falls back to it), `applicable(exerciseId:type:)`, `CriteriaValidation` (known tokens, ≤ 20 keys, ≤ 8192 bytes, reserved keys refused), `WeightUnit` kg/lb conversion. `ConfirmSet`/`SetActuals` carry `painReported`, `criteriaVersion`, `criteria` (both-or-neither).
+  - **CaliCore:** `LoggedSet` and `AppSettings.weightUnit` (old settings JSON decodes as kg).
+  - **App:** `CriteriaFields` renders scale/choice/chips/toggle/number from the config, `previousSet` prefill; load input and editor step follow the kg/lb setting; history shows criteria labels; Profile has "Đơn vị mức tạ"; bundled "Barbell Back Squat"; DEBUG `-uiScenario gym|hold`.
+  - **Behaviour change:** calisthenics sets lose the always-on RPE picker (config v1 limits `rpe` to gym).
+  - **Deferred:** fetching and caching the config with ETag (`TODO(IOS-007)`).
 - IOS-015 goals, roadmap and progress (iOS only; CON-005 already accepted, no API/contract change).
   - **Domain** (`Goals.swift`): `MeasurementType` (ADR-060), the 6 db/005 indicators bundled, `PlanGoal`/`GoalTarget` with contract keys, `PlanPhase` + `PhaseTimeline` (computed week ranges), `GoalRules` (validation, pin limit 3, unlock cycle, locked), `GoalProgress` (current value by scope, weekly summary, delta/%).
   - **CaliCore:** migration `v3_goals` (`plan_phases`, `plan_goals`, soft delete + sync columns); `WorkoutPlan.phases` sets the weekly program length; `ContentChange.goals`.

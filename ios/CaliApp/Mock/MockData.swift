@@ -35,6 +35,8 @@ enum MockData {
     // IOS-014 running (ids and slugs from fixtures/exercise_catalog.json).
     static let easyRun = id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7")
     static let timedRun = id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8")
+    // IOS-016 gym (id and slug from fixtures/exercise_catalog.json).
+    static let backSquat = id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9")
 
     static let catalog: [Exercise] = [
         Exercise(
@@ -148,6 +150,13 @@ enum MockData {
             cues: ["Chạy ở mức nói chuyện được", "Thả lỏng vai"],
             mistakes: ["Gồng vai", "Nín thở khi tăng tốc"],
             catalogVersion: catalogVersion, symbol: "figure.run.circle", paletteIndex: 4
+        ),
+        Exercise(
+            id: backSquat, slug: "barbell-back-squat", name: "Barbell Back Squat", type: .load, level: .intermediate,
+            equipment: ["Tạ đòn", "Giá squat"], muscles: ["Đùi trước", "Mông", "Core"],
+            cues: ["Giữ lưng trung tính", "Gối theo hướng mũi chân"],
+            mistakes: ["Gối cụp vào trong", "Lưng tròn ở đáy"],
+            catalogVersion: catalogVersion, symbol: "dumbbell", paletteIndex: 2
         ),
     ]
 

@@ -311,3 +311,28 @@ extension AppStore {
         }
     }
 }
+
+// MARK: - Criteria on saved sets (IOS-016)
+
+extension AppStore {
+    /// "Kỹ thuật: Chuẩn · Điều kiện: Có trợ lực · Có ghi nhận đau" for a saved set, labelled from the config
+    /// version it was entered with. Values of a criterion this build does not know are left out.
+    func criteriaSummary(of set: LoggedSet) -> String? {
+        var parts: [String] = []
+        if let config = [criteriaConfig].first(where: { $0.version == set.criteriaVersion }), let values = set.criteria {
+            for criterion in config.criteria {
+                guard let value = values[criterion.id] else { continue }
+                let labels = Dictionary(uniqueKeysWithValues: (criterion.options ?? []).map { ($0.v, $0.label) })
+                let text: String? = switch value {
+                case .token(let v): labels[v]
+                case .tokens(let list): list.compactMap { labels[$0] }.joined(separator: ", ")
+                case .number(let n): Fmt.number(n)
+                case .bool(let b): b ? "Có" : nil
+                }
+                if let text, !text.isEmpty { parts.append("\(criterion.label): \(text)") }
+            }
+        }
+        if set.painReported == true { parts.append("Có ghi nhận đau") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}

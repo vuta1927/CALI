@@ -473,6 +473,7 @@ struct SessionDetailView: View {
 
 /// Poster + target + grid of logged sets; shared by session detail and the player summary.
 struct ExerciseResultCard: View {
+    @Environment(AppStore.self) private var store
     let exercise: Exercise?
     let sets: [LoggedSet]
     var plannedSetCount: Int?
@@ -522,6 +523,11 @@ struct ExerciseResultCard: View {
                         .font(.caption)
                         .foregroundStyle(Color.caliSecondary)
                 }
+            }
+            ForEach(sets.compactMap { set in store.criteriaSummary(of: set).map { (set.setIndex, $0) } }, id: \.0) { index, text in
+                Text("Set \(index): \(text)")
+                    .font(.caption)
+                    .foregroundStyle(Color.caliSecondary)
             }
         }
         .caliCard()

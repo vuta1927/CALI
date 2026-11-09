@@ -21,6 +21,11 @@ final class AppStore {
     private(set) var settings: AppSettings
     /// CON-005 goals of every plan lineage.
     private(set) var goals: [PlanGoal] = []
+    /// CON-008: the criteria config the set form is built from. Only the bundled version 1 exists until the
+    /// config is downloaded and cached.
+    // TODO(IOS-007): fetch `GET /v1/criteria-config` with If-None-Match, cache the last good copy and pass it
+    // to `CriteriaConfig.resolve(cached:)`; a fetch failure keeps the cached or bundled version.
+    private(set) var criteriaConfig = CriteriaConfig.resolve(cached: nil)
 
     /// The in-flight (or just finished) workout. Kept after completion so the summary screen can
     /// render; removed when the player is closed.
@@ -64,6 +69,7 @@ final class AppStore {
         settings = loaded.settings
         goals = loaded.goals
         alertMessage = openError
+        Fmt.weightUnit = loaded.settings.weightUnit
         restoreActiveSession()
         closeEndedGoalScopes(now: now)
     }
@@ -85,6 +91,7 @@ final class AppStore {
         let title = (try? coordinator.activeSessionTitle()) ?? ""
         let model = WorkoutPlayerModel(active: ActiveSession(state: state, title: title, records: records))
         model.store = self
+        model.criteriaConfig = criteriaConfig
         player = model
     }
 
@@ -158,6 +165,7 @@ final class AppStore {
         }
         let model = WorkoutPlayerModel(active: ActiveSession(state: state, title: workout.title, records: []))
         model.store = self
+        model.criteriaConfig = criteriaConfig
         player = model
         isPlayerPresented = true
         if settings.notificationsEnabled { notifications.requestAuthorizationIfNeeded() }
@@ -313,6 +321,7 @@ final class AppStore {
         audit = loaded.audit
         settings = loaded.settings
         goals = loaded.goals
+        Fmt.weightUnit = loaded.settings.weightUnit
     }
 
     // MARK: Recommendations (approval workflow + audit trail, AGENTS rule 5)

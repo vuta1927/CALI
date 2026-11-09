@@ -13,6 +13,8 @@ enum DebugScenario: String {
     case race
     /// IOS-015 screens of the starter plan with a roadmap, goals and one recorded session.
     case overview, goals, roadmap, progress
+    /// IOS-016 set result form of a gym load set / a calisthenics hold, with the criteria of the bundled config.
+    case gym, hold
 
     static var launch: DebugScenario? { UserDefaults.standard.string(forKey: "uiScenario").flatMap(Self.init(rawValue:)) }
 
@@ -26,6 +28,15 @@ enum DebugScenario: String {
         switch self {
         case .overview, .goals, .roadmap, .progress:
             return seedGoals(store)
+        case .gym, .hold:
+            let load = self == .gym
+            let exerciseId = load ? MockData.backSquat : MockData.tuckPlanche
+            let item = PlannedExercise(id: UUID(), exerciseId: exerciseId, setCount: 3,
+                                       target: load ? .load(reps: 5, loadKg: 60) : .staticHold(holdSeconds: 12), restSeconds: 90)
+            store.startWorkout(PlannedWorkout(id: UUID(), weekday: store.today().isoWeekday, title: load ? "Chân" : "Planche", focus: "", exercises: [item]))
+            store.player?.startSet()
+            store.player?.stopSet()
+            return nil
         case .run:
             store.startWorkout(PlannedWorkout(id: UUID(), weekday: store.today().isoWeekday, title: "Chạy nhẹ 5 km", focus: "", exercises: [run]))
             store.player?.startSet()

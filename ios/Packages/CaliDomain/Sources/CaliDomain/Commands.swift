@@ -69,13 +69,23 @@ public struct ConfirmSet: Codable, Equatable, Sendable {
     /// CON-004: running segment values entered by hand (pace is derived, never sent).
     public var actualDistanceMeters: Int?
     public var actualDurationSeconds: Int?
+    /// CON-008 (ADR-045): the `pain` criterion; only recorded, never interpreted.
+    public var painReported: Bool?
+    /// CON-008 (ADR-067): the config version the form was built from and the extra values by criterion id;
+    /// both or neither.
+    public var criteriaVersion: Int?
+    public var criteria: [String: CriteriaValue]?
 
     public init(
         commandId: UUID, setResultId: UUID, executionId: UUID, setIndex: Int, status: SetStatus = .completed,
         actualReps: Int? = nil, actualHoldMs: Int64? = nil, actualWorkMs: Int64? = nil, actualRestMs: Int64? = nil,
         rpe: Int? = nil, note: String? = nil, actualLoadKg: Decimal? = nil,
-        actualDistanceMeters: Int? = nil, actualDurationSeconds: Int? = nil
+        actualDistanceMeters: Int? = nil, actualDurationSeconds: Int? = nil,
+        painReported: Bool? = nil, criteriaVersion: Int? = nil, criteria: [String: CriteriaValue]? = nil
     ) {
+        self.painReported = painReported
+        self.criteriaVersion = criteriaVersion
+        self.criteria = criteria
         self.commandId = commandId
         self.setResultId = setResultId
         self.executionId = executionId

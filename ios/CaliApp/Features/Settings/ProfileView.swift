@@ -46,6 +46,14 @@ struct ProfileView: View {
                         }
                     }
                     CardDivider()
+                    CardRow(title: "Đơn vị mức tạ") {
+                        Picker("Đơn vị mức tạ", selection: setting(\.weightUnit)) {
+                            ForEach(WeightUnit.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 140)
+                    }
+                    CardDivider()
                     Toggle("Rung phản hồi", isOn: setting(\.hapticsEnabled)).frame(minHeight: 52)
                     CardDivider()
                     Toggle("Thông báo nhắc hết giờ", isOn: setting(\.notificationsEnabled)).frame(minHeight: 52)

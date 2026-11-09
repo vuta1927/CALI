@@ -35,9 +35,17 @@ public struct SetActuals: Codable, Equatable, Hashable, Sendable {
     public var durationSeconds: Int?
     /// CON-004: where running values came from; only `manual` until Apple Health (ADR-043).
     public var source: ResultSource?
+    /// CON-008: `set_results.pain_reported`, and the criteria config version + values the set was entered with.
+    public var painReported: Bool?
+    public var criteriaVersion: Int?
+    public var criteria: [String: CriteriaValue]?
 
     public init(reps: Int? = nil, holdMs: Int64? = nil, workMs: Int64? = nil, restMs: Int64? = nil, rpe: Int? = nil, note: String? = nil,
-                loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil, source: ResultSource? = nil) {
+                loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil, source: ResultSource? = nil,
+                painReported: Bool? = nil, criteriaVersion: Int? = nil, criteria: [String: CriteriaValue]? = nil) {
+        self.painReported = painReported
+        self.criteriaVersion = criteriaVersion
+        self.criteria = criteria
         self.reps = reps
         self.holdMs = holdMs
         self.workMs = workMs

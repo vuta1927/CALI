@@ -173,7 +173,8 @@ public enum WorkoutReducer {
             prescribed: PrescribedSnapshot(spec),
             actual: SetActuals(reps: c.actualReps, holdMs: c.actualHoldMs, workMs: c.actualWorkMs, restMs: c.actualRestMs, rpe: c.rpe, note: c.note, loadKg: c.actualLoadKg,
                                distanceMeters: c.actualDistanceMeters, durationSeconds: c.actualDurationSeconds,
-                               source: spec.target.running == nil ? nil : .manual),
+                               source: spec.target.running == nil ? nil : .manual,
+                               painReported: c.painReported, criteriaVersion: c.criteriaVersion, criteria: c.criteria),
             endReason: draft.endReason,
             skipReason: nil,
             confirmedAt: now,
@@ -290,6 +291,13 @@ public enum WorkoutReducer {
         if let v = c.actualWorkMs, let i = ValidationIssue.min("actualWorkMs", v, 0) { issues.append(i) }
         if let v = c.actualRestMs, let i = ValidationIssue.min("actualRestMs", v, 0) { issues.append(i) }
         if let v = c.rpe, let i = ValidationIssue.range("rpe", v, DomainLimits.rpe) { issues.append(i) }
+        // CON-008 (ADR-067): version and values come together; the map is checked against its config version
+        // by the caller that holds the config (`CriteriaValidation.validate`), here only the structural limits.
+        if (c.criteriaVersion == nil) != (c.criteria == nil) {
+            issues.append(ValidationIssue(field: "criteria", reason: .inconsistent, detail: "criteriaVersion and criteria go together"))
+        }
+        if let v = c.criteriaVersion, v < 1 { issues.append(ValidationIssue(field: "criteriaVersion", reason: .outOfRange, detail: "\(v) < 1")) }
+        if let values = c.criteria { issues += CriteriaValidation.validate(values, config: nil) }
         // CON-006 (ADR-062): load is kg with at most 2 decimals, and only meaningful for a load target.
         if let v = c.actualLoadKg {
             if case .load = target {

@@ -138,9 +138,11 @@ private struct PlannedExerciseEditor: View {
             Stepper("Số lần thử: \(attempts)", value: binding(attempts) { .skillAttempt(attempts: $0) }, in: 1...10)
         case .load(let reps, let kg):
             // Kilograms step by 2.5 in Decimal (docs/18 §4); no Double round-trip, an off-step value stays exact.
+            // Display unit follows the settings (ADR-046): a 5 lb step is stored as kg with 2 decimals.
+            let step: Decimal = Fmt.weightUnit == .kg ? 2.5 : WeightUnit.lb.kg(fromDisplayed: 5)
             Stepper("Mức tạ: \(Fmt.loadKg(kg))",
-                    onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + 2.5)) },
-                    onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - 2.5)) })
+                    onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + step)) },
+                    onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - step)) })
             Stepper("Số lần: \(reps)", value: binding(reps) { .load(reps: $0, loadKg: kg) }, in: 1...50)
         case .distance(let meters, let goal):
             // CON-004: 1..500 km per segment in 0,5 km steps; goal time optional (pace is shown, never stored).

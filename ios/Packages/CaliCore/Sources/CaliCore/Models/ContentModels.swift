@@ -281,12 +281,20 @@ public struct LoggedSet: Identifiable, Codable, Hashable, Sendable {
     /// CON-004: running segment entered by hand; pace is derived (`pace`), never stored.
     public var distanceMeters: Int? = nil
     public var durationSeconds: Int? = nil
+    /// CON-008: the `pain` criterion and the extra criteria values with the config version they were entered with.
+    public var painReported: Bool? = nil
+    public var criteriaVersion: Int? = nil
+    public var criteria: [String: CriteriaValue]? = nil
 
     public init(
         id: UUID, exerciseId: UUID, setIndex: Int, status: SetStatus, target: Prescription, reps: Int? = nil,
         holdMs: Int64? = nil, workMs: Int64? = nil, rpe: Int? = nil, note: String? = nil, skipReason: String? = nil,
-        loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil
+        loadKg: Decimal? = nil, distanceMeters: Int? = nil, durationSeconds: Int? = nil,
+        painReported: Bool? = nil, criteriaVersion: Int? = nil, criteria: [String: CriteriaValue]? = nil
     ) {
+        self.painReported = painReported
+        self.criteriaVersion = criteriaVersion
+        self.criteria = criteria
         self.id = id
         self.exerciseId = exerciseId
         self.setIndex = setIndex
@@ -324,7 +332,10 @@ extension LoggedSet {
             skipReason: record.skipReason,
             loadKg: record.actual.loadKg,
             distanceMeters: record.actual.distanceMeters,
-            durationSeconds: record.actual.durationSeconds
+            durationSeconds: record.actual.durationSeconds,
+            painReported: record.actual.painReported,
+            criteriaVersion: record.actual.criteriaVersion,
+            criteria: record.actual.criteria
         )
     }
 }
@@ -447,11 +458,29 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var notificationsEnabled = true
     public var liveActivityEnabled = true
     public var hasSeenWelcome = false
+    /// ADR-046: load is stored in kg; this only changes how it is shown and typed.
+    public var weightUnit: WeightUnit = .kg
+
+    private enum CodingKeys: String, CodingKey {
+        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, hasSeenWelcome, weightUnit
+    }
+
+    /// Settings saved by an older build have no `weightUnit`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        countdownSeconds = try c.decodeIfPresent(Int.self, forKey: .countdownSeconds) ?? 3
+        hapticsEnabled = try c.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? true
+        notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
+        liveActivityEnabled = try c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
+        hasSeenWelcome = try c.decodeIfPresent(Bool.self, forKey: .hasSeenWelcome) ?? false
+        weightUnit = try c.decodeIfPresent(WeightUnit.self, forKey: .weightUnit) ?? .kg
+    }
 
     public init(
         countdownSeconds: Int = 3, hapticsEnabled: Bool = true, notificationsEnabled: Bool = true,
-        liveActivityEnabled: Bool = true, hasSeenWelcome: Bool = false
+        liveActivityEnabled: Bool = true, hasSeenWelcome: Bool = false, weightUnit: WeightUnit = .kg
     ) {
+        self.weightUnit = weightUnit
         self.countdownSeconds = countdownSeconds
         self.hapticsEnabled = hapticsEnabled
         self.notificationsEnabled = notificationsEnabled

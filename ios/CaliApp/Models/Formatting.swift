@@ -4,6 +4,14 @@ import Foundation
 enum Fmt {
     static let vi = Locale(identifier: "vi_VN")
 
+    /// "2,5", "60" (vi decimal comma, no trailing zeros).
+    static func number(_ value: Decimal) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)).locale(vi))
+    }
+
+    /// Display unit for load (ADR-046), mirrored from the user's settings by `AppStore`. Storage is always kg.
+    nonisolated(unsafe) static var weightUnit: WeightUnit = .kg
+
     /// "1:05" / "0:12" from milliseconds (floors partial seconds for elapsed time).
     static func clock(ms: Int64) -> String {
         clock(seconds: Int(max(ms, 0) / 1000))
@@ -61,7 +69,10 @@ enum Fmt {
     /// Kilograms with the `vi` decimal comma: "60 kg", "57,5 kg" (docs/18 §4). Display only, always kg
     /// (ADR-046); shows up to the 2 decimals the domain allows (ADR-062), so nothing is hidden.
     static func loadKg(_ kg: Decimal) -> String {
-        "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+        switch weightUnit {
+        case .kg: "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+        case .lb: "\(WeightUnit.lb.display(kg: kg).formatted(.number.precision(.fractionLength(0...1)).locale(vi))) lb"
+        }
     }
 
     /// "4 × giữ 12 giây · nghỉ 90 giây", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
