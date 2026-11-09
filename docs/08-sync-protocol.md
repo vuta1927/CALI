@@ -71,6 +71,8 @@ The envelope and every payload are closed objects, so an unknown field anywhere 
 ## 4. Pull
 `GET /v1/sync/pull?cursor=<opaque>&limit=100`; response `{ changes:[{changeId,entityType,entityId,operation,serverVersion,payload}],nextCursor,hasMore }`. For cursor safety, server assigns per-user `change_seq` only after acquiring/updating a row in `user_sync_state` inside the same transaction as business write and change-log append; a global `BIGSERIAL` alone is not commit-order safe. Server includes server-owned AI records and catalog metadata updates via separate versioned catalog endpoint (not feed for MVP). Client applies page and saves `nextCursor` **in one local transaction**; if interrupted, replay safe via idempotent upsert. Do not advance cursor before rows committed.
 
+**Cursor, `changeId` and errors (ADR-070).** The feed is the user's own change history: one row per version, including changes the pulling device pushed, so applying a page is an idempotent upsert keyed by `(entityType, entityId)` guarded by `serverVersion`. `cursor`, `nextCursor` and every `changeId` are the same opaque token: `seq` and `userId` signed with HMAC-SHA256 (76 characters, key `Sync:CursorSigningKey`). A `changeId` passed as `cursor` resumes right after that change. An empty page returns the cursor position unchanged. Omit `cursor` for the initial sync: it reads the whole feed from the start and is never rejected for age. Errors: **400** for a malformed, altered, foreign-key or other-user cursor, a `limit` outside 1..100 or a repeated parameter; **410** `cursor_expired` when the cursor is ahead of the feed, points at a change that is no longer in the log, or is older than `Sync:ChangeLogRetentionDays` (180). A client that saved a cursor and later gets 400 for it should treat it like 410 (the cursor only stops verifying when the signing key changed; IOS-007). Responses are `Cache-Control: no-store`.
+
 **Pull payload shapes (ADR-022).** `payload` is discriminated by `entityType` + `operation` (see `x-payload-schemas` on `SyncChange` in OpenAPI):
 
 | entityType | operation | payload |
@@ -103,7 +105,7 @@ The entity version is always `serverVersion` on the change, never a payload fiel
 
 ## 7. Deletes and retention
 - Every delete writes a tombstone with `deletedAt`, never hard-delete while unsynced.
-- Server retains tombstones for 180 days initial policy; if device offline longer, require full resync not silent stale resurrection.
+- Server retains tombstones for 180 days initial policy; if device offline longer, require full resync not silent stale resurrection. Pull enforces this as **410** `cursor_expired` (ADR-070). A log-compaction job (`TODO(OPS-001)`, not built yet) may delete only rows older than the window that a newer row of the same entity supersedes, and old tombstones; it must keep the newest row of every live entity because the full resync reads from `seq` 0.
 - Full resync keeps unsynced local outbox separate, resets pull cursor only after user identity confirmed and full snapshot loaded.
 
 ## 8. Retry and diagnostic states
