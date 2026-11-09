@@ -25,6 +25,8 @@ Evaluate sessions and training trends, not diagnose injuries. Backend produces s
 ```
 Only send fields necessary for coaching; raw personal notes require explicit user consent and PII redaction. Do not send user email, Apple subject, auth tokens, media links, or precise location to LLM.
 
+**Số đo cơ thể (CON-007, ADR-064).** `body_measurement` (cân nặng) **không bao giờ** nằm trong đầu vào AI: không có trường cân nặng hay chỉ số cơ thể trong JSON trên, `AnalysisRequest` chỉ có `{sessionId, sessionVersion}` (contract test `Body_data_is_never_part_of_ai_input`). Hiện chưa lưu đồng ý (consent) nào cho việc này. Nếu sau pilot cần dùng, đó là một slice riêng: opt-in tách biệt, mặc định tắt, có audit trail, và AI vẫn không được đưa lời khuyên y tế hay ăn kiêng (§5).
+
 ## 4. Deterministic statistics
 - `completionRate = completedPlannedSets / totalPlannedSets`, skipped separate.
 - Static holds: total confirmed hold and first/last set trend; rep work: confirmed total reps; exercise group workload by local rule.

@@ -481,6 +481,61 @@
           "volumeKg": 300
         }
       }
+    },
+    {
+      "name": "body_measurement_with_unit_field",
+      "reason": "CON-007 (ADR-063): the unit is fixed by the kind (weight = kg, ADR-046); a unit field is unknown and rejected",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000037",
+        "entityType": "body_measurement",
+        "entityId": "cb000000-0000-4000-8000-000000000037",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:00:00Z",
+        "payload": {
+          "id": "cb000000-0000-4000-8000-000000000037",
+          "kind": "weight",
+          "value": 160,
+          "unit": "lb",
+          "measuredAt": "2026-11-09T06:45:00Z"
+        }
+      }
+    },
+    {
+      "name": "body_measurement_unknown_kind",
+      "reason": "CON-007 (ADR-063): v1 kinds are weight only; waist/body fat need a contract change",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000038",
+        "entityType": "body_measurement",
+        "entityId": "cb000000-0000-4000-8000-000000000038",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:00:00Z",
+        "payload": {
+          "id": "cb000000-0000-4000-8000-000000000038",
+          "kind": "waist",
+          "value": 80,
+          "measuredAt": "2026-11-09T06:45:00Z"
+        }
+      }
+    },
+    {
+      "name": "body_weight_below_range",
+      "reason": "CON-007 (ADR-063): weight is 20..500 kg",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000039",
+        "entityType": "body_measurement",
+        "entityId": "cb000000-0000-4000-8000-000000000039",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:00:00Z",
+        "payload": {
+          "id": "cb000000-0000-4000-8000-000000000039",
+          "kind": "weight",
+          "value": 7.2,
+          "measuredAt": "2026-11-09T06:45:00Z"
+        }
+      }
     }
   ]
 }

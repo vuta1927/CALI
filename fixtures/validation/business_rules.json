@@ -536,6 +536,44 @@
           "restSeconds": 120
         }
       }
+    },
+    {
+      "name": "body_measured_at_in_the_future",
+      "rule": "body_measurement.measuredAt <= mutation.clientChangedAt (CON-007, ADR-063); a future measurement is rejected, never clamped",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "measuredAt"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000035",
+        "entityType": "body_measurement",
+        "entityId": "cb000000-0000-4000-8000-000000000035",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:00:00Z",
+        "payload": {
+          "id": "cb000000-0000-4000-8000-000000000035",
+          "kind": "weight",
+          "value": 72.4,
+          "measuredAt": "2026-11-10T07:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "body_weight_with_three_decimals",
+      "rule": "body_measurement.value has at most 2 decimals (CON-007, ADR-063; same rule as loadKg, ADR-062); rejected, never rounded",
+      "expect": {"status": "rejected", "code": "validation_failed", "field": "value"},
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000036",
+        "entityType": "body_measurement",
+        "entityId": "cb000000-0000-4000-8000-000000000036",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:00:00Z",
+        "payload": {
+          "id": "cb000000-0000-4000-8000-000000000036",
+          "kind": "weight",
+          "value": 72.455,
+          "measuredAt": "2026-11-09T06:45:00Z"
+        }
+      }
     }
   ]
 }

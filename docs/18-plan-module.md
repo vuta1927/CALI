@@ -178,7 +178,7 @@ Hiện trạng: `set_result` đã có `actualReps`, `actualHoldMs`, `rpe`, `pain
 | Entity `plan_goal` (§6.1: `indicatorId`, `exerciseId?`, `baseline`, `target` hoặc `min/max`, `scope`, `unlockAfter`, `status`, `achievedAt`, `pinned`), sửa được, có audit; thay cho `training_plan.goal` đơn | entity-payloads, SQL, sync, docs/03 |
 | Cấu hình `indicator_definition` (nhãn, đơn vị, bước, loại bài áp dụng, cách gộp max/sum), có phiên bản, đọc kèm `criteria_config` | OpenAPI, backend, portal |
 | `plan_phase[]` sửa được, có audit | entity-payloads, SQL, docs/03 |
-| Entity `body_measurement` (`kind`, `value`, `measuredAt`), dữ liệu nhạy cảm, không gửi cho AI nếu người dùng không bật | entity-payloads, SQL, docs/09, docs/11 |
+| Entity `body_measurement` (`kind`, `value`, `measuredAt`), dữ liệu nhạy cảm, không gửi cho AI nếu người dùng không bật. CON-007 (db/007): chỉ `weight` kg; ADR-064 (PO duyệt 2026-11-09): trong pilot hoàn toàn không gửi cho AI, opt-in có audit để sau pilot | entity-payloads, SQL, docs/09, docs/11 |
 | `exercise.focusTags` để sinh nhóm trên màn Tiến bộ | catalog-bundle schema, OpenAPI |
 | UX-02 trong docs/02: bỏ "unsynced marker" khỏi luồng lưu | docs/02 (đã cập nhật cùng tài liệu này) |
 
