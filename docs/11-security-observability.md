@@ -18,6 +18,7 @@
 - Consent/setting for cloud sync and AI; user can use offline guest.
 - Privacy-preserving logs with pseudonymous IDs, no freeform notes or token/PII log payloads.
 - Số đo cơ thể (`body_measurement`, CON-007) là dữ liệu nhạy cảm: không ghi `value` vào log, metric hay trace (chỉ ID và entity type); không gửi cho nhà cung cấp AI (docs/09 §3, ADR-064).
+- Cấu hình tiêu chí (`criteria_config_versions`) và `indicator_definitions` là nội dung của bên phát hành (CON-008): thiết bị chỉ đọc, chỉ portal được ghi (ADR-051, portal làm sau pilot), không có đường ghi nào từ app hay API. `GET /v1/criteria-config` công khai, không cần đăng nhập vì không chứa dữ liệu người dùng (PO chốt 2026-11-09). Bắt buộc có rate limit riêng cho endpoint ẩn danh, chia theo IP client (429 + `Retry-After`, cấu hình trong `RateLimiting`); sau reverse proxy phải cấu hình `ForwardedHeaders` với proxy tin cậy, nếu không mọi request có chung một IP. Response `Cache-Control: public, max-age=300` và ETag/304 để CDN hoặc reverse proxy trả lặp mà không chạm API. Rate limit ở tầng ứng dụng chỉ chặn một client gửi quá nhiều; tấn công phân tán (DDoS) phải chặn ở edge/CDN trước khi tới API (ADR-066). Map `set_result.criteria` chỉ chứa token đóng, số, boolean, không có văn bản tự do, nên không phải làm sạch như ghi chú. Tiêu chí `pain` chỉ ghi lại cho người dùng xem, không dùng để chẩn đoán.
 
 ## 3. Observability
 Common correlation: `traceId`, `mutationId`, `sessionId` (UUID only, no name). Metrics:

@@ -288,6 +288,80 @@ try:
                 errors.append(f'OpenAPI Exercise is missing {field} (CON-006)')
         if 'actualLoadKg' not in schema['$defs']['set_result_payload']['properties']:
             errors.append('entity-payloads set_result_payload is missing actualLoadKg (CON-006)')
+
+        # CON-008: criteria config (ADR-066) and per-set criteria values (ADR-067) stay in lockstep across
+        # OpenAPI, entity-payloads, db/008, fixtures/criteria_config.json and the db/005 indicator seed.
+        config_doc = json.loads((ROOT / 'fixtures/criteria_config.json').read_text(encoding='utf-8'))
+        config_doc.pop('_comment', None)
+        config_wire = jsonschema.Draft202012Validator(
+            {'$ref': f'{oas_uri}#/components/schemas/CriteriaConfig'},
+            registry=registry, format_checker=jsonschema.FormatChecker())
+        for error in config_wire.iter_errors(config_doc):
+            errors.append(f'fixtures/criteria_config.json does not match OpenAPI CriteriaConfig: {error.message}')
+        criteria_sql = (ROOT / 'db/008_criteria_config.sql').read_text(encoding='utf-8')
+        seed_match = re.search(r'\$criteria_v1\$(.*?)\$criteria_v1\$', criteria_sql, re.DOTALL)
+        seed_doc = json.loads(seed_match.group(1)) if seed_match else None
+        if seed_doc is None:
+            errors.append('db/008 seeds no criteria config version 1')
+        elif config_doc.get('version') == 1 and seed_doc != {k: config_doc.get(k) for k in ('supportedTypes', 'criteria')}:
+            errors.append('fixtures/criteria_config.json supportedTypes/criteria differ from the db/008 version 1 seed')
+        indicator_set = config_doc.get('indicators', {})
+        fixture_indicators = {i['id'] for i in indicator_set.get('indicators', [])}
+        if fixture_indicators != seeded_indicators:
+            errors.append(f'fixtures/criteria_config.json indicators {sorted(fixture_indicators)} != db/005 seed {sorted(seeded_indicators)}')
+        if indicator_set.get('version') != sum(i['version'] for i in indicator_set.get('indicators', [])):
+            errors.append('fixtures/criteria_config.json indicator set version must equal the sum of row versions (ADR-066)')
+        reserved_measures = {'holdSec', 'reps', 'loadKg'}
+        column_backed = {'rpe', 'pain'}
+        criteria_def = schema['$defs']['criteria_values']
+        reserved_entity = set(criteria_def['propertyNames']['not']['enum'])
+        reserved_sql_match = re.search(r"criteria \?\| ARRAY\[([^\]]*)\]", criteria_sql)
+        reserved_sql = set(re.findall(r"'([A-Za-z_]+)'", reserved_sql_match.group(1))) if reserved_sql_match else set()
+        reserved_oas = set(schemas['Criterion']['properties']['id']['not']['enum'])
+        if not reserved_entity == reserved_sql == reserved_measures | column_backed:
+            errors.append(f'Reserved criteria keys drift: entity schema {sorted(reserved_entity)} vs db/008 {sorted(reserved_sql)}')
+        if reserved_oas != reserved_measures:
+            errors.append(f'OpenAPI Criterion.id must exclude exactly {sorted(reserved_measures)}, got {sorted(reserved_oas)}')
+        token_pattern = schema['$defs']['criteria_token']['pattern']
+        if schemas['CriterionOption']['properties']['v']['pattern'] != token_pattern:
+            errors.append('OpenAPI CriterionOption.v pattern drifts from entity-payloads criteria_token')
+        if schemas['Criterion']['properties']['id']['pattern'] != criteria_def['propertyNames']['pattern']:
+            errors.append('OpenAPI Criterion.id pattern drifts from entity-payloads criteria key pattern')
+        chips_max = next(b['maxItems'] for b in criteria_def['additionalProperties']['anyOf'] if b.get('type') == 'array')
+        if schemas['Criterion']['properties']['options']['maxItems'] != chips_max:
+            errors.append('OpenAPI Criterion.options maxItems drifts from the entity-payloads chips maxItems')
+        applies_props = schemas['CriteriaAppliesTo']['properties']
+        if applies_props.get('measurementTypes', {}).get('items', {}).get('$ref') != '#/components/schemas/MeasurementType':
+            errors.append('OpenAPI CriteriaAppliesTo.measurementTypes must reference MeasurementType (ADR-066)')
+        measurement_types = set(schemas['MeasurementType']['enum'])
+        for criterion in config_doc.get('criteria', []):
+            if criterion['type'] not in config_doc.get('supportedTypes', []):
+                errors.append(f"fixtures/criteria_config.json criterion {criterion['id']} uses a type outside supportedTypes")
+            unknown_types = set(criterion.get('appliesTo', {}).get('measurementTypes', [])) - measurement_types
+            if unknown_types:
+                errors.append(f"fixtures/criteria_config.json criterion {criterion['id']} uses unknown measurementTypes {sorted(unknown_types)}")
+        # Worst-case criteria map: schema-valid and within the db/008 8192-byte text bound.
+        size_match = re.search(r'octet_length\(criteria::text\) <= (\d+)', criteria_sql)
+        token = 'a' * 32
+        worst = {f'k{i:02d}' + 'x' * 29: [token[:-2] + f'{j:02d}' for j in range(chips_max)]
+                 for i in range(criteria_def['maxProperties'])}
+        worst_mutation = json.loads(json.dumps(json.loads((ROOT / 'fixtures/samples/criteria_sync_push.sample.json')
+                                                          .read_text(encoding='utf-8'))['mutations'][0]))
+        worst_mutation['payload']['criteria'] = worst
+        for error in validator.iter_errors(worst_mutation):
+            errors.append(f'Worst-case criteria map is not schema-valid: {error.message}')
+        worst_bytes = len(json.dumps(worst, separators=(', ', ': ')).encode('utf-8'))
+        if not size_match or worst_bytes > int(size_match.group(1)):
+            errors.append(f'Worst-case criteria map ({worst_bytes} bytes) exceeds db/008 ck_set_results_criteria bound')
+        criteria_versions = {config_doc.get('version')}
+        valid_keys = {c['id'] for c in config_doc.get('criteria', []) if c['enabled']} - column_backed
+        for path in sample_pushes:
+            for mutation in json.loads(path.read_text(encoding='utf-8'))['mutations']:
+                payload = mutation.get('payload', {})
+                if mutation['entityType'] != 'set_result' or 'criteria' not in payload:
+                    continue
+                if payload.get('criteriaVersion') not in criteria_versions or not set(payload['criteria']) <= valid_keys:
+                    errors.append(f"{path.relative_to(ROOT).as_posix()} mutation {mutation['mutationId']} uses criteria outside fixtures/criteria_config.json")
 except ImportError:
     print('INFO: jsonschema unavailable; skipping JSON Schema semantic checks')
 except Exception as exc:

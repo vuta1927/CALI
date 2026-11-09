@@ -37,7 +37,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             await command.ExecuteNonQueryAsync();
         }
 
-        return new NpgsqlConnectionStringBuilder(AdminConnectionString) { Database = name }.ConnectionString;
+        // No pooling: every test database would otherwise keep its own idle pool open, and with one
+        // database per test the shared container hits max_connections (53300 "too many clients").
+        return new NpgsqlConnectionStringBuilder(AdminConnectionString) { Database = name, Pooling = false }.ConnectionString;
     }
 
     /// <summary>Blank database with production migrations (no dev seed) applied.</summary>

@@ -215,8 +215,26 @@
         "skipReason": {"type": ["string", "null"], "maxLength": 500},
         "painReported": {"type": "boolean"},
         "confirmedAt": {"$ref": "#/$defs/dateTime"},
-        "revision": {"type": "integer", "minimum": 1}
-      }, "additionalProperties": false
+        "revision": {"type": "integer", "minimum": 1},
+        "criteriaVersion": {"type": "integer", "minimum": 1, "description": "CON-008 (ADR-067). Published criteria config version the values were entered with; a session keeps the version it started with (docs/18 §5.3). Must be a published version (backend/CaliDomain rule, ADR-020)."},
+        "criteria": {"$ref": "#/$defs/criteria_values"}
+      },
+      "dependentRequired": {"criteria": ["criteriaVersion"], "criteriaVersion": ["criteria"]},
+      "additionalProperties": false
+    },
+    "criteria_token": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$", "description": "CON-008: an option value `v` of a choice/chips criterion. Closed tokens only, never free text."},
+    "criteria_values": {
+      "type": "object", "maxProperties": 20,
+      "description": "CON-008 (ADR-067). Extra per-set values keyed by criterion id. Column-backed ids never appear here (ADR-045): rpe -> rpe, pain -> painReported, holdSec/reps/loadKg -> actual* fields. Key, type, option and range must match the criterion in criteriaVersion (backend/CaliDomain rule, ADR-020). db/008 ck_set_results_criteria bounds the stored text to 8192 bytes.",
+      "propertyNames": {"pattern": "^[a-z][a-zA-Z0-9_]{0,31}$", "not": {"enum": ["rpe", "pain", "holdSec", "reps", "loadKg"]}},
+      "additionalProperties": {
+        "anyOf": [
+          {"$ref": "#/$defs/criteria_token"},
+          {"type": "number", "minimum": -100000, "maximum": 100000},
+          {"type": "boolean"},
+          {"type": "array", "maxItems": 10, "uniqueItems": true, "items": {"$ref": "#/$defs/criteria_token"}}
+        ]
+      }
     },
     "workout_note_payload": {
       "type": "object", "required": ["id", "sessionId", "noteText", "createdAt"],

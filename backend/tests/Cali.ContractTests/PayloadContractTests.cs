@@ -418,6 +418,91 @@ public sealed class PayloadContractTests : IClassFixture<OpenApiContractTests.Sp
                 || k.Contains("weight", StringComparison.OrdinalIgnoreCase));
     }
 
+    // ---- CON-008 criteria config + per-set criteria ----
+
+    [Fact]
+    public void Criteria_config_is_a_public_read_only_endpoint_with_one_etag()
+    {
+        // ADR-066: publisher content, no user data; the portal publishes later (ADR-051), so GET only.
+        _spec.Paths.Keys.ShouldContain("/v1/criteria-config");
+        var path = _spec.Paths["/v1/criteria-config"]!;
+        path.Operations!.Keys.Select(m => m.Method).ShouldBe(["GET"]);
+        var operation = path.Operations[HttpMethod.Get];
+        operation.Security.ShouldNotBeNull();
+        operation.Security.ShouldBeEmpty();
+        operation.Parameters!.Select(p => p.Name).ShouldBe(["version", "If-None-Match"], ignoreOrder: true);
+        operation.Responses!.Keys.ShouldBe(["200", "304", "400", "404", "429"], ignoreOrder: true);
+        operation.Responses["200"]!.Headers!.Keys.ShouldBe(["ETag", "Cache-Control"], ignoreOrder: true);
+        operation.Responses["304"]!.Headers!.Keys.ShouldContain("ETag");
+        operation.Responses["200"]!.Content!["application/json"].Schema.ShouldBeOfType<OpenApiSchemaReference>()
+            .Reference.Id.ShouldBe("CriteriaConfig");
+        // ADR-058: the indicator set travels in the same document under the same ETag.
+        Schema("CriteriaConfig").Properties!["indicators"].ShouldBeOfType<OpenApiSchemaReference>()
+            .Reference.Id.ShouldBe("IndicatorDefinitionSet");
+        Schema("CriteriaConfig").Required!.ShouldBe(["version", "publishedAt", "supportedTypes", "criteria", "indicators"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Criterion_ids_never_shadow_primary_measures_and_options_match_stored_tokens()
+    {
+        var criterion = Schema("Criterion");
+        Values(criterion.Properties!["id"].Not!).ShouldBe(["holdSec", "reps", "loadKg"], ignoreOrder: true);
+        criterion.Properties["id"].Pattern.ShouldBe(Def("criteria_values").GetProperty("propertyNames").GetProperty("pattern").GetString());
+        Schema("CriterionOption").Properties!["v"].Pattern.ShouldBe(Def("criteria_token").GetProperty("pattern").GetString());
+        // No measures block on the wire: primary fields follow measurementType (docs/18 §4, ADR-060).
+        Schema("CriteriaConfig").Properties!.Keys.ShouldNotContain("measures");
+        Values(Schema("CriteriaAppliesTo").Properties!["disciplines"].Items!)
+            .ShouldBe(Enum("Discipline").Append("*"), ignoreOrder: true);
+        // ADR-066: optional measurementTypes filter reuses the derived MeasurementType enum (ADR-060), no '*'.
+        var appliesTo = Schema("CriteriaAppliesTo");
+        appliesTo.Required!.ShouldBe(["disciplines"]);
+        appliesTo.Properties!.Keys.ShouldBe(["disciplines", "measurementTypes", "exerciseIds"], ignoreOrder: true);
+        appliesTo.Properties["measurementTypes"].Items.ShouldBeOfType<OpenApiSchemaReference>()
+            .Reference.Id.ShouldBe("MeasurementType");
+        appliesTo.Properties["measurementTypes"].UniqueItems.ShouldBe(true);
+    }
+
+    [Fact]
+    public void Set_result_criteria_are_optional_paired_and_closed()
+    {
+        var payload = Def("set_result_payload");
+        var properties = payload.GetProperty("properties");
+        properties.TryGetProperty("criteriaVersion", out _).ShouldBeTrue();
+        properties.TryGetProperty("criteria", out _).ShouldBeTrue();
+        payload.GetProperty("required").EnumerateArray().Select(e => e.GetString())
+            .ShouldNotContain(name => name == "criteria" || name == "criteriaVersion");
+        var dependent = payload.GetProperty("dependentRequired");
+        dependent.GetProperty("criteria").EnumerateArray().Select(e => e.GetString()).ShouldBe(["criteriaVersion"]);
+        dependent.GetProperty("criteriaVersion").EnumerateArray().Select(e => e.GetString()).ShouldBe(["criteria"]);
+
+        // Values are tokens, numbers, booleans or token lists: no free-text string branch.
+        var values = Def("criteria_values");
+        values.GetProperty("maxProperties").GetInt32().ShouldBe(20);
+        foreach (var branch in values.GetProperty("additionalProperties").GetProperty("anyOf").EnumerateArray())
+        {
+            if (branch.TryGetProperty("type", out var type))
+            {
+                type.GetString().ShouldNotBe("string");
+                type.GetString().ShouldNotBe("object");
+            }
+            else
+            {
+                branch.GetProperty("$ref").GetString().ShouldBe("#/$defs/criteria_token");
+            }
+        }
+    }
+
+    [Fact]
+    public void Column_backed_criteria_keys_are_rejected_by_schema_and_sql()
+    {
+        // ADR-045 / ADR-067: rpe and pain stay columns; holdSec, reps, loadKg are actual* fields.
+        string[] reserved = ["rpe", "pain", "holdSec", "reps", "loadKg"];
+        Def("criteria_values").GetProperty("propertyNames").GetProperty("not").GetProperty("enum").EnumerateArray()
+            .Select(e => e.GetString()!).ShouldBe(reserved, ignoreOrder: true);
+        var sql = File.ReadAllText(Path.Combine(RepoPaths.DbDirectory, "008_criteria_config.sql"));
+        sql.ShouldContain("criteria ?| ARRAY[" + string.Join(", ", reserved.Select(r => $"'{r}'")) + "]");
+    }
+
     private HashSet<string> Enum(string schema) => Values(Schema(schema));
 
     // Microsoft.OpenApi reads a YAML `null` enum member as a sentinel string; nullable enums keep only real values.

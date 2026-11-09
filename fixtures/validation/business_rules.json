@@ -574,6 +574,210 @@
           "measuredAt": "2026-11-09T06:45:00Z"
         }
       }
+    },
+    {
+      "name": "criteria_unknown_version",
+      "rule": "CON-008 / ADR-067: criteriaVersion must be a published criteria config version (db/008 fk_set_results_criteria_version)",
+      "expect": {
+        "status": "rejected",
+        "code": "validation_failed",
+        "field": "criteriaVersion"
+      },
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000040",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000040",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000040",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 99,
+          "criteria": {
+            "technique": "good"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_key_not_in_version",
+      "rule": "CON-008 / ADR-067: every criteria key must be an enabled criterion of that version",
+      "expect": {
+        "status": "rejected",
+        "code": "validation_failed",
+        "field": "criteria"
+      },
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000041",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000041",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000041",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "grip": "wide"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_choice_value_not_in_options",
+      "rule": "CON-008 / ADR-067: a choice value must be one of the criterion options",
+      "expect": {
+        "status": "rejected",
+        "code": "validation_failed",
+        "field": "criteria"
+      },
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000042",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000042",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000042",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "technique": "perfect"
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_chips_value_not_in_options",
+      "rule": "CON-008 / ADR-067: chips values must be a subset of the criterion options",
+      "expect": {
+        "status": "rejected",
+        "code": "validation_failed",
+        "field": "criteria"
+      },
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000043",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000043",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000043",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "condition": [
+              "same",
+              "band"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "criteria_value_type_mismatch",
+      "rule": "CON-008 / ADR-067: the value shape must match the criterion type (choice = one token, chips = token list, toggle = boolean, scale/number = number in min..max)",
+      "expect": {
+        "status": "rejected",
+        "code": "validation_failed",
+        "field": "criteria"
+      },
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000044",
+        "entityType": "set_result",
+        "entityId": "c4000000-0000-4000-8000-000000000044",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-09T07:10:00Z",
+        "payload": {
+          "id": "c4000000-0000-4000-8000-000000000044",
+          "executionId": "c5000000-0000-4000-8000-000000000002",
+          "setIndex": 1,
+          "status": "completed",
+          "prescribedSnapshot": {
+            "target": {
+              "kind": "reps",
+              "repMin": 5,
+              "repMax": 8
+            },
+            "setCount": 3,
+            "restSeconds": 90,
+            "catalogVersion": 1,
+            "exerciseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+          },
+          "confirmedAt": "2026-11-09T07:10:00Z",
+          "actualReps": 6,
+          "criteriaVersion": 1,
+          "criteria": {
+            "technique": true,
+            "condition": "same"
+          }
+        }
+      }
     }
   ]
 }

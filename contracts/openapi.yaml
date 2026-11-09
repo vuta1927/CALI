@@ -130,6 +130,61 @@ paths:
                 $ref: '#/components/schemas/Exercise'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/criteria-config:
+    get:
+      tags: [Catalog]
+      summary: Published set-entry criteria config and indicator set
+      description: >-
+        CON-008 (docs/18 §5, ADR-058, ADR-066). Read-only publisher content, no user data, so no
+        authentication (like the catalog). Without `version` returns the latest published criteria
+        config; with `version` returns that published version so history recorded under an older
+        version can be rendered (docs/18 §5.3). The indicator set is always the current one. The
+        strong ETag covers both parts (`"c{criteriaVersion}.i{indicatorSetVersion}"`); a matching
+        `If-None-Match` returns 304 without a body. There is no write endpoint: the portal publishes
+        new immutable versions later (ADR-051). Anonymous, so it is rate limited per client IP
+        (429 with Retry-After) and the response is cacheable by a shared cache in front of the API
+        (docs/11 §2).
+      operationId: getCriteriaConfig
+      security: []
+      parameters:
+        - name: version
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1}
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: {type: string, maxLength: 200}
+      responses:
+        '200':
+          description: Criteria config with the current indicator set
+          headers:
+            ETag:
+              description: Strong validator for criteria version + indicator set version.
+              schema: {type: string}
+            Cache-Control:
+              description: >-
+                `public, max-age=300`: a CDN or reverse proxy may serve repeat requests for up to
+                5 minutes without reaching the API; afterwards clients and caches revalidate with
+                If-None-Match. Clients keep the last copy for offline use.
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CriteriaConfig'}
+        '304':
+          description: Not modified; the cached copy for this ETag is current.
+          headers:
+            ETag:
+              schema: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: The requested `version` is not published (`code` = `criteria_version_not_found`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/plans:
     get:
       tags: [Plans]
@@ -687,8 +742,11 @@ components:
       type: object
       description: >-
         CON-005 / ADR-058. The versioned set of indicator definitions. No endpoint is added in
-        CON-005: CON-008 embeds this object in `GET /v1/criteria-config`; until then the client
-        uses the bundled default set (same content as the db/005 seed).
+        CON-005: CON-008 embeds this object in `GET /v1/criteria-config` (ADR-066); offline the
+        client uses its cached or bundled default set (same content as the db/005 seed). Set
+        `version` = sum of the row versions in indicator_definitions (rows are never deleted and
+        every change bumps a row version or adds a row, so it only grows); `publishedAt` = latest
+        row `updated_at`.
       required: [version, publishedAt, indicators]
       properties:
         version: {type: integer, minimum: 1}
@@ -696,6 +754,110 @@ components:
         indicators:
           type: array
           items: {$ref: '#/components/schemas/IndicatorDefinition'}
+    # CON-008 begin: criteria config (docs/18 §5; ADR-050, ADR-051, ADR-058, ADR-066, ADR-067).
+    CriteriaConfig:
+      type: object
+      description: >-
+        CON-008 (ADR-066). A published, immutable criteria config version (db/008
+        criteria_config_versions) plus the current indicator set (ADR-058), served by
+        `GET /v1/criteria-config` under one ETag. Read-only for devices; only the future portal
+        publishes (ADR-051). Primary measure fields are not configured here: they follow the
+        exercise measurementType (docs/18 §4, ADR-060). Clients skip criteria whose `type` they do
+        not know and keep the last config for offline use; first launch uses the bundled version 1.
+      required: [version, publishedAt, supportedTypes, criteria, indicators]
+      additionalProperties: false
+      properties:
+        version: {type: integer, minimum: 1}
+        publishedAt: {type: string, format: date-time}
+        supportedTypes:
+          type: array
+          uniqueItems: true
+          description: 'Criterion types the version uses. v1: number, choice, scale, chips, toggle.'
+          items: {$ref: '#/components/schemas/CriterionType'}
+        criteria:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/Criterion'}
+        indicators: {$ref: '#/components/schemas/IndicatorDefinitionSet'}
+    CriterionType:
+      type: string
+      pattern: '^[a-z][a-z_]{0,31}$'
+      description: >-
+        Open vocabulary: v1 values are number, choice, scale, chips and toggle. A client that does not
+        know a type skips that criterion instead of failing (docs/18 §5.2).
+    Criterion:
+      type: object
+      description: >-
+        CON-008 (docs/18 §5.2). `id` is stable and never reused once data exists. Ids `rpe` and `pain`
+        only control display of the rpe / painReported columns (ADR-045); holdSec, reps and loadKg are
+        reserved for primary measures and never used. choice/chips need `options`; scale needs `min`
+        and `max`. `appliesTo` (all present filters must match): the exercise discipline must match
+        (`*` = any); when `measurementTypes` is present, the exercise measurementType (derived from its
+        type, ADR-060) must be listed, which also works for personal exercises; when `exerciseIds` is
+        present, the exercise id must be listed, unknown ids are ignored and personal exercises never
+        match it (ADR-050, ADR-066). `required` is a client form rule only.
+      required: [id, type, label, appliesTo, enabled]
+      additionalProperties: false
+      properties:
+        id: {type: string, pattern: '^[a-z][a-zA-Z0-9_]{0,31}$', not: {enum: [holdSec, reps, loadKg]}}
+        type: {$ref: '#/components/schemas/CriterionType'}
+        label: {type: string, minLength: 1, maxLength: 120}
+        hint: {type: string, maxLength: 240}
+        icon: {type: string, pattern: '^[a-z][a-zA-Z0-9_]{0,31}$', description: 'Design-system icon name; unknown names render no icon.'}
+        appliesTo: {$ref: '#/components/schemas/CriteriaAppliesTo'}
+        options:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: {$ref: '#/components/schemas/CriterionOption'}
+        min: {type: number, minimum: -100000, maximum: 100000}
+        max: {type: number, minimum: -100000, maximum: 100000}
+        step: {type: number, exclusiveMinimum: 0}
+        unit: {type: string, maxLength: 16}
+        prefill: {type: string, pattern: '^[a-zA-Z]{1,32}$', description: 'v1: previousSet (value of the previous set in the same execution). Unknown values = no prefill.'}
+        splitsTrend: {type: boolean, default: false, description: 'A changed value starts a new series on the progress chart (docs/18 §5.2).'}
+        required: {type: boolean, default: false}
+        enabled: {type: boolean, description: 'Disabled criteria are not rendered; recorded values are kept.'}
+      allOf:
+        - if: {properties: {type: {enum: [choice, chips]}}}
+          then: {required: [options]}
+        - if: {properties: {type: {const: scale}}}
+          then: {required: [min, max]}
+        - if: {properties: {id: {const: rpe}}}
+          then: {properties: {type: {const: scale}, min: {minimum: 1}, max: {maximum: 10}}}
+        - if: {properties: {id: {const: pain}}}
+          then: {properties: {type: {const: toggle}}}
+    CriteriaAppliesTo:
+      type: object
+      required: [disciplines]
+      additionalProperties: false
+      properties:
+        disciplines:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: ['*', calisthenics, gym, running]
+        measurementTypes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: 'Optional (ADR-066). Absent = any measurement type. No `*`: omit the field instead.'
+          items: {$ref: '#/components/schemas/MeasurementType'}
+        exerciseIds:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    CriterionOption:
+      type: object
+      required: [v, label]
+      additionalProperties: false
+      properties:
+        v: {type: string, pattern: '^[a-z][a-z0-9_]{0,31}$', description: 'Stored value; never reused with another meaning.'}
+        label: {type: string, minLength: 1, maxLength: 60}
+        hint: {type: string, maxLength: 120}
     GoalStatus:
       type: string
       enum: [active, reached, achieved, missed, archived]

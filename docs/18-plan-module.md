@@ -5,6 +5,7 @@
 > **Ngày:** 2026-11-08 · Dữ liệu trong mockup là **dữ liệu mẫu**.
 > **PO-002 (2026-11-08):** câu hỏi §9.1, 9.2, 9.5, 9.6 **đã chốt** bằng ADR-045..048 (Accepted; ADR-048 là mặc định tạm) trong [docs/15](15-decisions-risks.md). §9.3, 9.4, 9.7 **đã chốt** bằng ADR-050..052.
 > **CON-005 (2026-11-08, đã review):** contract cho §6 (mục tiêu, giai đoạn, chỉ số) đã có: `plan_goal`, `plan_phase`, `IndicatorDefinition` trong OpenAPI/entity schema, `db/005_plan_goals_phases.sql`, docs 03 §2.3, 07, 08. PO đã duyệt ADR-057..059 ngày 2026-11-08. Logic `current`/`reached` phía client thuộc IOS-011; `GET /v1/criteria-config` thuộc CON-008.
+> **CON-008 (2026-11-09, đã review):** contract cho §5 đã có: `GET /v1/criteria-config` (`CriteriaConfig`, kèm `indicators`, một ETag), `set_result.criteriaVersion` + `criteria`, `db/008_criteria_config.sql`, `fixtures/criteria_config.json`. PO duyệt ADR-066/067 ngày 2026-11-09. Endpoint thật thuộc BE-001/002; form P6 động thuộc IOS-016.
 > **Nhiều giáo án:** xem [docs/19](19-multi-plan.md). Người dùng có thể theo song song nhiều giáo án (Calisthenics, chạy giải, Gym). Khi được chốt: "giáo án hiện tại" trong tài liệu này đổi thành "giáo án đang xem", tuần hiện tại tính theo docs/19 D7 (§6.5, §6.6), và §4 thêm môn `running` với kiểu đo `distance` / `duration`.
 
 ## 1. Mục tiêu sản phẩm
@@ -75,13 +76,17 @@ Màn P6 không hard-code tiêu chí. App nhận một **bộ cấu hình có phi
 ```
 Bản đầy đủ, có nhãn, gợi ý và icon, nằm trong mockup (panel "Xem cấu hình đang dùng (JSON)").
 
+> **CON-008 (2026-11-09, ADR-066/067):** ví dụ trên là bản thiết kế. Wire thật là schema `CriteriaConfig` trong OpenAPI (`GET /v1/criteria-config`), bản v1 ở `fixtures/criteria_config.json` và seed trong `db/008_criteria_config.sql`. Khác biệt: **không có `measures`** (trường đo chính cố định theo `measurementType`, §4, ADR-060); `options` là `[{v, label, hint?}]`; tài liệu kèm luôn `indicators` (`IndicatorDefinitionSet`, ADR-058) dưới cùng một ETag `"c{version}.i{indicatorSetVersion}"`.
+
 ### 5.2 Ngữ nghĩa các trường
 | Trường | Ý nghĩa |
 |--------|---------|
-| `id` | Khoá ổn định, **không tái sử dụng** sau khi đã có dữ liệu. Đổi nhãn được, đổi nghĩa thì phải tạo id mới. |
+| `version` | Số nguyên ≥ 1, tăng mỗi lần portal xuất bản. Phiên bản đã xuất bản không sửa, không xoá (ADR-051, trigger `ck_criteria_config_versions_immutable`). |
+| `id` | Khoá ổn định, **không tái sử dụng** sau khi đã có dữ liệu. Đổi nhãn được, đổi nghĩa thì phải tạo id mới. `holdSec`, `reps`, `loadKg` không bao giờ là id tiêu chí (là trường `actual*`). `rpe` và `pain` là tiêu chí chỉ điều khiển hiển thị; giá trị vẫn lưu ở cột `rpe` và `painReported`, không nằm trong map `criteria` (ADR-045, ADR-067). |
 | `type` | Một trong `supportedTypes`. Mỗi kiểu có một renderer. Kiểu mà client không biết thì **bỏ qua tiêu chí đó**, không làm vỡ màn hình. |
 | `appliesTo.disciplines` | `*` = mọi môn. |
-| `appliesTo.exerciseIds` | Tuỳ chọn, có từ v1 ([ADR-050](15-decisions-risks.md)). Có thì tiêu chí chỉ hiện cho các bài trong danh sách (vẫn phải khớp môn). Id không có trong catalog thì bỏ qua; bài tập cá nhân chỉ nhận tiêu chí theo môn. `measurementTypes` để sau. |
+| `appliesTo.exerciseIds` | Tuỳ chọn, có từ v1 ([ADR-050](15-decisions-risks.md)). Có thì tiêu chí chỉ hiện cho các bài trong danh sách (vẫn phải khớp môn). Id không có trong catalog thì bỏ qua; bài tập cá nhân không bao giờ khớp `exerciseIds`. |
+| `appliesTo.measurementTypes` | Tuỳ chọn (CON-008, ADR-066, PO chốt 2026-11-09). Có thì tiêu chí chỉ hiện cho bài có `measurementType` nằm trong danh sách (vẫn phải khớp môn và `exerciseIds` nếu có). Áp được cho cả bài tập cá nhân vì `measurementType` suy ra từ `type` (ADR-060). Không có `*`: bỏ trường là áp mọi loại đo. Lọc theo `focusTags` để tới khi PO chốt bộ tag. |
 | `options[].v` | Giá trị lưu. `label` chỉ dùng để hiển thị và đổi được. |
 | `prefill: previousSet` | Điền sẵn bằng giá trị của set trước trong cùng bài. |
 | `splitsTrend` | Khi giá trị đổi so với set hoặc buổi trước, điểm trên biểu đồ Tiến bộ được tách chuỗi để không so sánh khập khiễng. |
@@ -90,7 +95,8 @@ Bản đầy đủ, có nhãn, gợi ý và icon, nằm trong mockup (panel "Xem
 
 ### 5.3 Quy tắc phiên bản và offline
 - App **cache bộ cấu hình cuối cùng** và dùng nó khi offline. Lần cài đầu dùng bộ đóng gói sẵn trong app.
-- Mỗi `set_result` lưu `criteriaVersion` cùng các giá trị theo `id`. Lịch sử luôn được đọc đúng theo phiên bản tại thời điểm ghi.
+- Mỗi `set_result` lưu `criteriaVersion` cùng các giá trị theo `id` (map `criteria`; có cái này thì phải có cái kia, set cũ không có cả hai). Lịch sử luôn được đọc đúng theo phiên bản tại thời điểm ghi.
+- Giá trị trong map chỉ là token (`options[].v`), số, boolean hoặc danh sách token; **không có chữ tự do**. Tối đa 20 khoá, chips tối đa 10 giá trị, SQL chặn trên 8192 byte (ADR-067). Server kiểm tra theo phiên bản đã ghi: phiên bản lạ, khoá không phải tiêu chí đang bật, giá trị ngoài `options` hoặc ngoài `min..max`, sai kiểu ⇒ `validation_failed`. Server không kiểm tra lại `appliesTo`; `required` chỉ áp ở client.
 - Bộ cấu hình mới chỉ áp dụng cho **set ghi sau đó**. Buổi đang tập giữ nguyên phiên bản đã dùng lúc bắt đầu buổi.
 - Tắt hoặc gỡ một tiêu chí không xoá giá trị đã ghi.
 
@@ -173,8 +179,8 @@ Hiện trạng: `set_result` đã có `actualReps`, `actualHoldMs`, `rpe`, `pain
 | `exercise.discipline`, `exercise.measurementType` | OpenAPI, `db/`, catalog-bundle schema, docs/03 |
 | Prescription kind mới `load` (`reps`, `loadKg`) | entity-payloads schema, CaliDomain, reducer fixtures |
 | `set_result.actualLoadKg` (decimal, ≥ 0) | entity-payloads, SQL, OpenAPI |
-| `set_result.criteriaVersion` + `criteria` (map `id → value`, có giới hạn kích thước) | entity-payloads, SQL (JSONB), validator |
-| Tài nguyên `criteria_config` (đọc: `GET /v1/criteria-config`, ETag; ghi: chỉ portal) | OpenAPI, backend, docs/11 (quyền admin) |
+| `set_result.criteriaVersion` + `criteria` (map `id → value`, có giới hạn kích thước). CON-008 (db/008, ADR-067): tối đa 20 khoá, ≤ 8192 byte, không có `rpe`/`pain`/`holdSec`/`reps`/`loadKg` | entity-payloads, SQL (JSONB), validator |
+| Tài nguyên `criteria_config` (đọc: `GET /v1/criteria-config`, ETag; ghi: chỉ portal). CON-008 (ADR-066): contract và bảng `criteria_config_versions` (immutable) đã có; endpoint thuộc BE-001/002 | OpenAPI, backend, docs/11 (quyền admin) |
 | Entity `plan_goal` (§6.1: `indicatorId`, `exerciseId?`, `baseline`, `target` hoặc `min/max`, `scope`, `unlockAfter`, `status`, `achievedAt`, `pinned`), sửa được, có audit; thay cho `training_plan.goal` đơn | entity-payloads, SQL, sync, docs/03 |
 | Cấu hình `indicator_definition` (nhãn, đơn vị, bước, loại bài áp dụng, cách gộp max/sum), có phiên bản, đọc kèm `criteria_config` | OpenAPI, backend, portal |
 | `plan_phase[]` sửa được, có audit | entity-payloads, SQL, docs/03 |
