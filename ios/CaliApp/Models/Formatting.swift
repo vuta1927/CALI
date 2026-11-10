@@ -4,6 +4,24 @@ import Foundation
 enum Fmt {
     static let vi = Locale(identifier: "vi_VN")
 
+    /// Body weight, always kilograms ("72,4 kg"): the unit is fixed by the kind (ADR-063), not by the load setting.
+    static func bodyKg(_ kg: Decimal) -> String {
+        "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+    }
+
+    /// "+0,5 kg", "−0,3 kg", "±0 kg".
+    static func signedBodyKg(_ kg: Decimal) -> String {
+        kg == 0 ? "±0 kg" : (kg > 0 ? "+" : "−") + bodyKg(abs(kg))
+    }
+
+    /// "2,5", "60" (vi decimal comma, no trailing zeros).
+    static func number(_ value: Decimal) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)).locale(vi))
+    }
+
+    /// Display unit for load (ADR-046), mirrored from the user's settings by `AppStore`. Storage is always kg.
+    nonisolated(unsafe) static var weightUnit: WeightUnit = .kg
+
     /// "1:05" / "0:12" from milliseconds (floors partial seconds for elapsed time).
     static func clock(ms: Int64) -> String {
         clock(seconds: Int(max(ms, 0) / 1000))
@@ -19,38 +37,84 @@ enum Fmt {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
+    /// "90 giây", "2 phút", "2 phút 30 giây" (mockup wording, no unit abbreviations).
     static func seconds(_ s: Int) -> String {
         if s >= 60 && s % 60 == 0 { return "\(s / 60) phút" }
-        if s > 60 { return "\(s / 60)p\(String(format: "%02d", s % 60))s" }
-        return "\(s)s"
+        if s > 60 { return "\(s / 60) phút \(s % 60) giây" }
+        return "\(s) giây"
     }
 
+    /// "12 giây", "11,5 giây" with the `vi` decimal comma.
     static func holdSeconds(ms: Int64) -> String {
-        let tenths = Double(ms) / 1000
-        return tenths.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(tenths))s" : String(format: "%.1fs", tenths)
+        let value = Double(ms) / 1000
+        return "\(value.formatted(.number.precision(.fractionLength(0...1)).locale(vi))) giây"
     }
 
-    /// Target of one set: "giữ 12s", "8–10 lần".
+    /// Target of one set: "giữ 12 giây", "8–10 lần".
     static func target(_ p: Prescription) -> String {
         switch p {
-        case .staticHold(let s): "giữ \(s)s"
+        case .staticHold(let s): "giữ \(s) giây"
         case .reps(let lo, let hi): lo == hi ? "\(lo) lần" : "\(lo)–\(hi) lần"
-        case .timedReps(let s): "\(s)s tối đa lần"
-        case .interval(let work, let rest): "\(work)s tập / \(rest)s nghỉ"
+        case .timedReps(let s): "\(s) giây tối đa lần"
+        case .interval(let work, let rest): "\(work) giây tập / \(rest) giây nghỉ"
         case .skillAttempt(let n): "\(n) lần thử"
         case .load(let reps, let kg): "\(reps) lần @ \(loadKg(kg))"
+        case .distance(let meters, let seconds):
+            seconds.map { "\(km(meters)) trong \(duration($0))" } ?? km(meters)
+        case .duration(let s): "chạy \(seconds(s))"
         }
+    }
+
+    /// "5 km", "8,25 km" (ADR-055: kilometres only, `vi` decimal comma, at most 2 decimals).
+    static func km(_ meters: Int) -> String {
+        RunningFormat.kilometers(distanceMeters: meters).replacingOccurrences(of: ",00 km", with: " km")
+    }
+
+    /// "29:00", "1:58:40" (h:mm:ss; minutes and seconds only under an hour).
+    static func duration(_ seconds: Int) -> String {
+        let s = max(seconds, 0)
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
 
     /// Kilograms with the `vi` decimal comma: "60 kg", "57,5 kg" (docs/18 §4). Display only, always kg
     /// (ADR-046); shows up to the 2 decimals the domain allows (ADR-062), so nothing is hidden.
     static func loadKg(_ kg: Decimal) -> String {
-        "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+        switch weightUnit {
+        case .kg: "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+        case .lb: "\(WeightUnit.lb.display(kg: kg).formatted(.number.precision(.fractionLength(0...1)).locale(vi))) lb"
+        }
     }
 
-    /// "4 × giữ 12s · nghỉ 90s", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
+    /// "4 × giữ 12 giây · nghỉ 90 giây", "3 × 5 lần @ 60 kg · nghỉ 2 phút"
     static func prescription(_ item: PlannedExercise) -> String {
-        "\(item.setCount) × \(target(item.target)) · nghỉ \(seconds(item.restSeconds))"
+        "\(setsTarget(item)) · nghỉ \(seconds(item.restSeconds))"
+    }
+
+    /// "4 × giữ 12 giây"
+    static func setsTarget(_ item: PlannedExercise) -> String {
+        "\(item.setCount) × \(target(item.target))"
+    }
+
+    /// "Nghỉ 2 phút · Giữ tĩnh"
+    static func restLine(_ item: PlannedExercise) -> String {
+        "Nghỉ \(seconds(item.restSeconds)) · \(item.target.type.label)"
+    }
+
+    /// "5 bài · 15 set · ~55 phút"
+    static func workoutMeta(_ workout: PlannedWorkout) -> String {
+        "\(workout.exercises.count) bài · \(workout.totalSets) set · ~\(workout.estimatedMinutes) phút"
+    }
+
+    /// "6/11"
+    static func dayMonthShort(_ date: Date, calendar: Calendar = .current) -> String {
+        let c = calendar.dateComponents([.day, .month], from: date)
+        return "\(c.day ?? 0)/\(c.month ?? 0)"
+    }
+
+    /// "2 – 8/11", "27/10 – 2/11"
+    static func range(_ start: Date, _ end: Date, calendar: Calendar = .current) -> String {
+        let sameMonth = calendar.component(.month, from: start) == calendar.component(.month, from: end)
+        return sameMonth ? "\(calendar.component(.day, from: start)) – \(dayMonthShort(end))" : "\(dayMonthShort(start)) – \(dayMonthShort(end))"
     }
 
     static func weekdayShort(_ iso: Int) -> String {
@@ -105,6 +169,12 @@ enum Fmt {
         return days > 0 ? "\(days) ngày trước" : dayMonth(date)
     }
 
+    /// "Hôm nay, 9/11", "Thứ Sáu, 6/11"
+    static func relativeDayLong(_ date: Date) -> String {
+        let day = Calendar.current.isDateInToday(date) ? "Hôm nay" : weekdayLong(isoWeekday(date))
+        return "\(day), \(dayMonthShort(date))"
+    }
+
     /// Actual result of a logged set: "11.5s", "9 lần", "Bỏ qua".
     static func actual(_ set: LoggedSet) -> String {
         if set.status == .skipped { return "Bỏ qua" }
@@ -124,6 +194,10 @@ enum Fmt {
         case .load:
             if let r = set.reps { parts.append("\(r) lần") }
             if let kg = set.loadKg { parts.append("@ \(loadKg(kg))") }
+        case .distance, .duration:
+            if let meters = set.distanceMeters { parts.append(km(meters)) }
+            if let seconds = set.durationSeconds { parts.append(duration(seconds)) }
+            if let pace = set.pace { parts.append("· \(pace.formatted)") }
         }
         if set.status == .failed, set.target.type != .skillAttempt {
             parts.append("(chưa đạt)")
@@ -141,6 +215,8 @@ extension ExerciseType {
         case .interval: "Interval"
         case .skillAttempt: "Kỹ năng"
         case .load: "Tạ"
+        case .distance: "Quãng đường"
+        case .duration: "Thời gian chạy"
         }
     }
 
@@ -152,6 +228,8 @@ extension ExerciseType {
         case .interval: "repeat.circle"
         case .skillAttempt: "star.circle"
         case .load: "dumbbell"
+        case .distance: "figure.run"
+        case .duration: "stopwatch"
         }
     }
 
@@ -165,6 +243,43 @@ extension ExerciseType {
         case .skillAttempt: .skillAttempt(attempts: 3)
         // Conservative starting point; the plan editor steps kg by 2.5 (docs/18 §4).
         case .load: .load(reps: 5, loadKg: 20)
+        case .distance: .distance(distanceMeters: 5000, durationSeconds: nil)
+        case .duration: .duration(durationSeconds: 1200)
+        }
+    }
+}
+
+/// Training discipline shown as a chip (mockup `pchip`). Derived from exercise types like db/006:
+/// `load` is Gym, `distance`/`duration` Running, everything else Calisthenics; several is Mixed.
+enum Discipline: Equatable {
+    case calisthenics, gym, running, mixed
+
+    init(types: [ExerciseType]) {
+        let kinds = Set(types.map { type -> Discipline in
+            switch type {
+            case .load: .gym
+            case .distance, .duration: .running
+            default: .calisthenics
+            }
+        })
+        self = kinds.count > 1 ? .mixed : (kinds.first ?? .calisthenics)
+    }
+
+    var label: String {
+        switch self {
+        case .calisthenics: "Calisthenics"
+        case .gym: "Gym"
+        case .running: "Chạy bộ"
+        case .mixed: "Kết hợp"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .calisthenics: "figure.strengthtraining.functional"
+        case .gym: "dumbbell"
+        case .running: "figure.run"
+        case .mixed: "square.stack.3d.up"
         }
     }
 }
@@ -182,5 +297,75 @@ extension Phase {
         case .completed: "Hoàn thành"
         case .abandoned: "Đã dừng"
         }
+    }
+}
+
+// MARK: - Multi-plan (IOS-013)
+
+extension PlanDiscipline {
+    var label: String {
+        switch self {
+        case .calisthenics: "Calisthenics"
+        case .running: "Chạy bộ"
+        case .gym: "Gym"
+        case .mixed: "Kết hợp"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .calisthenics: "figure.strengthtraining.functional"
+        case .running: "figure.run"
+        case .gym: "dumbbell"
+        case .mixed: "square.stack.3d.up"
+        }
+    }
+}
+
+extension PlanStatus {
+    /// docs/19 §4.2 labels; `scheduled` gets its date from the caller ("Bắt đầu từ dd/mm").
+    var label: String {
+        switch self {
+        case .draft: "Nháp"
+        case .scheduled: "Đã lên lịch"
+        case .active: "Đang theo"
+        case .paused: "Tạm dừng"
+        case .ended: "Đã kết thúc"
+        case .archived: "Lưu trữ"
+        case .deleted: "Đã xoá"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .draft: "pencil"
+        case .scheduled: "calendar"
+        case .active: "play.circle"
+        case .paused: "pause.circle"
+        case .ended: "flag.checkered"
+        case .archived: "archivebox"
+        case .deleted: "trash"
+        }
+    }
+}
+
+extension Fmt {
+    /// "Thứ Hai, 9/11" for a local date.
+    static func day(_ day: LocalDate) -> String {
+        "\(weekdayLong(day.isoWeekday)), \(day.day)/\(day.month)"
+    }
+
+    /// "9/11", or "14/3/2027" outside the current year.
+    static func shortDate(_ day: LocalDate, currentYear: Int = Calendar.current.component(.year, from: Date())) -> String {
+        day.year == currentYear ? "\(day.day)/\(day.month)" : "\(day.day)/\(day.month)/\(day.year)"
+    }
+}
+
+extension LocalDate {
+    /// Midnight of this calendar day in `timeZone`.
+    func startOfDay(in timeZone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? Date(timeIntervalSince1970: 0)
     }
 }

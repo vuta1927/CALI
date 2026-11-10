@@ -16,9 +16,8 @@ public enum RunningLimits {
 /// Planned target of a running exercise, JSON shape of `$defs/target` kinds `distance` / `duration`,
 /// e.g. `{ "kind": "distance", "distanceMeters": 5000, "durationSeconds": 1800 }`.
 ///
-/// Deliberately a separate type, not new `Prescription` cases: adding cases would change the reducer
-/// (`validateActuals`, `ConfirmSet` actuals) and the CON-002 vectors, which are not approved yet.
-// TODO(CON-002): fold into `Prescription` + reducer actuals once CON-002 is approved.
+/// `Prescription.distance` / `.duration` carry the same values inside a session (IOS-014); this type keeps
+/// the running rules in one place and is what `Prescription.running` returns.
 public enum RunningTarget: Equatable, Hashable, Sendable {
     /// Distance in metres with an optional goal time (`5 × 1 km @ 4:50/km` → 1000 m, 290 s).
     case distance(distanceMeters: Int, durationSeconds: Int?)

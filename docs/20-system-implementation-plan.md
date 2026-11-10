@@ -155,7 +155,71 @@ flowchart TB
 
 > **Trạng thái POC-002 (2026-11-08):** code sẵn sàng, chờ build macOS + chạy trên iPhone. Gói `ios/Packages/CaliCore` dùng GRDB 7.12.0, ghim chính xác trong `Package.swift` và `ios/project.yml`. `WorkoutCoordinator.handle` chạy `BEGIN IMMEDIATE`, dedupe theo `processed_commands` và ghi outbox trong cùng transaction. `commandId` tất định cho nút màn khoá. 19/19 test Linux đạt (T-04, T-09, ghi đồng thời từ hai connection). App và `LiveActivityIntent` gọi cùng một coordinator trong process app (ADR-013). DB riêng `Application Support/POC/poc-002.sqlite`; `LocalStore` giữ nguyên tới IOS-001. Checklist ở `evidence/POC-002/README.md`. Báo cáo GO/NO-GO chờ bằng chứng thiết bị.
 
-> **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. Việc còn lại: integrator + iOS duyệt (cùng POC-002 theo docs/13).
+> **Trạng thái IOS-001 (2026-11-09):** PO duyệt CON-002 và miễn cổng POC-002 cho riêng IOS-001 (ADR-073). POC-002 tạm dừng ở P2-03, cổng vẫn áp dụng cho IOS-005 và REL-001.
+> - **Dữ liệu:** app chạy trên CaliCore/GRDB (`Application Support/cali.sqlite`, migration `v2_content`, ADR-074). `LocalStore` và `TODO(POC-003)` đã bị xoá. Model nội dung đã chuyển vào CaliCore.
+> - **Ghi:** player gửi lệnh qua `WorkoutCoordinator` (transaction, dedupe `commandId`, outbox). Chỉ khi reducer thấy có thay đổi thì nhịp tick 4 Hz mới mở transaction. Sửa giáo án, quyết định đề xuất và cài đặt đi qua `ContentStore`.
+> - **Import:** `cali-poc.json` được import một lần. Trên iPhone 15 đã import 14 bài, 4 buổi, 6 lịch sử mẫu, 3 đề xuất, 4 audit. File gốc giữ làm `cali-poc.imported.json`.
+> - **Test:** CaliCore `swift test` 39/39 trên macOS. XCTest app 24/24 trên iPhone (thêm `AppDatabaseTests`: mở lại app khôi phục buổi đang tập, lịch sử sau khi bỏ buổi, quyết định đề xuất nguyên tử, đặt lại dữ liệu).
+> - **Còn lại:** đẩy nội dung `dirty` lên server (`TODO(IOS-007)`), rồi tới IOS-013.
+
+> **Trạng thái IOS-013 (2026-11-09):** code và test xong, chờ review.
+> - **Đã làm:** danh sách giáo án (MP-01), tạo / nhân bản / lặp lại (MP-02/03), bắt đầu theo với chọn ngày, sheet giới hạn 3 và lựa chọn tạm dừng hoặc kết thúc giáo án khác trong cùng lệnh (MP-04/05), chi tiết giáo án với tạm dừng / kết thúc (lý do + ghi chú) / lưu trữ / xoá mềm, thẻ MP-07 (kết thúc / kéo dài / lặp lại), Tuần của tôi (MP-06), Hôm nay gộp các giáo án và đếm ngược sự kiện (MP-09), nhãn giáo án trên Lịch sử. Mỗi lệnh có `commandId` và một dòng audit (I5).
+> - **Hoãn:** lịch nhắc MP-13 (contract chưa có giờ nhắc cho từng buổi). Độ dài lộ trình, bắt đầu muộn và phase chờ CON-005/IOS-015, nên giáo án theo tuần chưa có "Tuần x/y" và không tự hết lộ trình. Kết quả thi chờ IOS-014. Bộ lọc lịch sử theo giáo án chờ IOS-017. "Từ mẫu" chỉ có giáo án mẫu đi kèm app.
+> - **Bằng chứng:** `evidence/IOS-013/README.md`. CaliCore 43/43, app XCTest 35/35 trên iPhone 15.
+
+> **Trạng thái IOS-014 (2026-11-09):** code và test xong, chờ review.
+> - **P6 bài chạy:** nhập km + giờ/phút/giây, pace tự tính và không lưu; kết quả lưu với `source = manual`. Biên CON-004: 0 hoặc hơn 24 giờ bị từ chối.
+> - **MP-07 "Ghi kết quả thi":** có từ ngày sự kiện. Lưu thành một buổi `distance` đã hoàn thành, gắn với buổi của ngày thi, trong một transaction kèm audit; lặp lệnh không ghi thêm.
+> - **Hoãn:** ghi lùi ngày (ADR-054 chưa có field trong contract nên kết quả mang ngày nhập), xác nhận mục tiêu chạy (chưa có chỉ số chạy, `TODO(CON-008)`), nhập từ Apple Health.
+> - **Bằng chứng:** `evidence/IOS-014/README.md`.
+
+> **Trạng thái IOS-015 (2026-11-09):** code và test xong, chờ review. Không đổi API/contract (CON-005 đã có).
+> - **Mục tiêu:** nhiều mục tiêu nhỏ theo lineage, ghim tối đa 3, thang kỹ năng (`unlockAfterGoalId`, chặn vòng lặp), "Chưa mở" khi mục tiêu trước chưa được xác nhận. Chạm mức đích sau một buổi hoàn thành chỉ chuyển sang "Chờ xác nhận"; "Đã đạt" chỉ khi người dùng bấm "Xác nhận đạt". Đổi bài hoặc chỉ số bị từ chối (ADR-047). Kết thúc giáo án chuyển mục tiêu đang theo đuổi sang "Chưa đạt" (ADR-053), người dùng gia hạn hoặc lưu trữ.
+> - **Lộ trình:** sửa giai đoạn trên bản nháp, Lưu một lần kèm audit "Sửa lộ trình"; khoảng tuần và trạng thái tự tính; tổng tuần là độ dài giáo án theo tuần ("Tuần x/y"). Xoá giai đoạn hiện tại hoặc rút ngắn qua tuần hiện tại phải xác nhận; mục tiêu của giai đoạn bị xoá chuyển sang cả giáo án.
+> - **Tiến bộ:** mỗi bài trong giáo án có dữ liệu: hiện tại, mốc tuần đầu có dữ liệu, delta và % (chỉ khi có từ 2 tuần), xu hướng theo tuần; bám lịch theo tuần từ tuần 1, không tính hôm nay, bỏ lỡ không tô đỏ.
+> - **Hoãn:** mục tiêu bám lịch / cơ thể / chạy (db/005 chưa có chỉ số, `TODO(CON-008)`); bắt đầu muộn và "Kéo dài" giáo án theo tuần (`TODO(IOS-013)`); ghim KPI riêng.
+> - **Bằng chứng:** `evidence/IOS-015/README.md`.
+
+> **Trạng thái IOS-016 (2026-11-09):** code và test xong, chờ review. Không đổi API/contract (CON-006, CON-008 đã có).
+> - **Form P6 theo cấu hình:** tiêu chí dựng từ `criteria_config` v1 gói sẵn, lọc theo `appliesTo` (calisthenics: Kỹ thuật, Điều kiện, Đau; gym: Kỹ thuật, RPE 6–10, Dụng cụ, Đau). `choice` chọn một, `chips` chọn nhiều, `toggle`, `scale`; kiểu lạ bị bỏ qua. `rpe` và `pain` chỉ điều khiển hiển thị, ghi vào cột `rpe`, `painReported`, không vào map `criteria`. `prefill: previousSet` lấy từ set trước cùng bài. Mọi tiêu chí đều tuỳ chọn; đau chỉ ghi nhận, không diễn giải.
+> - **Lưu:** set lưu `criteriaVersion` + `criteria` (cùng có hoặc cùng không), ≤ 20 khoá, ≤ 8192 byte, giá trị là token đã biết; phiên đang chạy giữ phiên bản lúc bắt đầu. Lịch sử hiện nhãn tiêu chí và "Có ghi nhận đau".
+> - **Mức tạ:** lưu kg (0..1000, tối đa 2 số lẻ, quá chính xác thì từ chối chứ không làm tròn); cài đặt "Đơn vị mức tạ" kg/lb chỉ đổi hiển thị và nhập (bước 2,5 kg / 5 lb). Cài đặt cũ không có trường này vẫn đọc được (mặc định kg).
+> - **Cấu hình không đọc được:** `CriteriaConfig.resolve(cached:)` rơi về bản gói sẵn; bản gói sẵn bằng đúng `fixtures/criteria_config.json`.
+> - **Thay đổi hành vi:** bài calisthenics không còn bộ chọn RPE luôn bật, vì cấu hình v1 chỉ cho gym dùng RPE.
+> - **Hoãn:** tải cấu hình có ETag và cache (`TODO(IOS-007)`, backend chưa sẵn sàng); lọc theo `focusTags` chờ PO chốt bộ tag.
+> - **Bằng chứng:** `evidence/IOS-016/README.md`.
+
+> **Trạng thái IOS-017 (2026-11-10):** code và test xong, chờ review. Không đổi API/contract.
+> - **Lịch sử tuần/tháng (UX-10):** nhìn qua mọi giáo án; thanh lọc "Tất cả" + từng giáo án (giáo án đã xoá vẫn lọc được, nhãn "(đã xoá)"). Trạng thái ngày: hoàn thành, dừng sớm (cảnh báo, không đỏ), **bỏ lỡ** (theo lịch giáo án nhưng không có buổi hoàn thành; viền nét đứt, không bấm được), **hôm nay** (còn mở, bấm để sang Hôm nay), ngày tương lai chỉ là chấm. Trạng thái không chỉ dựa vào màu (icon, kiểu viền). Tháng nhóm theo tuần kèm "x/y buổi", chạm một ngày để lọc.
+> - **Tổng kỳ và so sánh:** buổi, set, phút và km là các ô riêng, không cộng set với km. Kỳ đang diễn ra so với **cùng số ngày đã trôi qua** của kỳ trước và không tính hôm nay; kỳ cũ nhất ghi "Kỳ đầu tiên có dữ liệu"; ngày đầu của kỳ chưa có gì để so thì nói rõ. Dòng "Theo lịch x/y" chỉ đếm buổi trong lịch; buổi tự do không tính vào lịch.
+> - **Thẻ "Tuần này" ở Cá nhân:** buổi xong/lịch, phút, km, chuyên cần chung (xong ÷ đến hạn: ngày đã qua và buổi đã xong; buổi bỏ lỡ chỉ hạ con số, không tô đỏ), mỗi giáo án một dòng ("Calisthenics 3/3"), "thêm n buổi ngoài lịch" nếu có.
+> - **Quy tắc:** logic thuần trong `CaliCore/HistoryStats.swift` (`PeriodTotals`, `HistoryPeriods`, `HistoryDayState`, `WeekSummary`), có test; lịch bỏ lỡ lấy từ `PlanSchedule.adherence` (I4), gồm cả giáo án đã kết thúc cho các ngày đã qua.
+> - **Sửa test:** `GoalFlowTests.testProgressAndAdherenceComeFromSavedSets` (IOS-015) phụ thuộc thứ trong tuần; nay xếp buổi tập vào ngày hôm nay.
+> - **Hoãn:** ghi lùi ngày (ADR-054), lọc theo môn.
+> - **Bằng chứng:** `evidence/IOS-017/README.md`.
+
+> **Trạng thái IOS-018 (2026-11-10):** code và test xong, chờ review. Không đổi API/contract (CON-007 đã duyệt).
+> - **Số đo cơ thể:** Cá nhân → "Số đo cơ thể": thẻ "Gần nhất" kèm chênh lệch có dấu so với lần trước (trung tính, không màu, không nhận xét), biểu đồ diễn biến, danh sách các lần đo (chạm để sửa, nút xoá có xác nhận). Nhập kg, bước ±0,1, thời điểm đo không chọn được tương lai; một nút "Lưu". Nhiều lần đo trong ngày được giữ.
+> - **Quy tắc:** `CaliDomain/BodyMeasurement.swift` (20..500 kg, tối đa 2 chữ số thập phân, từ chối chứ không làm tròn; `measuredAt` không sau hiện tại). Bảng `body_measurements` (migration `v4_body_measurements`, `value` là chuỗi thập phân chính xác, CHECK trùng contract, xoá mềm, cột đồng bộ `server_version`/`dirty`).
+> - **Riêng tư (ADR-064):** không công tắc chia sẻ; giá trị không vào audit (chỉ "Cân nặng"), không vào log, widget, Live Activity, thông báo hay AI. `tools/validate_ios_project_config.py` thất bại nếu `BodyMeasurement`/`bodyKg` xuất hiện trong `CaliActivityWidget`, `Shared`, `CaliApp/Services`.
+> - **Quyết định:** cân nặng luôn hiển thị bằng kg (ADR-063: đơn vị cố định theo kind); cài đặt kg/lb chỉ áp cho mức tạ.
+> - **Hoãn:** đồng bộ `body_measurement` (chờ lớp sync iOS), chỉ số `body` (ADR-065), opt-in chia sẻ sau pilot.
+> - **Bằng chứng:** `evidence/IOS-018/README.md`.
+
+> **Trạng thái IOS-012 (2026-11-10):** code và test xong, chờ review. Chỉ dev build; không đổi API/contract.
+> - **Màn Diagnostics** (Cá nhân → "Diagnostics (dev)", bọc `#if DEBUG`, không có trong Release): phiên bản + SHA, cỡ file DB, migration đã chạy, số dòng và `dirty` từng bảng, outbox theo trạng thái (số lượng, lần thử, cũ nhất, lỗi cuối đã che), cursor sync (chỉ tên scope), thông báo đang chờ (id + giờ, không đọc nội dung), Live Activity hiện tại, 150 dòng log gần nhất (`OSLogStore`, subsystem `com.cali.app`/`cali.poc`), base URL + JWT dev, nút Export (ShareLink, file văn bản).
+> - **Không lộ dữ liệu (AGENTS rule 6, ADR-064):** chỉ số đếm và trạng thái, không nội dung dòng (không có cân nặng, ghi chú, tiêu đề). `LogRedactor` che JWT, `Bearer …`, `token/password/secret/api_key = …` ở lỗi outbox, log và toàn bộ file xuất. JWT nằm trong Keychain (`ThisDeviceOnly`), không hiện lại, không vào UserDefaults, log hay export.
+> - **Kiểm tra:** `validate_ios_project_config.py` thất bại nếu file trong `Features/Diagnostics` không bọc `#if DEBUG`; Release build qua.
+> - **Hoãn:** nối base URL/JWT vào client thật (IOS-007); outbox hiện chưa có mutation nội dung (`TODO(IOS-007)`).
+> - **Bằng chứng:** `evidence/IOS-012/README.md`.
+
+> **Trạng thái IOS-004h (2026-11-10):** code và test xong, chờ review; đã chạy trên iPhone 15. Không đổi code Player, API hay contract: domain và coordinator đã có T-04/T-09 từ IOS-001; slice này khoá hành vi ở tầng player và đo ngân sách.
+> - **Test mới** (`CaliAppTests/PlayerHardeningTests`, 7): T-01 (poster, đích, 4 set, không cần mạng), T-03 (hết giờ giữ → `awaitingResult`, không có set result, không có mutation outbox; câu trả lời của người dùng là thứ được lưu, ADR-009), T-04 (bấm Lưu hai lần → 1 set result, 1 mutation `set_result`), T-06 (cả buổi offline: 3 set + 2 mutation `workout_session`, mọi dòng `pending`), nghỉ +30s đúng 30 giây, bỏ buổi giữ set đã xác nhận và cho bắt đầu buổi mới, đo confirm-set.
+> - **Ngân sách docs/14 "confirm-set < 100ms p95":** 60 set liên tiếp, DB file WAL. iPhone 15: p50 5,1 ms, p95 5,5 ms, max 5,6 ms (đạt). Simulator: p50 5,7 ms, p95 6,0 ms, max 34 ms.
+> - **Còn lại:** bằng chứng thiết bị (video + export Diagnostics) theo docs/16.
+> - **Bằng chứng:** `evidence/IOS-004h/README.md`.
+
+> **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**
 - Nếu intent không chạy được khi app bị kill (P-06), nút trên Activity chỉ còn là deep link mở app. Bỏ `LiveActivityIntent` khỏi IOS-005.

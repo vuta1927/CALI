@@ -11,9 +11,12 @@ struct WorkoutEditorView: View {
     @State private var confirmDiscard = false
     @State private var saveError: String?
     private let original: PlannedWorkout
+    /// The plan the workout belongs to.
+    private let lineageId: UUID
 
-    init(workout: PlannedWorkout) {
+    init(workout: PlannedWorkout, lineageId: UUID) {
         original = workout
+        self.lineageId = lineageId
         _draft = State(initialValue: workout)
     }
 
@@ -23,9 +26,18 @@ struct WorkoutEditorView: View {
                 Section {
                     TextField("Tên buổi", text: $draft.title)
                     TextField("Trọng tâm", text: $draft.focus)
-                    Picker("Ngày tập", selection: $draft.weekday) {
-                        ForEach(1...7, id: \.self) { Text(Fmt.weekdayLong($0)).tag($0) }
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        Text("Thứ").font(.caption).foregroundStyle(Color.caliSecondary)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(1...7, id: \.self) { day in
+                                    FilterChip(title: Fmt.weekdayShort(day), isSelected: draft.weekday == day) { draft.weekday = day }
+                                        .accessibilityLabel(Fmt.weekdayLong(day))
+                                }
+                            }
+                        }
                     }
+                    .padding(.vertical, Spacing.xs)
                 } header: {
                     Text("Thông tin")
                 }
@@ -47,7 +59,7 @@ struct WorkoutEditorView: View {
                 .listRowBackground(Color.caliSurface)
             }
             .caliScreen()
-            .navigationTitle(store.plan.workouts.contains { $0.id == draft.id } ? "Sửa buổi tập" : "Thêm buổi tập")
+            .navigationTitle(store.plan(lineageId)?.workouts.contains { $0.id == draft.id } == true ? "Sửa buổi tập" : "Thêm buổi tập")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -57,7 +69,7 @@ struct WorkoutEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Lưu") {
-                        if store.updateWorkout(draft) { dismiss() }
+                        if store.updateWorkout(draft, in: lineageId) { dismiss() }
                         else { saveError = store.alertMessage; store.alertMessage = nil }
                     }
                     .disabled(draft == original || draft.exercises.isEmpty || draft.title.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -90,7 +102,7 @@ private struct PlannedExerciseEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             HStack(spacing: Spacing.m) {
-                PosterThumb(exercise: exercise, size: 44)
+                PosterThumb(exercise: exercise, size: 56)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(exercise?.name ?? "Bài tập")
                         .font(.headline)
@@ -126,10 +138,30 @@ private struct PlannedExerciseEditor: View {
             Stepper("Số lần thử: \(attempts)", value: binding(attempts) { .skillAttempt(attempts: $0) }, in: 1...10)
         case .load(let reps, let kg):
             // Kilograms step by 2.5 in Decimal (docs/18 §4); no Double round-trip, an off-step value stays exact.
+            // Display unit follows the settings (ADR-046): a 5 lb step is stored as kg with 2 decimals.
+            let step: Decimal = Fmt.weightUnit == .kg ? 2.5 : WeightUnit.lb.kg(fromDisplayed: 5)
             Stepper("Mức tạ: \(Fmt.loadKg(kg))",
-                    onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + 2.5)) },
-                    onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - 2.5)) })
+                    onIncrement: { item.target = .load(reps: reps, loadKg: min(1000, kg + step)) },
+                    onDecrement: { item.target = .load(reps: reps, loadKg: max(0, kg - step)) })
             Stepper("Số lần: \(reps)", value: binding(reps) { .load(reps: $0, loadKg: kg) }, in: 1...50)
+        case .distance(let meters, let goal):
+            // CON-004: 1..500 km per segment in 0,5 km steps; goal time optional (pace is shown, never stored).
+            Stepper("Quãng đường: \(Fmt.km(meters))", value: binding(meters) { .distance(distanceMeters: $0, durationSeconds: goal) },
+                    in: 500...500_000, step: 500)
+            Toggle("Thời gian mục tiêu", isOn: Binding(
+                get: { goal != nil },
+                set: { item.target = .distance(distanceMeters: meters, durationSeconds: $0 ? max(60, meters * 6 / 10) : nil) }
+            ))
+            if let goal {
+                Stepper("Mục tiêu: \(Fmt.duration(goal))", value: binding(goal) { .distance(distanceMeters: meters, durationSeconds: $0) },
+                        in: 30...86_400, step: 30)
+                if case .success(let pace) = Pace.derive(distanceMeters: meters, durationSeconds: goal) {
+                    Text("Pace mục tiêu \(pace.formatted)").font(.caption).foregroundStyle(Color.caliSecondary)
+                }
+            }
+        case .duration(let seconds):
+            Stepper("Thời gian: \(Fmt.duration(seconds))", value: binding(seconds) { .duration(durationSeconds: $0) },
+                    in: 60...86_400, step: 60)
         }
     }
 

@@ -11,8 +11,8 @@ import UserNotifications
 /// runs inside the app process). ADR-013: the widget extension never opens this database.
 ///
 /// Isolated from the normal workout: separate file (`Application Support/POC/poc-002.sqlite`), separate
-/// notification id, Live Activity flagged `deviceGatePOC`. `LocalStore` stays the app's store until
-/// IOS-001 (after a GO). TODO(IOS-001): delete this POC runtime once the coordinator backs the real player.
+/// notification id, Live Activity flagged `deviceGatePOC`. The app itself uses `AppDatabase` since
+/// IOS-001. TODO(POC-002): delete this POC runtime after the POC-002 GO/NO-GO decision.
 final class POCRuntime: Sendable {
     static let shared = POCRuntime()
 

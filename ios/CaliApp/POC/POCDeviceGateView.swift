@@ -7,7 +7,7 @@ import UserNotifications
 
 /// Dev/POC screen for the POC-001/002 device gate (docs/20 phase 0, checklists in `evidence/POC-00x`).
 /// Reached from "Cá nhân → POC thiết bị"; it drives its own database and Live Activity and never touches
-/// `AppStore` / `LocalStore`. TODO(IOS-001): remove after the GO/NO-GO decision.
+/// `AppStore` / `AppDatabase`. TODO(POC-002): remove after the GO/NO-GO decision.
 struct POCDeviceGateView: View {
     @State private var model = POCDeviceGateModel()
     @Environment(\.scenePhase) private var scenePhase

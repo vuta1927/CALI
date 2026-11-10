@@ -12,7 +12,8 @@ SOURCE_ROOTS = [ROOT / "ios/CaliApp", ROOT / "ios/CaliActivityWidget"]
 
 def main() -> int:
     problems: list[str] = []
-    quoted_cali = re.compile(r'"[^"\n]*(?:CALI|Cali)[^"\n]*"')
+    # Whole word only, so discipline names such as "Calisthenics" are not flagged.
+    quoted_cali = re.compile(r'"[^"\n]*\b(?:CALI|Cali)\b[^"\n]*"')
     allowed_fragments = ("CaliBuildSHA",)
 
     for source_root in SOURCE_ROOTS:
@@ -26,8 +27,9 @@ def main() -> int:
 
     root_view = (ROOT / "ios/CaliApp/App/RootView.swift").read_text(encoding="utf-8")
     today = (ROOT / "ios/CaliApp/Features/Home/TodayView.swift").read_text(encoding="utf-8")
-    if "BrandHeader(" not in root_view and "BrandHeader(" not in today:
-        problems.append("app shell lacks BrandHeader")
+    # plan-module.html: Today starts with the large title; the wordmark lives on the welcome screen.
+    if "BrandHeader(" not in root_view and "BrandHeader(" not in today and "COAMIWordmark(" not in root_view:
+        problems.append("app shell lacks BrandHeader / COAMIWordmark")
     if "COAMISymbol(" not in root_view:
         problems.append("onboarding lacks COAMISymbol")
     if problems:

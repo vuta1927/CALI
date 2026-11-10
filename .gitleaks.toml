@@ -1,0 +1,18 @@
+# Gitleaks configuration for CALI (read automatically from the repository root by .github/workflows/security.yml).
+title = "CALI gitleaks config"
+
+[extend]
+useDefault = true
+
+# IOS-012: these two test files exercise the Diagnostics redactor and the Keychain round trip with
+# deliberately fake JWTs (header {"alg":"HS256"}, payload {"sub":"1"} / {"sub":"2"} / {"sub":"123456"},
+# signature "sig" / "signature"). They sign nothing and grant no access.
+# The allowlist is scoped to these paths and to the two rules that match them, so a real secret added
+# anywhere else, or any other rule firing in these files, is still reported.
+[[allowlists]]
+description = "Fake JWT fixtures in the IOS-012 Diagnostics tests"
+targetRules = ["generic-api-key", "jwt"]
+paths = [
+  '''^ios/CaliAppTests/DiagnosticsTests\.swift$''',
+  '''^ios/Packages/CaliCore/Tests/CaliCoreTests/DiagnosticsTests\.swift$''',
+]

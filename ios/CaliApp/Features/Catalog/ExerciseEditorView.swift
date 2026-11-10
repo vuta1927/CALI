@@ -40,13 +40,19 @@ struct ExerciseEditorView: View {
                     Picker("Cấp độ", selection: $draft.level) {
                         ForEach(ExerciseLevel.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
+                    .pickerStyle(.segmented)
                     TextField("Nhóm cơ (mỗi dòng một mục)", text: lines($draft.muscles), axis: .vertical)
                     TextField("Dụng cụ (mỗi dòng một mục)", text: lines($draft.equipment), axis: .vertical)
                     TextField("Điểm cần nhớ (mỗi dòng một mục)", text: lines($draft.cues), axis: .vertical)
                     TextField("Lỗi thường gặp (mỗi dòng một mục)", text: lines($draft.mistakes), axis: .vertical)
                 }
                 Section("Ảnh bài tập") {
-                    PosterView(exercise: draft, height: 160)
+                    HStack(spacing: Spacing.m) {
+                        PosterThumb(exercise: draft, size: 96)
+                        Text(draft.poster == nil ? "Chưa có ảnh. Bài tập luôn cần ảnh để nhận diện." : "Ảnh đã chọn.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.caliSecondary)
+                    }
                     TextField("Link ảnh HTTPS", text: $posterLink).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Chọn ảnh từ Tệp") { importingVideo = false; importing = true }
                     PhotosPicker("Chọn ảnh từ Thư viện", selection: $photoSelection, matching: .images)
@@ -65,7 +71,10 @@ struct ExerciseEditorView: View {
                 if busy { ProgressView("Đang nhập tệp…") }
                 if let error { Text(error).foregroundStyle(Color.caliError) }
             }
-            .navigationTitle(isNew ? "Thêm bài tập" : "Sửa bài tập")
+            .scrollContentBackground(.hidden)
+            .background(COAMIScreenBackground())
+            .navigationTitle(isNew ? "Bài tập mới" : "Sửa bài tập")
+            .navigationBarTitleDisplayMode(.inline)
             .disabled(busy)
             .onChange(of: photoSelection) { _, item in loadSelection(item, isVideo: false) }
             .onChange(of: videoSelection) { _, item in loadSelection(item, isVideo: true) }

@@ -13,22 +13,28 @@ final class ContentEditingTests: XCTestCase {
         XCTAssertTrue(store.saveExercise(exercise, commandId: command))
         XCTAssertEqual(store.exercise(exercise.id)?.name, "Tên riêng")
         XCTAssertEqual(store.audit.filter { $0.id == command }.count, 1)
-        XCTAssertEqual(store.plan.workouts[0].exercises[0].exerciseId, exercise.id)
+        XCTAssertEqual(store.starterPlan.workouts[0].exercises[0].exerciseId, exercise.id)
     }
 
     @MainActor
-    func testDeletePlanPreservesHistoryAndActiveSession() {
+    func testDeletePlanIsBlockedDuringItsWorkoutThenKeepsHistoryAndWorkouts() throws {
         let store = AppStore(persists: false)
         store.updateSettings { $0.notificationsEnabled = false; $0.liveActivityEnabled = false }
-        store.startWorkout(store.plan.workouts[0])
-        let session = store.player?.state.sessionId
-        let history = store.history
-        XCTAssertTrue(store.deletePlan())
-        XCTAssertTrue(store.plan.workouts.isEmpty)
-        XCTAssertNotNil(store.plan.deletedAt)
-        XCTAssertEqual(store.history, history)
+        store.startWorkout(store.starterPlan.workouts[0])
+        let session = try XCTUnwrap(store.player?.state.sessionId)
+        XCTAssertFalse(store.deleteStarterPlan())
+        XCTAssertNil(store.starterPlan.deletedAt)
         XCTAssertEqual(store.player?.state.sessionId, session)
-        XCTAssertTrue(store.activeSessionInProgress)
+
+        store.player?.abandon(reason: "test")
+        let history = store.history
+        let workouts = store.starterPlan.workouts
+        XCTAssertTrue(store.deleteStarterPlan())
+        XCTAssertNotNil(store.starterPlan.deletedAt)
+        XCTAssertEqual(store.starterPlan.workouts, workouts)
+        XCTAssertEqual(store.history, history)
+        XCTAssertEqual(store.planLabel(for: try XCTUnwrap(store.history.first { $0.id == session })), "\(store.starterPlan.title) (đã xoá)")
+        XCTAssertTrue(store.followedPlans().isEmpty)
     }
 
     @MainActor
@@ -43,7 +49,7 @@ final class ContentEditingTests: XCTestCase {
     func testCannotInvalidateBundledQuickTestPrescription() throws {
         let store = AppStore(persists: false)
         let item = try XCTUnwrap(MockData.quickTest.exercises.first { $0.exerciseId == MockData.pushUp })
-        XCTAssertFalse(store.plan.workouts.contains { $0.exercises.contains { $0.exerciseId == item.exerciseId } })
+        XCTAssertFalse(store.starterPlan.workouts.contains { $0.exercises.contains { $0.exerciseId == item.exerciseId } })
         XCTAssertFalse(store.history.contains { $0.exerciseIds.contains(item.exerciseId) })
         XCTAssertNil(store.player)
         var exercise = try XCTUnwrap(store.exercise(item.exerciseId))
@@ -76,7 +82,7 @@ final class ContentEditingTests: XCTestCase {
         XCTAssertNil(decoded.poster)
         XCTAssertNil(decoded.video)
         let store = AppStore(persists: false, now: Date(timeIntervalSince1970: 1_800_000_000))
-        let old = PersistedSnapshot(plan: store.plan, history: store.history,
+        let old = PersistedSnapshot(plan: store.starterPlan, history: store.history,
             recommendations: [], audit: [], settings: AppSettings(), createdAt: Date())
         let oldData = try encoder.encode(old)
         let restored = try decoder.decode(PersistedSnapshot.self, from: oldData)
@@ -93,8 +99,8 @@ final class ContentEditingTests: XCTestCase {
         exercise.name = "Bài cá nhân"
         exercise.poster = .remote("https://example.com/poster.jpg")
         XCTAssertTrue(store.saveExercise(exercise))
-        XCTAssertTrue(store.deletePlan())
-        let snapshot = PersistedSnapshot(catalog: store.catalog, plan: store.plan, history: store.history,
+        XCTAssertTrue(store.deleteStarterPlan())
+        let snapshot = PersistedSnapshot(catalog: store.catalog, plan: store.starterPlan, history: store.history,
             recommendations: [], audit: store.audit, settings: AppSettings(), createdAt: Date())
         let restored = try DomainJSON.makeDecoder().decode(PersistedSnapshot.self, from: DomainJSON.makeEncoder().encode(snapshot))
         XCTAssertEqual(restored.catalog?.last, exercise)
@@ -109,11 +115,11 @@ final class ContentEditingTests: XCTestCase {
     @MainActor
     func testDuplicateWeekdayIsRejectedWithoutChangingPlan() {
         let store = AppStore(persists: false)
-        let before = store.plan
+        let before = store.starterPlan
         var duplicate = before.workouts[0]
         duplicate.id = UUID()
-        XCTAssertFalse(store.updateWorkout(duplicate))
-        XCTAssertEqual(store.plan, before)
+        XCTAssertFalse(store.updateWorkout(duplicate, in: before.lineageId))
+        XCTAssertEqual(store.starterPlan, before)
         XCTAssertTrue(store.audit.isEmpty)
     }
 

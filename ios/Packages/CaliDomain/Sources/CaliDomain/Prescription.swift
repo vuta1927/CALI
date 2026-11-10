@@ -9,6 +9,13 @@ public enum ExerciseType: String, Codable, Sendable, CaseIterable {
     case skillAttempt = "skill_attempt"
     /// CON-006 (ADR-062): weight x reps, kilograms only (ADR-046).
     case load
+    /// CON-004: one running segment of a distance (goal time optional).
+    case distance
+    /// CON-004: one running segment of a duration.
+    case duration
+
+    /// CON-004 running types (docs/03 §3.1): results are distance/time entered by hand, pace is derived.
+    public var isRunning: Bool { self == .distance || self == .duration }
 }
 
 /// Planned target of one set. JSON shape matches `contracts/entity-payloads.schema.json#/$defs/target`,
@@ -23,6 +30,26 @@ public enum Prescription: Equatable, Hashable, Sendable {
     case skillAttempt(attempts: Int)
     /// CON-006 (ADR-062): one set = `reps` at `loadKg` (kg, at most 2 decimals). Volume is derived, never stored.
     case load(reps: Int, loadKg: Decimal)
+    /// CON-004: one segment of `distanceMeters`, with an optional goal time (`5 × 1 km @ 4:50/km`).
+    case distance(distanceMeters: Int, durationSeconds: Int?)
+    /// CON-004: one segment of `durationSeconds` (`3 × 5 phút`, rest between segments is `restSeconds`).
+    case duration(durationSeconds: Int)
+
+    public init(_ running: RunningTarget) {
+        switch running {
+        case .distance(let meters, let seconds): self = .distance(distanceMeters: meters, durationSeconds: seconds)
+        case .duration(let seconds): self = .duration(durationSeconds: seconds)
+        }
+    }
+
+    /// The running target, when this is one.
+    public var running: RunningTarget? {
+        switch self {
+        case .distance(let meters, let seconds): .distance(distanceMeters: meters, durationSeconds: seconds)
+        case .duration(let seconds): .duration(durationSeconds: seconds)
+        default: nil
+        }
+    }
 
     public var type: ExerciseType {
         switch self {
@@ -32,6 +59,8 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .interval: .interval
         case .skillAttempt: .skillAttempt
         case .load: .load
+        case .distance: .distance
+        case .duration: .duration
         }
     }
 
@@ -42,7 +71,9 @@ public enum Prescription: Equatable, Hashable, Sendable {
         case .staticHold(let s): s
         case .timedReps(let s): s
         case .interval(let work, _): work
-        case .reps, .skillAttempt, .load: nil
+        // A timed segment gets a prompt at its end like any timed set; a distance segment ends when the user stops.
+        case .duration(let s): s
+        case .reps, .skillAttempt, .load, .distance: nil
         }
     }
 
@@ -66,13 +97,15 @@ public enum Prescription: Equatable, Hashable, Sendable {
             return [ValidationIssue.min("target.attempts", attempts, 1)].compactMap { $0 }
         case .load(let reps, let kg):
             return [ValidationIssue.range("target.reps", reps, DomainLimits.loadReps), ValidationIssue.loadKg("target.loadKg", kg)].compactMap { $0 }
+        case .distance, .duration:
+            return running?.validate() ?? []
         }
     }
 }
 
 extension Prescription: Codable {
     private enum CodingKeys: String, CodingKey {
-        case kind, holdSeconds, repMin, repMax, timeSeconds, workSeconds, restSeconds, attempts, reps, loadKg
+        case kind, holdSeconds, repMin, repMax, timeSeconds, workSeconds, restSeconds, attempts, reps, loadKg, distanceMeters, durationSeconds
     }
 
     public init(from decoder: Decoder) throws {
@@ -84,6 +117,10 @@ extension Prescription: Codable {
         case .interval: self = .interval(workSeconds: try c.decode(Int.self, forKey: .workSeconds), restSeconds: try c.decode(Int.self, forKey: .restSeconds))
         case .skillAttempt: self = .skillAttempt(attempts: try c.decode(Int.self, forKey: .attempts))
         case .load: self = .load(reps: try c.decode(Int.self, forKey: .reps), loadKg: try c.decode(Decimal.self, forKey: .loadKg))
+        case .distance:
+            self = .distance(distanceMeters: try c.decode(Int.self, forKey: .distanceMeters),
+                             durationSeconds: try c.decodeIfPresent(Int.self, forKey: .durationSeconds))
+        case .duration: self = .duration(durationSeconds: try c.decode(Int.self, forKey: .durationSeconds))
         }
     }
 
@@ -103,6 +140,10 @@ extension Prescription: Codable {
         case .load(let reps, let kg):
             try c.encode(reps, forKey: .reps)
             try c.encode(kg, forKey: .loadKg)
+        case .distance(let meters, let seconds):
+            try c.encode(meters, forKey: .distanceMeters)
+            try c.encodeIfPresent(seconds, forKey: .durationSeconds)
+        case .duration(let s): try c.encode(s, forKey: .durationSeconds)
         }
     }
 }

@@ -10,9 +10,14 @@ struct ResultFormView: View {
     @State private var status: SetStatus = .completed
     @State private var reps: Int?
     @State private var seconds: Double?
-    /// CON-006: kilograms for a load set, kept exactly as entered (never rounded).
+    /// CON-006: the load as typed, in the display unit (kg or lb, ADR-046). Converted to kg on save; a kg value
+    /// is kept exactly as entered, never rounded.
     @State private var loadKg: Decimal?
+    /// CON-004: running segment typed by hand (km + h:mm:ss); pace is shown, never stored.
+    @State private var run = RunEntry()
     @State private var rpe: Int?
+    @State private var pain = false
+    @State private var criteriaValues: [String: CriteriaValue] = [:]
     @State private var note = ""
     @State private var showSkipReasons = false
     @State private var didPrefill = false
@@ -27,19 +32,31 @@ struct ResultFormView: View {
 
     var body: some View {
         PlayerScaffold {
+            Text("Nhập kết quả set")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
             header
             if let target {
                 inputs(for: target)
                 statusPicker(for: target)
             }
-            rpePicker
+            CriteriaFields(criteria: applicableCriteria, rpe: $rpe, pain: $pain, values: $criteriaValues)
             noteField
+            HStack(alignment: .top, spacing: Spacing.m) {
+                Image(systemName: "info.circle").foregroundStyle(Color.caliSecondary)
+                Text("COAMI không tự đánh dấu set hoàn thành khi hết giờ. Set chỉ được ghi khi bạn bấm Lưu.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.caliSecondary)
+            }
+            .caliCard(padding: Spacing.m)
         } actions: {
-            Button("Lưu set", systemImage: "checkmark.circle.fill", action: save)
-                .buttonStyle(.caliPrimary)
-                .disabled(!canSave)
-            Button("Bỏ qua set này") { showSkipReasons = true }
-                .buttonStyle(.caliQuiet)
+            HStack(spacing: Spacing.m) {
+                Button("Bỏ qua set") { showSkipReasons = true }
+                    .buttonStyle(.caliSecondary)
+                Button("Lưu", systemImage: "checkmark", action: save)
+                    .buttonStyle(.caliPrimary)
+                    .disabled(!canSave)
+            }
         }
         .skipReasonDialog(isPresented: $showSkipReasons) { model.skipCurrentSet(reason: $0) }
         .toolbar {
@@ -54,34 +71,32 @@ struct ResultFormView: View {
     // MARK: Sections
 
     private var header: some View {
-        VStack(spacing: Spacing.m) {
+        VStack(alignment: .leading, spacing: Spacing.m) {
             if deadlineReached {
                 Label("Đã hết thời gian — xác nhận kết quả", systemImage: "bell.badge")
                     .font(.headline)
                     .foregroundStyle(Color.caliWarning)
-            } else {
-                Text("Nhập kết quả set")
-                    .font(.headline)
-                    .foregroundStyle(Color.caliSecondary)
             }
             HStack(spacing: Spacing.m) {
                 PosterThumb(exercise: model.currentExercise, size: 72)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(model.currentExercise?.name ?? "")
-                        .font(.title3.bold())
+                        .font(.headline)
                         .foregroundStyle(Color.caliText)
                     if let execution = model.currentExecution {
                         Text("Set \(draft?.key.setIndex ?? model.state.currentSetIndex)/\(execution.setCount) · Mục tiêu \(Fmt.target(execution.target))")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.caliAccentInk)
-                    }
-                    if let draft, draft.measuredElapsedMs > 0 {
-                        Text("Đo được: \(Fmt.holdSeconds(ms: draft.measuredElapsedMs))")
-                            .font(.caption)
+                            .font(.footnote.monospacedDigit())
                             .foregroundStyle(Color.caliSecondary)
+                        HStack(spacing: 6) {
+                            let discipline = Discipline(types: [execution.target.type])
+                            TagChip(text: discipline.label, systemImage: discipline.systemImage)
+                            if let draft, draft.measuredElapsedMs > 0 {
+                                TagChip(text: "Đo được \(Fmt.clock(ms: draft.measuredElapsedMs))", systemImage: "clock")
+                            }
+                        }
                     }
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .caliCard(padding: Spacing.m)
             .accessibilityElement(children: .combine)
@@ -103,8 +118,18 @@ struct ResultFormView: View {
         case .skillAttempt:
             EmptyView()
         case .load(let lo, let kg):
-            KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, focused: $focused)
+            KgInput(title: "Mức tạ thực tế", value: $loadKg, targetKg: kg, unit: model.store?.settings.weightUnit ?? .kg, focused: $focused)
             RepsInput(title: "Số lần thực tế", value: $reps, hint: "Mục tiêu \(lo) lần", focused: $focused)
+        case .distance, .duration:
+            if durationUnknown {
+                Label("COAMI không đo được chính xác thời gian chặng này. Hãy nhập thời gian bạn thực sự chạy.", systemImage: "exclamationmark.triangle")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.caliWarning)
+            }
+            RunEntryFields(entry: $run, distanceOptional: target.type == .duration, focused: $focused)
+            Label("Nhập tay", systemImage: "pencil")
+                .font(.caption)
+                .foregroundStyle(Color.caliSecondary)
         }
     }
 
@@ -122,61 +147,40 @@ struct ResultFormView: View {
     @ViewBuilder
     private func statusPicker(for target: Prescription) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text(target.type == .skillAttempt ? "Kết quả lần thử" : "Đánh giá set")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.caliSecondary)
+            Label(target.type == .skillAttempt ? "Kết quả lần thử" : "Đánh giá set", systemImage: "star")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
+                .labelStyle(AccentIconLabelStyle())
             HStack(spacing: Spacing.s) {
                 FilterChip(title: target.type == .skillAttempt ? "Thành công" : "Đạt mục tiêu",
                            systemImage: "checkmark", isSelected: status == .completed) { status = .completed }
                 FilterChip(title: "Chưa đạt", systemImage: "xmark", isSelected: status == .failed) { status = .failed }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .caliCard()
     }
 
-    private var rpePicker: some View {
-        VStack(alignment: .leading, spacing: Spacing.s) {
-            HStack {
-                Text("Mức gắng sức (RPE)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
-                Spacer()
-                Text(rpe.map(Self.rpeLabel) ?? "Không bắt buộc")
-                    .font(.caption)
-                    .foregroundStyle(Color.caliSecondary)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 5), spacing: Spacing.s) {
-                ForEach(1...10, id: \.self) { value in
-                    Button {
-                        rpe = rpe == value ? nil : value
-                    } label: {
-                        Text("\(value)")
-                            .font(.headline.monospacedDigit())
-                            .frame(maxWidth: .infinity, minHeight: minTapTarget)
-                            .foregroundStyle(rpe == value ? Color.caliOnAccent : Color.caliText)
-                            .background(rpe == value ? Color.caliAccent : Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.chip))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("RPE \(value), \(Self.rpeLabel(value))")
-                    .accessibilityAddTraits(rpe == value ? .isSelected : [])
-                }
-            }
-        }
+    /// Extra fields from the criteria config of this session (CON-008); none when no criterion applies.
+    private var applicableCriteria: [Criterion] {
+        guard let execution = model.currentExecution, let exercise = model.currentExercise else { return [] }
+        return model.criteriaConfig.applicable(exerciseId: execution.exerciseId, type: exercise.type)
     }
 
     private var noteField: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text("Ghi chú")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.caliSecondary)
+            Label("Ghi chú", systemImage: "square.and.pencil")
+                .font(.headline)
+                .foregroundStyle(Color.caliText)
+                .labelStyle(AccentIconLabelStyle())
             TextField("Ví dụ: hơi mỏi cổ tay", text: $note, axis: .vertical)
                 .lineLimit(1...3)
                 .focused($focused)
                 .padding(Spacing.m)
                 .frame(minHeight: minTapTarget)
-                .background(Color.caliSurface, in: RoundedRectangle(cornerRadius: Radius.chip))
+                .background(Color.caliSurfaceRaised, in: RoundedRectangle(cornerRadius: Radius.chip))
                 .foregroundStyle(Color.caliText)
         }
+        .caliCard()
     }
 
     // MARK: Logic
@@ -199,8 +203,16 @@ struct ResultFormView: View {
         }
     }
 
+    private var isRunning: Bool { target?.running != nil }
+
     private var canSave: Bool {
-        (!needsReps || reps != nil) && (!needsDuration || seconds != nil) && (!needsLoad || loadKg != nil)
+        if isRunning {
+            // Completed needs what pace (distance) or the segment (duration) requires; the domain re-checks bounds.
+            guard !run.hasInvalidTime else { return false }
+            if status == .failed { return true }
+            return (run.durationSeconds ?? 0) > 0 && (target?.type == .duration || (run.distanceMeters ?? 0) > 0)
+        }
+        return (!needsReps || reps != nil) && (!needsDuration || seconds != nil) && (!needsLoad || loadKg != nil)
     }
 
     private func prefill() {
@@ -212,7 +224,20 @@ struct ResultFormView: View {
         if case .reps(let lo, _)? = target { reps = lo }
         if case .load(let r, let kg)? = target {
             reps = r
-            loadKg = kg
+            loadKg = (model.store?.settings.weightUnit ?? .kg).display(kg: kg)
+        }
+        let applicable = applicableCriteria
+        if let execution = model.currentExecution, let index = Optional(draft.key.setIndex) {
+            let previous = model.records(for: execution).last { $0.key.setIndex < index && $0.status != .skipped }
+            criteriaValues = CriteriaFields.prefill(applicable, from: previous?.actual)
+        }
+        // Running: time from the measured segment, distance from the plan; both stay editable and nothing
+        // is saved until "Lưu".
+        if isRunning {
+            // Under a second measured (stopped right away) is not a time worth suggesting.
+            let measured = draft.suggestedActualMs.map { Int(($0 + 500) / 1000) }.flatMap { $0 > 0 ? $0 : nil }
+            if case .distance(let meters, _)? = target { run = RunEntry(distanceMeters: meters, durationSeconds: measured) }
+            else { run = RunEntry(distanceMeters: nil, durationSeconds: measured) }
         }
         if case .staticHold(let hold)? = target, let s = seconds, s + 0.05 < Double(hold) {
             status = .failed
@@ -227,9 +252,13 @@ struct ResultFormView: View {
             reps: needsReps ? reps : nil,
             holdMs: target?.type == .staticHold ? ms : nil,
             workMs: (target?.type == .timedReps || target?.type == .interval) ? ms : nil,
-            rpe: rpe,
+            rpe: applicableCriteria.contains { $0.id == "rpe" } ? rpe : nil,
             note: note,
-            loadKg: needsLoad ? loadKg : nil
+            loadKg: needsLoad ? loadKg.map { (model.store?.settings.weightUnit ?? .kg).kg(fromDisplayed: $0) } : nil,
+            distanceMeters: isRunning ? run.distanceMeters : nil,
+            durationSeconds: isRunning ? run.durationSeconds : nil,
+            painReported: applicableCriteria.contains { $0.id == "pain" } ? pain : nil,
+            criteria: criteriaValues.filter { key, _ in applicableCriteria.contains { $0.id == key } }
         )
     }
 
@@ -256,10 +285,10 @@ private struct SecondsInput: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
-                Button("= mục tiêu \(targetSeconds)s") { value = Double(targetSeconds) }
+                Button("= mục tiêu \(targetSeconds) giây") { value = Double(targetSeconds) }
                     .font(.caption.weight(.semibold))
                     .frame(minHeight: minTapTarget)
             }
@@ -283,8 +312,8 @@ private struct SecondsInput: View {
                     value = (value ?? Double(targetSeconds) - 1) + 1
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
     }
 }
@@ -299,8 +328,8 @@ private struct RepsInput: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
                 Text(hint)
                     .font(.caption)
@@ -326,8 +355,8 @@ private struct RepsInput: View {
                     value = (value ?? 0) + 1
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
     }
 }
@@ -337,26 +366,31 @@ private struct RepsInput: View {
 /// with more than 2 decimals are rejected by the domain with a message, not silently fixed (ADR-062).
 private struct KgInput: View {
     let title: String
+    /// In the display unit.
     @Binding var value: Decimal?
     let targetKg: Decimal
+    let unit: WeightUnit
     var focused: FocusState<Bool>.Binding
 
-    private let step: Decimal = 2.5
+    private var step: Decimal { unit == .kg ? 2.5 : 5 }
+    private var target: Decimal { unit.display(kg: targetKg) }
+    private var unitLabel: String { unit.label }
+    private var stepText: String { Fmt.number(step) + " " + unitLabel }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.headline)
+                    .foregroundStyle(Color.caliText)
                 Spacer()
-                Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = targetKg }
+                Button("= mục tiêu \(Fmt.loadKg(targetKg))") { value = target }
                     .font(.caption.weight(.semibold))
                     .frame(minHeight: minTapTarget)
             }
             HStack(spacing: Spacing.m) {
-                CircleIconButton(systemImage: "minus", label: "Bớt 2,5 kg") {
-                    value = max(0, (value ?? targetKg) - step)
+                CircleIconButton(systemImage: "minus", label: "Bớt \(stepText)") {
+                    value = max(0, (value ?? target) - step)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
                     // Shows up to 4 decimals so an over-precise entry stays visible until the domain rejects it.
@@ -366,17 +400,27 @@ private struct KgInput: View {
                         .multilineTextAlignment(.center)
                         .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.caliText)
-                    Text("kg")
+                    Text(unitLabel)
                         .font(.headline)
                         .foregroundStyle(Color.caliSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                CircleIconButton(systemImage: "plus", label: "Thêm 2,5 kg") {
-                    value = min(1000, (value ?? targetKg - step) + step)
+                CircleIconButton(systemImage: "plus", label: "Thêm \(stepText)") {
+                    value = min(unit.display(kg: 1000), (value ?? target - step) + step)
                 }
             }
-            .caliCard(padding: Spacing.m)
         }
+        .caliCard()
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Headline label whose icon uses the accent ink (mockup criteria cards).
+private struct AccentIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: Spacing.s) {
+            configuration.icon.foregroundStyle(Color.caliAccentInk)
+            configuration.title
+        }
     }
 }
