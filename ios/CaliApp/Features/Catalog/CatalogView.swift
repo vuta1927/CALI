@@ -8,11 +8,35 @@ struct CatalogView: View {
     @State private var query = ""
     @State private var level: ExerciseLevel?
 
+    /// Why the list may be out of date; the exercises already on the phone stay usable.
+    private var catalogNotice: String? {
+        switch store.sync.catalogState {
+        case .idle: nil
+        case .noServer: "Chưa kết nối máy chủ. Đang hiện các bài tập có trên máy."
+        case .offline: "Không có mạng. Đang hiện các bài tập có trên máy."
+        case .failed: "Không tải được danh sách bài tập mới. Đang hiện các bài tập có trên máy."
+        }
+    }
+
     private let columns = [GridItem(.flexible(), spacing: Spacing.m), GridItem(.flexible(), spacing: Spacing.m)]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.l) {
+                if let notice = catalogNotice {
+                    HStack(alignment: .top, spacing: Spacing.s) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.caliWarning)
+                        Text(notice).font(.subheadline).foregroundStyle(Color.caliText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if store.sync.catalogState != .noServer {
+                            Button("Thử lại") { Task { await store.sync.refreshCatalog() } }
+                                .font(.subheadline.bold())
+                                .frame(minHeight: minTapTarget)
+                        }
+                    }
+                    .padding(.horizontal, Spacing.m)
+                    .background(Color.caliWarning.opacity(0.15), in: RoundedRectangle(cornerRadius: Radius.chip))
+                }
                 SearchField(text: $query, prompt: "Tìm bài tập, nhóm cơ")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Spacing.s) {

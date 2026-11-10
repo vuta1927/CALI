@@ -11,6 +11,10 @@ final class SyncService {
     private(set) var issues: [SyncIssue] = []
     private(set) var isSyncing = false
     private(set) var lastOutcome: SyncRunSummary.Outcome?
+    /// How the last attempt to read the published catalog ended, so the Catalog tab can say why it still shows old data.
+    private(set) var catalogState: CatalogState = .idle
+
+    enum CatalogState: Equatable { case idle, noServer, offline, failed }
 
     @ObservationIgnored private var client: SyncClient
     @ObservationIgnored private let coordinator: WorkoutCoordinator
@@ -22,6 +26,9 @@ final class SyncService {
     @ObservationIgnored var onContentChanged: (() -> Void)?
     /// Called with the cached or newly downloaded criteria and indicators (CON-008).
     @ObservationIgnored var onConfigChanged: ((PublishedConfig) -> Void)?
+
+    /// A test replaces this to answer without a network.
+    @ObservationIgnored var makeCatalogAPI: (URL) -> any ExerciseCatalogAPI = { URLSessionExerciseCatalogAPI(baseURL: $0) }
 
     /// DEBUG only: the pasted dev credentials in the Keychain, used while nobody is signed in.
     @ObservationIgnored private let usesDevCredentials: Bool
@@ -71,15 +78,24 @@ final class SyncService {
     /// The published exercise catalog (anonymous). Offline or failing it changes nothing; new exercises also unblock pulled
     /// plans that were waiting for them, so a sync follows.
     func refreshCatalog() async {
-        guard let base = auth?.baseURL, !isRefreshingCatalog else { return }
+        guard !isRefreshingCatalog else { return }
+        guard let base = auth?.baseURL else { catalogState = .noServer; return }
         isRefreshingCatalog = true
         defer { isRefreshingCatalog = false }
         await refreshConfig(base)
-        let refresher = ExerciseCatalogRefresher(api: URLSessionExerciseCatalogAPI(baseURL: base), coordinator: coordinator,
+        let refresher = ExerciseCatalogRefresher(api: makeCatalogAPI(base), coordinator: coordinator,
                                                 media: ExerciseMediaCache(directory: LocalMedia.directory))
-        guard let changed = try? await refresher.refresh(), changed > 0 else { return }
-        onContentChanged?()
-        syncSoon()
+        do {
+            let changed = try await refresher.refresh()
+            catalogState = .idle
+            guard changed > 0 else { return }
+            onContentChanged?()
+            syncSoon()
+        } catch let error as SyncTransportError where error == .offline {
+            catalogState = .offline
+        } catch {
+            catalogState = .failed
+        }
     }
 
     /// At launch, before any network: the last downloaded config, or the bundled one.

@@ -152,7 +152,7 @@ final class AuthServiceTests: XCTestCase {
     }
 }
 
-private final class FakeAuthAPI: AuthAPI, @unchecked Sendable {
+final class FakeAuthAPI: AuthAPI, @unchecked Sendable {
     private let lock = NSLock()
     private var seen: [String] = []
     var user = UUID()
@@ -173,7 +173,7 @@ private final class FakeAuthAPI: AuthAPI, @unchecked Sendable {
     }
 }
 
-private final class MemorySessionStore: SessionStore, @unchecked Sendable {
+final class MemorySessionStore: SessionStore, @unchecked Sendable {
     private let lock = NSLock()
     private var value: StoredSession?
     func load() throws -> StoredSession? { lock.withLock { value } }
