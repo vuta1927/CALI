@@ -112,4 +112,118 @@ final class LiveServerTests: XCTestCase {
         let leftovers = try await states(a.coordinator.writer).filter { !$0.contains(" acked ") }
         XCTAssertTrue(leftovers.isEmpty, "\(leftovers)")
     }
+
+    /// Everything a plan carries besides workouts: an activation, a phase, a goal and a body weight. A is the only writer;
+    /// B starts empty and must read all of it back. Cleanup deletes them so the test user keeps no live plan.
+    func testActivationGoalsAndBodyThroughTheServer() async throws {
+        let api = try api()
+        let env = ProcessInfo.processInfo.environment
+        let catalogAPI = URLSessionExerciseCatalogAPI(baseURL: URL(string: env["CALI_LIVE_BASE_URL"]!)!)
+        let utc = TimeZone(identifier: "UTC")!
+        let exerciseId = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!
+
+        let a = try CoreFixture.inMemory()
+        let storeA = ContentStore(writer: a.coordinator.writer)
+        try storeA.seedIfEmpty(.empty(), now: a.clock.now(), timeZone: utc)
+        try await ExerciseCatalogRefresher(api: catalogAPI, store: storeA).refresh(now: a.clock.now())
+
+        let item = PlannedExercise(id: UUID(), exerciseId: exerciseId, setCount: 2, target: .staticHold(holdSeconds: 10), restSeconds: 45)
+        let workout = PlannedWorkout(id: UUID(), weekday: 3, title: "Live full", focus: "", exercises: [item])
+        let phase = PlanPhase(id: UUID(), name: "Nền tảng", weeks: 4)
+        let today = try XCTUnwrap(LocalDate(Self.localDay(a.clock.now(), utc)))
+        var plan = WorkoutPlan(id: UUID(), title: "Live full \(UUID().uuidString.prefix(6))", workouts: [workout], phases: [phase])
+        plan.createdAt = a.clock.now()
+        plan.activations = [PlanActivation(id: UUID(), fromDate: today, timezone: "UTC")]
+        try storeA.apply(ContentChange(plans: [plan]), now: a.clock.now())
+
+        let goal = PlanGoal(id: UUID(), planLineageId: plan.lineageId, title: "Giữ 30 giây", indicatorId: "best_hold_seconds",
+                            exerciseId: exerciseId, baseline: 10, target: .value(30), pinned: true)
+        let weight = BodyMeasurement(value: Decimal(string: "72.4")!, measuredAt: a.clock.now())
+        try storeA.apply(ContentChange(goals: [goal], bodyMeasurements: [weight]), now: a.clock.now())
+
+        let engineA = OutboxSyncEngine(writer: a.coordinator.writer, api: api)
+        let runA = await engineA.syncOnce()
+        let rowsA = try await states(a.coordinator.writer)
+        XCTAssertTrue(rowsA.allSatisfy { $0.contains(" acked ") }, "\(rowsA) \(runA)")
+        for type in ["training_plan", "plan_activation", "plan_phase", "plan_goal", "body_measurement"] {
+            XCTAssertEqual(rowsA.filter { $0.hasPrefix(type + " ") }.count, 1, "\(type) in \(rowsA)")
+        }
+
+        let b = try CoreFixture.inMemory()
+        let storeB = ContentStore(writer: b.coordinator.writer)
+        try storeB.seedIfEmpty(.empty(), now: b.clock.now(), timeZone: utc)
+        try await ExerciseCatalogRefresher(api: catalogAPI, store: storeB).refresh(now: b.clock.now())
+        let runB = await OutboxSyncEngine(writer: b.coordinator.writer, api: api).syncOnce()
+        let content = try storeB.load()
+        let pulled = try XCTUnwrap(content.plans.first { $0.id == plan.id }, "\(runB)")
+        XCTAssertEqual(pulled.activations.map(\.fromDate), [today])
+        XCTAssertEqual(pulled.phases.map(\.name), ["Nền tảng"])
+        XCTAssertEqual(pulled.phases.map(\.weeks), [4])
+        XCTAssertEqual(content.goals.first { $0.id == goal.id }?.target, .value(30))
+        XCTAssertEqual(content.bodyMeasurements.first { $0.id == weight.id }?.value, Decimal(string: "72.4"))
+
+        var goneGoal = goal, goneWeight = weight, gonePlan = plan
+        goneGoal.deletedAt = a.clock.now(); goneWeight.deletedAt = a.clock.now(); gonePlan.deletedAt = a.clock.now()
+        try storeA.apply(ContentChange(plans: [gonePlan], goals: [goneGoal], bodyMeasurements: [goneWeight]), now: a.clock.now())
+        _ = await engineA.syncOnce()
+        let leftovers = try await states(a.coordinator.writer).filter { !$0.contains(" acked ") }
+        XCTAssertTrue(leftovers.isEmpty, "\(leftovers)")
+    }
+
+    /// Two devices edit the same plan from the same server version. A pushes first; B's edit is based on the old version, so the
+    /// server answers `version_conflict`: B's row waits as `conflicted` with the server's copy attached, nothing is overwritten.
+    func testStaleEditIsAConflictNotAnOverwrite() async throws {
+        let api = try api()
+        let utc = TimeZone(identifier: "UTC")!
+        let exerciseId = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!
+        let catalogAPI = URLSessionExerciseCatalogAPI(baseURL: URL(string: ProcessInfo.processInfo.environment["CALI_LIVE_BASE_URL"]!)!)
+
+        let a = try CoreFixture.inMemory()
+        let storeA = ContentStore(writer: a.coordinator.writer)
+        try storeA.seedIfEmpty(.empty(), now: a.clock.now(), timeZone: utc)
+        try await ExerciseCatalogRefresher(api: catalogAPI, store: storeA).refresh(now: a.clock.now())
+        let item = PlannedExercise(id: UUID(), exerciseId: exerciseId, setCount: 1, target: .staticHold(holdSeconds: 5), restSeconds: 30)
+        var plan = WorkoutPlan(id: UUID(), title: "Conflict \(UUID().uuidString.prefix(6))",
+                               workouts: [PlannedWorkout(id: UUID(), weekday: 2, title: "Live", focus: "", exercises: [item])])
+        plan.createdAt = a.clock.now()
+        try storeA.apply(ContentChange(plans: [plan]), now: a.clock.now())
+        let engineA = OutboxSyncEngine(writer: a.coordinator.writer, api: api)
+        _ = await engineA.syncOnce()
+
+        let b = try CoreFixture.inMemory()
+        let storeB = ContentStore(writer: b.coordinator.writer)
+        try storeB.seedIfEmpty(.empty(), now: b.clock.now(), timeZone: utc)
+        try await ExerciseCatalogRefresher(api: catalogAPI, store: storeB).refresh(now: b.clock.now())
+        let engineB = OutboxSyncEngine(writer: b.coordinator.writer, api: api)
+        _ = await engineB.syncOnce()
+        var onB = try XCTUnwrap(try storeB.load().plans.first { $0.id == plan.id }, "B pulled the plan")
+
+        var editA = plan
+        editA.title = plan.title + " A"
+        try storeA.apply(ContentChange(plans: [editA]), now: a.clock.now())
+        let afterA = await engineA.syncOnce()
+        let rowsA = try await states(a.coordinator.writer)
+        XCTAssertTrue(rowsA.allSatisfy { $0.contains(" acked ") }, "\(rowsA) \(afterA)")
+
+        onB.title = plan.title + " B"
+        try storeB.apply(ContentChange(plans: [onB]), now: b.clock.now())
+        let afterB = await engineB.syncOnce()
+        let rowsB = try await states(b.coordinator.writer)
+        XCTAssertTrue(rowsB.contains { $0.hasPrefix("training_plan conflicted") }, "\(rowsB) \(afterB)")
+
+        // Clean up from A (the winner holds the current version).
+        var gone = editA
+        gone.deletedAt = a.clock.now()
+        try storeA.apply(ContentChange(plans: [gone]), now: a.clock.now())
+        _ = await engineA.syncOnce()
+        let leftovers = try await states(a.coordinator.writer).filter { !$0.contains(" acked ") }
+        XCTAssertTrue(leftovers.isEmpty, "\(leftovers)")
+    }
+
+    private static func localDay(_ date: Date, _ zone: TimeZone) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let p = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", p.year!, p.month!, p.day!)
+    }
 }
