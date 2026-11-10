@@ -218,7 +218,7 @@ struct GoalsView: View {
         if !goals.isEmpty {
             SectionHeader(title: title, trailing: "\(goals.count)")
             ForEach(goals) { goal in
-                GoalCard(goal: goal, plan: plan, onEdit: editable ? { editing = GoalDraft(goal: goal) } : nil)
+                GoalCard(goal: goal, plan: plan, onEdit: editable ? { editing = GoalDraft(goal: goal, kind: store.indicator(goal.indicatorId)?.kind) } : nil)
             }
         }
     }
@@ -243,10 +243,10 @@ struct GoalDraft: Identifiable {
         pinned = false
     }
 
-    init(goal: PlanGoal) {
+    init(goal: PlanGoal, kind: IndicatorKind?) {
         id = goal.id
         existing = goal
-        kind = IndicatorDefinition.bundled.first { $0.id == goal.indicatorId }?.kind ?? .performance
+        self.kind = kind ?? .performance
         exerciseId = goal.exerciseId
         indicatorId = goal.indicatorId
         if case .value(let v) = goal.target { target = v }

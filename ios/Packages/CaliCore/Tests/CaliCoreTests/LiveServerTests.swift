@@ -220,6 +220,27 @@ final class LiveServerTests: XCTestCase {
         XCTAssertTrue(leftovers.isEmpty, "\(leftovers)")
     }
 
+    /// `GET /v1/criteria-config`: the body decodes into what the app reads, and the ETag revalidates to 304 (`nil`).
+    func testCriteriaConfigFromTheServer() async throws {
+        _ = try api()
+        let base = URL(string: ProcessInfo.processInfo.environment["CALI_LIVE_BASE_URL"]!)!
+        let api = URLSessionCriteriaConfigAPI(baseURL: base)
+        let fetched = try await api.fetch(ifNoneMatch: nil)
+        let first = try XCTUnwrap(fetched)
+        let config = try XCTUnwrap(PublishedConfig.decode(first.body), "the served config is readable")
+        XCTAssertGreaterThanOrEqual(config.criteria.version, 1)
+        XCTAssertFalse(config.criteria.criteria.isEmpty)
+        XCTAssertTrue(config.indicators.contains { $0.id == "best_hold_seconds" })
+        let etag = try XCTUnwrap(first.etag)
+        let again = try await api.fetch(ifNoneMatch: etag)
+        XCTAssertNil(again, "304 for the same ETag")
+        let store = CriteriaConfigStore(writer: try CaliDatabase.openInMemory())
+        let changed = try await CriteriaConfigRefresher(api: api, store: store).refresh()
+        XCTAssertTrue(changed)
+        let cached = await store.load()
+        XCTAssertEqual(cached, config)
+    }
+
     private static func localDay(_ date: Date, _ zone: TimeZone) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone

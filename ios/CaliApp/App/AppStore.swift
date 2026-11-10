@@ -23,11 +23,10 @@ final class AppStore {
     private(set) var goals: [PlanGoal] = []
     /// CON-007, sensitive (ADR-064): only the app process reads these; nothing here reaches the widget or the AI.
     private(set) var bodyMeasurements: [BodyMeasurement] = []
-    /// CON-008: the criteria config the set form is built from. Only the bundled version 1 exists until the
-    /// config is downloaded and cached.
-    // TODO(IOS-007): fetch `GET /v1/criteria-config` with If-None-Match, cache the last good copy and pass it
-    // to `CriteriaConfig.resolve(cached:)`; a fetch failure keeps the cached or bundled version.
-    private(set) var criteriaConfig = CriteriaConfig.resolve(cached: nil)
+    /// CON-008: the criteria config the set form is built from and the indicators of the goal pickers. The bundled
+    /// version 1 until `GET /v1/criteria-config` has been downloaded; then the cached copy, also offline.
+    private(set) var published = PublishedConfig.bundled
+    var criteriaConfig: CriteriaConfig { published.criteria }
 
     /// The in-flight (or just finished) workout. Kept after completion so the summary screen can
     /// render; removed when the player is closed.
@@ -55,6 +54,7 @@ final class AppStore {
     @ObservationIgnored private(set) lazy var sync: SyncService = {
         let service = SyncService(coordinator: database.coordinator, auth: auth)
         service.onContentChanged = { [weak self] in self?.reloadContent() }
+        service.onConfigChanged = { [weak self] in self?.published = $0 }
         return service
     }()
     @ObservationIgnored private let notifications = NotificationService()
@@ -128,12 +128,7 @@ final class AppStore {
 
     func exercise(_ id: UUID) -> Exercise? { catalog.first { $0.id == id } }
 
-    /// The bundled demo workouts (quick test, sample plan) are offered only when every exercise they use is in the catalog, so a
-    /// catalog that comes from the server never shows a demo with missing exercises.
-    func canUse(_ workout: PlannedWorkout) -> Bool { workout.exercises.allSatisfy { exercise($0.exerciseId) != nil } }
-
     func workout(_ id: UUID) -> PlannedWorkout? {
-        if id == MockData.quickTestId { return MockData.quickTest }
         return plan(containing: id)?.workouts.first { $0.id == id }
     }
 
@@ -285,7 +280,6 @@ final class AppStore {
         }
         if let previous = self.exercise(exercise.id), previous.type != exercise.type {
             let referenced = plans.contains { $0.workouts.contains { $0.exercises.contains { $0.exerciseId == exercise.id } } }
-                || MockData.quickTest.exercises.contains { $0.exerciseId == exercise.id }
                 || history.contains { $0.exerciseIds.contains(exercise.id) }
                 || (player?.state.executions.contains { $0.exerciseId == exercise.id } ?? false)
             guard !referenced else {

@@ -15,7 +15,20 @@ final class PlanLifecycleTests: XCTestCase {
 
     @MainActor
     private func template(_ store: AppStore, _ title: String) throws -> UUID {
-        try XCTUnwrap(store.createPlan(PlanDraft(method: .template, title: title)))
+        try XCTUnwrap(sampleWorkouts(store, PlanDraft(title: title)))
+    }
+
+    /// A new plan with the workouts of the in-memory sample plan (the app itself no longer offers a template).
+    @MainActor
+    private func sampleWorkouts(_ store: AppStore, _ draft: PlanDraft) -> UUID? {
+        guard let id = store.createPlan(draft) else { return nil }
+        for workout in MockData.plan.workouts {
+            var copy = workout
+            copy.id = UUID()
+            copy.exercises = copy.exercises.map { var item = $0; item.id = UUID(); return item }
+            _ = store.updateWorkout(copy, in: id)
+        }
+        return id
     }
 
     @MainActor
@@ -151,7 +164,7 @@ final class PlanLifecycleTests: XCTestCase {
     @MainActor
     func testExtendTurnsAPastEventPlanIntoAWeeklyRevision() throws {
         let store = try makeStore()
-        let id = try XCTUnwrap(store.createPlan(PlanDraft(method: .template, title: "Giải", kind: .event, eventDate: store.today())))
+        let id = try XCTUnwrap(sampleWorkouts(store, PlanDraft(title: "Giải", kind: .event, eventDate: store.today())))
         XCTAssertFalse(store.extendPlan(id))
         // Simulate the event day passing: a plan followed from earlier with its event yesterday.
         var plan = try XCTUnwrap(store.plan(id))

@@ -7,11 +7,11 @@ import Foundation
 extension AppStore {
     // MARK: Lookups
 
-    /// db/005 defaults until the downloaded indicator config exists (CON-008).
-    // TODO(CON-008): replace with the indicator definitions served with `GET /v1/criteria-config`.
-    var indicators: [IndicatorDefinition] { IndicatorDefinition.bundled.filter(\.enabled) }
+    /// The enabled indicators of the downloaded set (CON-008); the db/005 defaults until it exists.
+    var indicators: [IndicatorDefinition] { published.indicators.filter(\.enabled) }
 
-    func indicator(_ id: String) -> IndicatorDefinition? { IndicatorDefinition.bundled.first { $0.id == id } }
+    /// Also a disabled one: a goal keeps the indicator it was made with.
+    func indicator(_ id: String) -> IndicatorDefinition? { published.indicators.first { $0.id == id } ?? IndicatorDefinition.bundled.first { $0.id == id } }
 
     func goal(_ id: UUID) -> PlanGoal? { goals.first { $0.id == id } }
 
@@ -305,7 +305,7 @@ extension AppStore {
         return ids.compactMap { id in
             guard let exercise = exercise(id) else { return nil }
             let measurement = exercise.type.measurementType
-            guard let indicator = IndicatorDefinition.bundled.first(where: {
+            guard let indicator = indicators.first(where: {
                 $0.kind == .performance && $0.measurementTypes.contains(measurement)
             }) else { return nil }
             let summary = GoalProgress.summary(samples: samples, exerciseId: id, measurement: measurement, aggregation: .max)
@@ -321,7 +321,7 @@ extension AppStore {
     /// version it was entered with. Values of a criterion this build does not know are left out.
     func criteriaSummary(of set: LoggedSet) -> String? {
         var parts: [String] = []
-        if let config = [criteriaConfig].first(where: { $0.version == set.criteriaVersion }), let values = set.criteria {
+        if let config = [criteriaConfig, .bundled].first(where: { $0.version == set.criteriaVersion }), let values = set.criteria {
             for criterion in config.criteria {
                 guard let value = values[criterion.id] else { continue }
                 let labels = Dictionary(uniqueKeysWithValues: (criterion.options ?? []).map { ($0.v, $0.label) })

@@ -37,8 +37,6 @@ struct PlanDraft: Identifiable {
         case blank
         /// MP-03: copy another plan (also "Lặp lại" and "Nhân bản để sửa").
         case clone(UUID)
-        /// The starter plan bundled with the app.
-        case template
     }
 
     var method: Method = .blank
@@ -249,7 +247,6 @@ extension AppStore {
         var action = "Tạo giáo án"
         switch draft.method {
         case .blank: break
-        case .template: workouts = MockData.plan.workouts
         case .clone(let source):
             guard let original = plan(source) else { refuse("Không tìm thấy giáo án để nhân bản."); return nil }
             workouts = original.workouts

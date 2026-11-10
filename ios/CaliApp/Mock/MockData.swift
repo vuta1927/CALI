@@ -167,7 +167,6 @@ enum MockData {
     static let wednesdayId = id("22222222-2222-4222-8222-222222222224")
     static let fridayId = id("22222222-2222-4222-8222-222222222226")
     static let saturdayId = id("22222222-2222-4222-8222-22222222222f")
-    static let quickTestId = id("22222222-2222-4222-8222-2222222222aa")
 
     static let mondayPlanche = id("33333333-3333-4333-8333-333333333331")
     static let mondayPullUp = id("33333333-3333-4333-8333-333333333332")
@@ -207,15 +206,6 @@ enum MockData {
             ]),
         ]
     )
-
-    /// Short session covering all five exercise types, so the whole player flow can be tried in ~3 minutes.
-    static let quickTest = PlannedWorkout(id: quickTestId, weekday: 0, title: "Buổi thử nhanh", focus: "Đủ 5 loại bài · ~3 phút", exercises: [
-        item("55555555-5555-4555-8555-555555555551", hollowHold, 2, .staticHold(holdSeconds: 10), rest: 15),
-        item("55555555-5555-4555-8555-555555555552", pushUp, 2, .reps(repMin: 5, repMax: 8), rest: 15),
-        item("55555555-5555-4555-8555-555555555553", burpee, 1, .timedReps(timeSeconds: 15), rest: 15),
-        item("55555555-5555-4555-8555-555555555554", mountainClimber, 1, .interval(workSeconds: 15, restSeconds: 10), rest: 10),
-        item("55555555-5555-4555-8555-555555555555", wallHandstand, 1, .skillAttempt(attempts: 2), rest: 0),
-    ])
 
     // MARK: Sample history (relative to `now`, always flagged isSample)
 
