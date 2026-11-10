@@ -52,6 +52,14 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 ## Milestone M2 — Backend and sync
 **B1 (2026-11-09, PO duyệt ADR-068):** BE-001/002 có catalog (`GET /v1/exercises`, `/v1/exercises/{id}`, `GET /v1/criteria-config`) và plans (`GET/POST /v1/plans`, idempotent theo `Idempotency-Key`, `db/009_http_idempotency.sql`). `url` của media vẫn null cho tới BE-006.
 
+**B2 (2026-11-09, PO duyệt ADR-069):** BE-003 có `POST /v1/sync/push`: một transaction cho cả push, mỗi mutation một savepoint, receipt idempotent theo `mutationId` + fingerprint, change log liên tục theo user, đăng ký thiết bị an toàn khi push song song. Chưa đo p95 push 100 mutation.
+
+**B3 (2026-11-09, PO duyệt ADR-070):** BE-004 có `GET /v1/sync/pull`: feed lịch sử thay đổi của user theo `seq`, cursor và `changeId` ký HMAC gắn với user (sai/bị sửa/của user khác ⇒ 400), cursor hết hạn retention 180 ngày hoặc vượt feed ⇒ 410 `cursor_expired`, không cursor là initial sync. Tombstone đi qua feed. Chưa có job dọn log (`TODO(OPS-001)`) và chưa đo p95 pull; `ai_analysis`/`ai_recommendation` chưa vào feed. Khoá `Sync__CursorSigningKey` là secret mới ngoài Development.
+
+**BE-006 (2026-11-10, PO duyệt ADR-072):** catalog trả `url` presigned (AWS SigV4, object store S3-tương thích như Cloudflare R2) cùng `urlExpiresAt` cho media công khai đã duyệt; hạn mặc định 15 phút, response `no-store`. Đã kiểm chứng với một server S3-tương thích thật; **chưa thử với R2/S3 thật**. Chưa có công cụ ingestion (upload file, tạo `exercise_media`), nên môi trường chưa có media thì `url` vẫn null. Secret mới `Media__Storage__SecretAccessKey` (và endpoint, bucket, access key id) ngoài Development.
+
+**B4 (2026-11-10, PO duyệt ADR-071):** BE-005 có `POST /v1/auth/apple` và `POST /v1/auth/refresh`: kiểm tra token Apple (RS256, JWKS cache, `iss`/`aud`/`exp`/nonce), nonce dùng một lần, access JWT 15 phút ký bằng secret mới `Auth__AccessTokenSigningKey`, refresh token một lần dùng, chỉ lưu hash, dùng lại ⇒ revoke cả phiên. Mọi từ chối là cùng một 401. Thêm gitleaks và quét package có lỗ hổng (`security.yml`). Chưa thử với token Apple thật (`TODO(BE-004-APPLE)`), chưa có đăng xuất/thu hồi và gắn dữ liệu guest (IOS-008).
+
 | Task | Owner | Depends | Output / DoD |
 |---|---|---|---|
 | BE-001 | BE | CON-001 | .NET modular monolith, auth stubs/prod validation, OpenAPI implementation |

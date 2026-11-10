@@ -46,7 +46,7 @@ Use GRDB over SQLite to make schema/versioning, atomic transactions and outbox e
 
 Main tables mirror server business entities plus `processed_commands(command_id PK,response_json)`, `sync_outbox(seq PK, mutation_id UNIQUE, entity_type, entity_id, action, base_version, json, state, attempts, created_at, last_error)`, `sync_cursor(user_id, cursor)`, `media_cache`, `local_session_state`.
 
-**Implemented (IOS-001, ADR-070).** `ios/Packages/CaliCore` owns the database `Application Support/cali.sqlite` (WAL `DatabasePool`, foreign keys on). The app process is the only writer (ADR-013); the widget extension never opens it.
+**Implemented (IOS-001, ADR-074).** `ios/Packages/CaliCore` owns the database `Application Support/cali.sqlite` (WAL `DatabasePool`, foreign keys on). The app process is the only writer (ADR-013); the widget extension never opens it.
 - Migration `v1` (POC-002): `local_session_state`, `set_results`, `sync_outbox`, `processed_commands`.
 - Migration `v2_content`:
   - Plan tables per CON-003: `training_plans`, `plan_activations`, `planned_workouts`, `planned_exercises`, each with `server_version` and `dirty`.

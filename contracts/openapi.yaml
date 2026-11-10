@@ -22,6 +22,14 @@ paths:
     post:
       tags: [Identity]
       summary: Exchange validated Apple identity token for application tokens
+      description: >-
+        BE-005, ADR-071. The server checks the Apple identity token (RS256 signature against Apple's published keys,
+        issuer `https://appleid.apple.com`, audience = the app bundle id, expiry and the `nonce` claim) and maps its
+        `sub` to a user, creating one on the first sign-in. `nonce` is the RAW random string; the app must give Apple
+        its lowercase hex SHA-256 as the authorization request nonce, because Apple copies that value into the token
+        and the server compares it with the hash of `nonce`. A nonce works once: replaying a token or reusing a
+        nonce is 401. Every refusal is the same 401 with no reason. The response is never cached. Anonymous, rate
+        limited per client IP. 503 means Apple's keys could not be fetched; retry later.
       security: []
       operationId: authenticateWithApple
       requestBody:
@@ -37,14 +45,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request body is larger than 16 KiB
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not application/json
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Apple's signing keys cannot be fetched, or Sign in with Apple is not configured; retry later
+          headers:
+            Retry-After:
+              description: Delay before retry in seconds
+              schema: {type: integer, minimum: 1}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
   /v1/auth/refresh:
     post:
       tags: [Identity]
       summary: Rotate refresh token
+      description: >-
+        BE-005, ADR-071. Every refresh token works once: the response carries the next one and the presented one is
+        spent. Presenting a spent token again (a replay, or a client that retried after losing the response) revokes
+        the whole session, so the client must send one refresh at a time and keep the newest token. Unknown, expired,
+        revoked, reused and malformed tokens are all the same 401 with no reason. `deviceId`, when the session was
+        started with one, must match it. The response is never cached. Anonymous (the refresh token is the credential),
+        rate limited per client IP.
       operationId: refreshAuthToken
       security: []
       requestBody:
@@ -60,8 +96,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request body is larger than 16 KiB
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not application/json
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/me:
@@ -109,7 +157,9 @@ paths:
           schema: {type: integer, minimum: 1, maximum: 100, default: 50}
       description: >-
         BE-001. Only published exercises; media lists the newest public, reviewed version per kind.
-        `url` stays null until signed media URLs land (BE-006). Anonymous, rate limited per client IP.
+        BE-006 (ADR-072): each media item carries a short-lived signed `url` and its `urlExpiresAt`;
+        fetch it with a plain GET, no credentials. The response is `Cache-Control: no-store` because
+        those URLs expire. Anonymous, rate limited per client IP.
       responses:
         '200':
           description: Page of approved exercises
@@ -127,6 +177,9 @@ paths:
       summary: Exercise details and media metadata
       operationId: getExercise
       security: []
+      description: >-
+        Media `url` values are short-lived signed URLs (BE-006, ADR-072) and the response is
+        `Cache-Control: no-store`.
       parameters:
         - $ref: '#/components/parameters/ExerciseId'
       responses:
@@ -293,6 +346,9 @@ paths:
         change-log entry. Per-mutation conflicts do not fail unrelated mutations.
         The first push from a `deviceId` registers it for the caller (`devices` row
         upserted in the same transaction, `last_seen_at` refreshed); ADR-033.
+        The whole push is one transaction; each mutation runs in its own savepoint so a
+        rejected or conflicting mutation leaves the others applied. A malformed envelope
+        or batch fails the whole request with 400 before anything is written (ADR-069).
       requestBody:
         required: true
         content:
@@ -310,8 +366,23 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token is valid but its subject has no active user record (`code` = `user_not_found`); nothing is applied.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '409':
           description: '`deviceId` is already registered to another user (`code` = `device_owner_mismatch`); nothing is applied (ADR-033).'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '413':
+          description: Request body larger than 1 MiB (`code` = `payload_too_large`).
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not JSON (`code` = `unsupported_media_type`).
           content:
             application/problem+json:
               schema: {$ref: '#/components/schemas/Problem'}
@@ -321,12 +392,20 @@ paths:
     get:
       tags: [Sync]
       summary: Pull changes since last acknowledged cursor
+      description: >-
+        The caller's change feed in commit order (ADR-070). Omit `cursor` for the initial sync, which returns the
+        whole feed from the start (the latest state of every entity plus tombstones still retained). Save
+        `nextCursor` in the same local transaction that applies the page. A page may repeat a change the device
+        already holds (its own pushes appear in the feed): applying it is an idempotent upsert. The response is
+        never cached (`Cache-Control: no-store`).
       operationId: syncPull
       parameters:
         - name: cursor
           in: query
-          description: Opaque user-scoped cursor; omit for initial sync.
-          schema: {type: string}
+          description: >-
+            A `nextCursor` or `changeId` this server issued to the same user. Anything else (malformed, altered,
+            another user's) is a 400. Omit for initial sync.
+          schema: {type: string, maxLength: 128}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 100}
@@ -342,11 +421,16 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '410':
-          description: Cursor expired; client must perform full resync
+          description: >-
+            The cursor is older than the change-log retention window (180 days by default), or ahead of the feed.
+            Problem `code` is `cursor_expired`. The client keeps unsynced outbox rows, resets its pull cursor and
+            pulls again without a cursor (docs/08 section 7).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/analyses:
     post:
       tags: [Coaching]
@@ -514,22 +598,33 @@ components:
       type: object
       required: [identityToken, nonce]
       properties:
-        identityToken: {type: string, minLength: 10}
-        nonce: {type: string, minLength: 8}
-        deviceId: {type: string, format: uuid}
+        identityToken: {type: string, minLength: 10, maxLength: 8192}
+        nonce:
+          type: string
+          minLength: 8
+          maxLength: 256
+          description: Raw random string. The app gives Apple its lowercase hex SHA-256 (ADR-071).
+        deviceId:
+          type: string
+          format: uuid
+          description: The sync device id; a later refresh that sends a different one is refused.
     RefreshTokenRequest:
       type: object
       required: [refreshToken]
       properties:
-        refreshToken: {type: string, minLength: 10}
+        refreshToken: {type: string, minLength: 10, maxLength: 128}
         deviceId: {type: string, format: uuid}
     AuthTokens:
       type: object
       required: [accessToken, refreshToken, expiresInSeconds, user]
       properties:
-        accessToken: {type: string}
-        refreshToken: {type: string}
-        expiresInSeconds: {type: integer, minimum: 1}
+        accessToken:
+          type: string
+          description: Short-lived bearer JWT (15 minutes by default). Sessions are not checked per request, so a revoked session stays usable until this expires.
+        refreshToken:
+          type: string
+          description: Opaque single-use token (43 characters). Store only the newest one (Keychain).
+        expiresInSeconds: {type: integer, minimum: 1, description: Lifetime of `accessToken`.}
         user: {$ref: '#/components/schemas/UserProfile'}
     UserProfile:
       type: object
@@ -583,7 +678,19 @@ components:
           type: string
           enum: [thumbnail, poster, preview, tutorial, correct, incorrect]
         contentVersion: {type: integer, minimum: 1}
-        url: {type: [string, 'null'], format: uri}
+        url:
+          type: [string, 'null']
+          format: uri
+          description: >-
+            Short-lived signed read URL for the file (ADR-072); plain GET, no credentials, may be fetched
+            with Range requests. Null when this deployment has no object storage; then keep the bundled
+            or cached copy. Contains no credential, only a signature. Check `sha256` after download.
+        urlExpiresAt:
+          type: [string, 'null']
+          format: date-time
+          description: >-
+            When `url` stops working; null exactly when `url` is null. Request the exercise again for a
+            fresh URL (do not cache the response past this instant).
         mimeType: {type: string}
         sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
         sizeBytes: {type: [integer, 'null'], minimum: 0}
@@ -1019,7 +1126,14 @@ components:
       required: [mutationId, entityType, entityId, action, baseVersion, clientChangedAt, payload]
       properties:
         mutationId: {type: string, format: uuid}
-        entityType: {$ref: '#/components/schemas/SyncEntityType'}
+        entityType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: >-
+            Writable types are listed in SyncEntityType. Any other value is accepted by the envelope
+            and answered with a `forbidden_entity` result, so a newer client never fails a whole batch
+            on an entity type this server does not accept (ADR-069).
         entityId: {type: string, format: uuid}
         action: {type: string, enum: [upsert, delete]}
         baseVersion: {type: integer, minimum: 0, format: int64}
@@ -1029,6 +1143,7 @@ components:
           additionalProperties: true
     SyncPushRequest:
       type: object
+      additionalProperties: false
       required: [deviceId, mutations]
       properties:
         deviceId: {type: string, format: uuid}
@@ -1051,7 +1166,9 @@ components:
       description: >-
         ADR-021. Results with `retryable: true` are never persisted as receipts, so the client may
         resend the same mutationId later (e.g. after the missing parent is applied). Non-retryable
-        results are persisted and replayed for the same mutationId (except mutation_id_reused).
+        results are persisted and replayed with status `duplicate` for the same mutationId, except
+        mutation_id_reused and forbidden_entity (ADR-069). The replay key is the mutation fingerprint
+        over entityType, entityId, action, baseVersion and payload; clientChangedAt is not part of it.
       required: [code, message, retryable]
       properties:
         code:
@@ -1061,7 +1178,7 @@ components:
             dependency_missing (status conflict, retryable) - a referenced parent is not applied yet;
             version_conflict (status conflict) - baseVersion != serverVersion, serverEntity returned;
             validation_failed (status rejected) - schema or business rule violation (ADR-020);
-            forbidden_entity (status rejected) - entityType not writable by devices;
+            forbidden_entity (status rejected, not persisted) - entityType not writable by devices;
             cross_user_reference (status rejected) - references an entity owned by another user;
             mutation_id_reused (status rejected, not persisted) - mutationId already used with a different payload (ADR-031);
             active_plan_limit (status rejected) - a plan_activation would make more than the server limit
@@ -1090,7 +1207,7 @@ components:
       type: object
       required: [changeId, entityType, entityId, operation, serverVersion, payload]
       properties:
-        changeId: {type: string, description: Opaque user-scoped sequence token}
+        changeId: {type: string, description: Opaque user-scoped sequence token; accepted as `cursor` to resume right after this change}
         entityType: {$ref: '#/components/schemas/ChangeEntityType'}
         entityId: {type: string, format: uuid}
         operation: {type: string, enum: [upsert, delete]}
@@ -1125,7 +1242,7 @@ components:
         changes:
           type: array
           items: {$ref: '#/components/schemas/SyncChange'}
-        nextCursor: {type: string}
+        nextCursor: {type: string, description: Position after the last change of this page; unchanged when the page is empty}
         hasMore: {type: boolean}
     AnalysisRequest:
       type: object

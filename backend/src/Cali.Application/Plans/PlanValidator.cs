@@ -28,7 +28,7 @@ public static class PlanValidator
     public const int MaxTitleLength = 120;
     public const int MaxEventNameLength = 120;
 
-    private const string Required = "Required.";
+    internal const string Required = "Required.";
 
     private sealed record TargetField(string Name, bool Required, int Min, int Max, bool IsDecimal = false);
 
@@ -374,7 +374,7 @@ public static class PlanValidator
         }
     }
 
-    private static bool CheckInt(int? value, string field, int min, int max, ValidationErrors errors)
+    internal static bool CheckInt(int? value, string field, int min, int max, ValidationErrors errors)
     {
         if (value is not { } v)
         {
@@ -393,7 +393,7 @@ public static class PlanValidator
         return true;
     }
 
-    private static bool CheckText(string? value, string field, bool required, int minLength, int maxLength, ValidationErrors errors)
+    internal static bool CheckText(string? value, string field, bool required, int minLength, int maxLength, ValidationErrors errors)
     {
         if (value is null)
         {

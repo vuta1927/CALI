@@ -147,6 +147,9 @@ try:
                 {'$ref': f'{oas_uri}#/components/schemas/{name}'},
                 registry=registry, format_checker=jsonschema.FormatChecker())
             instance = json.loads((ROOT / rel).read_text(encoding='utf-8'))
+            # `_comment` labels fixture files and is never sent; closed schemas (ADR-069) would reject it.
+            if isinstance(instance, dict):
+                instance.pop('_comment', None)
             for error in wire.iter_errors(instance):
                 errors.append(f'{rel} does not match OpenAPI {name}: {error.message}')
         # CON-004: prescription kinds stay in lockstep across contracts (catalog type == target kind).

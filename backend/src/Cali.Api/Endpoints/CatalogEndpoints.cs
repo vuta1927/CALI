@@ -10,14 +10,20 @@ namespace Cali.Api.Endpoints;
 
 /// <summary>OpenAPI <c>ExerciseMedia</c>.</summary>
 public sealed record ExerciseMediaResponse(
-    Guid Id, string Kind, int ContentVersion, Uri? Url, string MimeType, string Sha256,
+    Guid Id, string Kind, int ContentVersion, Uri? Url, DateTimeOffset? UrlExpiresAt, string MimeType, string Sha256,
     long? SizeBytes, long? DurationMs, string License, string? Attribution)
 {
-    // TODO(BE-006): issue short-lived signed URLs from object storage (docs/10, docs/07). Until then
-    // `url` is null and clients keep bundled/cached media; remove when BE-006 lands.
-    public static ExerciseMediaResponse From(CatalogMedia media) => new(
-        media.Id, media.Kind, media.ContentVersion, Url: null, media.MimeType, media.Sha256,
-        media.SizeBytes, media.DurationMs, media.License, media.Attribution);
+    /// <summary>
+    /// <paramref name="signer"/> null, or a key it will not sign, gives <c>url: null</c> and <c>urlExpiresAt: null</c>
+    /// (ADR-072); <see cref="CatalogMedia.StorageKey"/> itself is never sent.
+    /// </summary>
+    public static ExerciseMediaResponse From(CatalogMedia media, IMediaUrlSigner? signer = null, DateTimeOffset issuedAt = default)
+    {
+        var signed = signer?.Sign(media.StorageKey, issuedAt);
+        return new(
+            media.Id, media.Kind, media.ContentVersion, signed?.Url, signed?.ExpiresAt, media.MimeType, media.Sha256,
+            media.SizeBytes, media.DurationMs, media.License, media.Attribution);
+    }
 }
 
 /// <summary>OpenAPI <c>Exercise</c>.</summary>
@@ -26,9 +32,9 @@ public sealed record ExerciseResponse(
     IReadOnlyList<string> FocusTags, IReadOnlyList<string> Equipment, IReadOnlyList<string> Cues,
     int CatalogVersion, IReadOnlyList<ExerciseMediaResponse> Media)
 {
-    public static ExerciseResponse From(CatalogExercise e) => new(
+    public static ExerciseResponse From(CatalogExercise e, IMediaUrlSigner? signer = null, DateTimeOffset issuedAt = default) => new(
         e.Id, e.Slug, e.Name, e.Type, e.Discipline, e.MeasurementType, e.FocusTags, e.Equipment, e.Cues,
-        e.CatalogVersion, e.Media.Select(ExerciseMediaResponse.From).ToArray());
+        e.CatalogVersion, e.Media.Select(m => ExerciseMediaResponse.From(m, signer, issuedAt)).ToArray());
 }
 
 /// <summary>OpenAPI <c>ExercisePage</c>.</summary>
@@ -59,6 +65,10 @@ public sealed record CriteriaConfigResponse(
 public static class CatalogEndpoints
 {
     internal const string PublicCacheControl = "public, max-age=300";
+
+    // The exercise bodies carry signed media URLs that stop working after Media:UrlLifetimeSeconds (ADR-072).
+    // A cached copy, shared or private, would serve dead links, so these responses are never stored.
+    internal const string UncacheableMediaUrls = "no-store";
     private const int MaxQueryLength = 100;
     private const int MaxEquipmentLength = 50;
     private const int MaxIfNoneMatchLength = 200;
@@ -74,8 +84,11 @@ public static class CatalogEndpoints
         return app;
     }
 
-    private static async Task<IResult> ListExercisesAsync(HttpRequest request, ListExercises query, CancellationToken cancellationToken)
+    private static async Task<IResult> ListExercisesAsync(
+        HttpRequest request, HttpResponse response, ListExercises query, IMediaUrlSigner signer, TimeProvider time, CancellationToken cancellationToken)
     {
+        response.Headers.CacheControl = UncacheableMediaUrls;
+
         if (!QueryParameters.TrySingle(request.Query, "q", out var q) || q is { Length: > MaxQueryLength })
         {
             return BadRequest("Parameter 'q' must be at most 100 characters.");
@@ -104,16 +117,21 @@ public static class CatalogEndpoints
 
         var filter = new ExerciseFilter(NullIfEmpty(q), type, NullIfEmpty(equipment));
         var page = await query.ExecuteAsync(filter, after, limit, cancellationToken).ConfigureAwait(false);
+        // One issue time for the whole page, so every URL of a response expires together.
+        var issuedAt = time.GetUtcNow();
         return Results.Ok(new ExercisePageResponse(
-            page.Items.Select(ExerciseResponse.From).ToArray(), page.NextCursor?.Encode(), page.HasMore));
+            page.Items.Select(e => ExerciseResponse.From(e, signer, issuedAt)).ToArray(), page.NextCursor?.Encode(), page.HasMore));
     }
 
-    private static async Task<IResult> GetExerciseAsync(Guid id, GetExercise query, CancellationToken cancellationToken)
+    private static async Task<IResult> GetExerciseAsync(
+        Guid id, HttpResponse response, GetExercise query, IMediaUrlSigner signer, TimeProvider time, CancellationToken cancellationToken)
     {
+        response.Headers.CacheControl = UncacheableMediaUrls;
+
         var exercise = await query.ExecuteAsync(id, cancellationToken).ConfigureAwait(false);
         return exercise is null
             ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Exercise not found.")
-            : Results.Ok(ExerciseResponse.From(exercise));
+            : Results.Ok(ExerciseResponse.From(exercise, signer, time.GetUtcNow()));
     }
 
     private static async Task<IResult> GetCriteriaConfigAsync(HttpContext http, GetCriteriaConfig query, CancellationToken cancellationToken)

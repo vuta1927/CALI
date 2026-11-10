@@ -51,8 +51,33 @@ dotnet run --project src/Cali.Api        # http://localhost:5080, Development
 ```
 
 The API and `Cali.DevToken` share the user-secrets id `cali-backend-dev`. Secrets come from
-user-secrets or environment variables only (`ConnectionStrings__Cali`, `Auth__DevTokens__SigningKey`);
-nothing secret is committed.
+user-secrets or environment variables only (`ConnectionStrings__Cali`, `Auth__DevTokens__SigningKey`,
+`Auth__AccessTokenSigningKey`, `Sync__CursorSigningKey`); nothing secret is committed. `Sync__CursorSigningKey` signs sync pull cursors (base64,
+at least 32 bytes, required outside Development; in Development it is derived from the dev token key when unset).
+`Sync__ChangeLogRetentionDays` (default 180) is how long a pull cursor stays valid.
+
+Catalog media URLs (BE-006, ADR-072) are signed against an S3-compatible bucket (Cloudflare R2, AWS S3, MinIO):
+`Media__Storage__Endpoint` (origin only, `https` outside Development), `Media__Storage__Bucket`,
+`Media__Storage__Region` (default `auto`; AWS S3 needs the bucket's region), `Media__Storage__AccessKeyId` and
+`Media__Storage__SecretAccessKey` (secret; use a read-only credential for that bucket). All four are required outside
+Development; in Development, setting none of them keeps `url: null`, and setting some but not all is an error.
+`Media__UrlLifetimeSeconds` (default 900, 60..3600) is how long a signed URL works. For local work any S3-compatible
+server on `http://localhost:<port>` works in Development (the integration tests use Scality CloudServer). Uploading
+files and creating `exercise_media` rows is the ingestion tool, which does not exist yet.
+
+Sign in with Apple and refresh (BE-005, ADR-071) need these settings (env form with `__`):
+
+| Setting | Default | Notes |
+|---|---|---|
+| `Auth:AccessTokenSigningKey` | - | **Secret.** HS256 key for CALI access tokens: base64, at least 32 bytes. Required outside Development (the host refuses to start without it); in Development it is derived from the dev token key when unset. Rotating it signs everyone's access token out (refresh tokens keep working). |
+| `Auth:Apple:ClientId` | - | The app bundle id, the `aud` of Apple identity tokens. Not secret. Required outside Development; in Development unset means `POST /v1/auth/apple` answers 503. |
+| `Auth:Apple:KeysUrl` | Apple's JWKS URL | HTTPS only. Change only for a test double. |
+| `Auth:Audience` | `cali-api` | Audience of CALI access tokens. |
+| `Auth:AccessTokenMinutes` | 15 | 1..60. |
+| `Auth:RefreshTokenDays` | 60 | 1..365. Sliding: every rotation starts a new window. |
+| `Auth:RefreshFamilyMaxDays` | 180 | At least `RefreshTokenDays`, at most 730. Absolute cap since sign-in. |
+
+An invalid value stops the host at startup with a message that names the setting and never echoes the value.
 
 ## Migrations
 
@@ -73,10 +98,11 @@ the content root to the repo `db/`. The image sets it to `/app/db`.
 
 ## Dev tokens (Development only)
 
-Sign in with Apple is not implemented yet (`TODO(BE-004)`). Until then, Development uses locally minted
-HS256 tokens from issuer `cali-dev-token`, audience `cali-api`. **The API trusts this issuer only when
+Real sessions come from `POST /v1/auth/apple` (issuer `cali-auth`, trusted in every environment). Development
+can also use locally minted HS256 tokens from issuer `cali-dev-token`, audience `cali-api`, so the API can be
+exercised without an Apple account. **The API trusts the dev issuer only when
 `ASPNETCORE_ENVIRONMENT=Development`.** In every other environment those tokens get 401, even if a key
-is configured.
+is configured. Sign in with Apple has never been tried against a real Apple token (`TODO(BE-004-APPLE)`, below).
 
 ```bash
 cd backend
@@ -103,6 +129,14 @@ Lifetimes are capped at 30 days. The user id comes only from the token's `sub` c
 | `GET /health/live` | anonymous | Process is up. No DB access. |
 | `GET /health/ready` | anonymous | `SELECT 1` against PostgreSQL. Returns 200 or 503. |
 | `GET /v1/me` | bearer | `UserProfile` from `users`; 404 `user_not_found` if the row is missing. |
+| `POST /v1/auth/apple` | anonymous, `auth` rate limit per IP | Apple identity token + raw nonce -> access token + refresh token. Every refusal is the same 401. 503 when Apple's keys cannot be fetched. |
+| `POST /v1/auth/refresh` | anonymous, `auth` rate limit per IP | Single-use refresh token -> new pair. A spent token revokes the whole session. |
+
+`TODO(BE-004-APPLE)`: verify against a real Apple identity token when a paid Apple Developer account is
+available (it is needed for IOS-008 anyway). Expiry: remove this line when that check has been run and its result
+is recorded in `evidence/`. Until then the validator is tested only with self-signed tokens and a fake key set;
+the nonce convention (the app gives Apple the lowercase hex SHA-256 of the raw nonce it sends to the API) and the
+`aud` value are assumptions to confirm.
 
 Every other route requires authentication by default (fallback policy). Errors are
 `application/problem+json` with `type`, `title`, `status`, a stable `code` and `traceId`. Request bodies,

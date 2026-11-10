@@ -22,7 +22,7 @@ public sealed class CatalogEndpointTests(PostgresFixture postgres)
         return new CaliApiFactory("Development", settings);
     }
 
-    private static async Task ExecuteAsync(string connectionString, string sql, params object?[] args)
+    internal static async Task ExecuteAsync(string connectionString, string sql, params object?[] args)
     {
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await using var command = dataSource.CreateCommand(sql);
@@ -34,7 +34,7 @@ public sealed class CatalogEndpointTests(PostgresFixture postgres)
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<Guid> InsertExerciseAsync(
+    internal static async Task<Guid> InsertExerciseAsync(
         string connectionString, string slug, string name, string type = "reps", bool published = true,
         string equipment = "[]", string focusTags = "[]")
     {

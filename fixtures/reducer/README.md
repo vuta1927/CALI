@@ -1,6 +1,6 @@
 # Reducer conformance vectors (CON-002) — APPROVED
 
-> **Status: approved by the PO on 2026-11-09 (ADR-069).** These vectors encode the `CaliDomain` reducer's
+> **Status: approved by the PO on 2026-11-09 (ADR-073).** These vectors encode the `CaliDomain` reducer's
 > interpretation of `docs/03-workout-domain.md` and are now the frozen reducer contract.
 > Where docs/03 was ambiguous the chosen behavior was listed as a CON-002 question in the I1a PR.
 > Changes to them require the same review as a

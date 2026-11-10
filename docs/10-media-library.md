@@ -33,6 +33,7 @@ See [local data and QA rules](17-content-editing.md).
 
 ## 4. API and content operations
 - Catalog endpoint includes media references/metadata, not huge encoded binaries; media signed URLs expire, client refreshes as needed.
+- **Signed URLs (BE-006, ADR-072).** For each public, reviewed media row the catalog returns `url` (AWS SigV4 presigned GET on an S3-compatible bucket such as Cloudflare R2) and `urlExpiresAt` (default 15 minutes, configurable 60..3600 s). The client downloads with a plain GET (Range works), verifies `sha256`, and asks the catalog again when `urlExpiresAt` has passed; it must not store the URL, only the downloaded file. Both are null when the server has no object storage; then the client keeps its bundled or cached copy. The catalog responses are `Cache-Control: no-store` because the URLs expire. `storage_key` is never a field of the response, but it is part of the URL path (S3 cannot hide it), so keys must be opaque (for example `media/{mediaId}/v{contentVersion}`) and immutable per `(exercise, kind, content_version)`. Uploading files and creating `exercise_media` rows is the ingestion tool, not built yet.
 - A backend-only content ingestion tool verifies file license, thumbnail quality, orientation, SHA256, version and safety of depicted technique.
 - For MVP avoid hot-linking third-party video URLs of unclear license; create/obtain approved assets and keep attribution.
 

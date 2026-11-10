@@ -2,11 +2,14 @@ using Cali.Api.Auth;
 using Cali.Api.Endpoints;
 using Cali.Api.Errors;
 using Cali.Api.Health;
+using Cali.Api.Media;
 using Cali.Api.RateLimiting;
 using Cali.Api.Telemetry;
 using Cali.Application.Catalog;
 using Cali.Application.Identity;
 using Cali.Application.Plans;
+using Cali.Api.Sync;
+using Cali.Application.Sync;
 using Cali.Infrastructure;
 using Cali.Infrastructure.Persistence.Migrations;
 using Microsoft.AspNetCore.Diagnostics;
@@ -41,9 +44,13 @@ internal static class CaliApi
         services.AddScoped<ListExercises>();
         services.AddScoped<GetExercise>();
         services.AddScoped<GetCriteriaConfig>();
+        services.AddCaliMedia();
         services.AddScoped<ListPlans>();
         services.AddScoped<CreatePlan>();
+        services.AddScoped<SyncPush>();
+        services.AddCaliSyncPull();
         services.AddCaliAuthentication();
+        services.AddCaliAuthSessions();
         services.AddCaliRateLimiting();
         services.AddCaliTelemetry(builder.Configuration);
 
@@ -71,9 +78,11 @@ internal static class CaliApi
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains(ReadyTag) })
             .AllowAnonymous().DisableRateLimiting();
 
+        app.MapAuthEndpoints();
         app.MapMeEndpoints();
         app.MapCatalogEndpoints();
         app.MapPlanEndpoints();
+        app.MapSyncEndpoints();
     }
 
     /// <summary>Development only, and only when <c>Migrations:ApplyOnStartup</c> is true.</summary>

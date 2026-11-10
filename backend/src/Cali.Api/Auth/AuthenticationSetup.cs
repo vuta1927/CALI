@@ -17,14 +17,15 @@ public static class AuthenticationSetup
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
+        services.AddCaliAuthTokenSettings();
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 
         // Configured lazily so environment/configuration overrides (tests, user-secrets) are honoured.
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Configure<IConfiguration, IHostEnvironment, ILoggerFactory>((options, configuration, environment, loggerFactory) =>
+            .Configure<IConfiguration, IHostEnvironment, ILoggerFactory, AuthTokenSettings>((options, configuration, environment, loggerFactory, tokens) =>
             {
-                var issuers = TrustedIssuers.Build(configuration, environment, loggerFactory.CreateLogger(typeof(TrustedIssuers)));
-                var audience = configuration[AudienceConfigKey] is { Length: > 0 } a ? a : DevTokenDefaults.Audience;
+                var issuers = TrustedIssuers.Build(configuration, environment, loggerFactory.CreateLogger(typeof(TrustedIssuers)), tokens);
+                var audience = tokens.Audience;
 
                 options.MapInboundClaims = false;
                 options.RequireHttpsMetadata = !environment.IsDevelopment();
