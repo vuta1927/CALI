@@ -248,7 +248,7 @@ paths:
               schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
-  # CON-010 begin: voice pack (docs/02 §5, docs/10 §7; ADR-072, ADR-077, ADR-078).
+  # CON-010 begin: voice pack (docs/02 §5.1, docs/10 §5.1; ADR-072, ADR-077, ADR-078).
   /v1/voice-pack:
     get:
       tags: [Catalog]
