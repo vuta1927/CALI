@@ -20,13 +20,7 @@ struct WelcomeView: View {
     ]
 
     var body: some View {
-        ZStack {
-            Color.coamiInk
-            RadialGradient(colors: [Color.coamiOrange.opacity(0.55), .clear], center: .top, startRadius: 0, endRadius: 520)
-            LinearGradient(colors: [.clear, Color.coamiInk.opacity(0.9)], startPoint: .center, endPoint: .bottom)
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+        BrandBackdrop()
         .overlay {
             VStack(spacing: 0) {
                 VStack(spacing: Spacing.m) {

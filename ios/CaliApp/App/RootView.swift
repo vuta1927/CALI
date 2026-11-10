@@ -28,8 +28,20 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = AppTab.launchTab
     @State private var debugRacePlan: UUID?
-    /// The welcome screen opens on every launch (not once per install); it is dismissed for the rest of the session.
-    @State private var showsWelcome = !AppTab.skipsWelcome
+    /// True until the stored session and cached settings are restored. Covers the app on every launch.
+    @State private var isLaunching = !AppTab.skipsWelcome
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The welcome screen is for the first launch after install, while no account is set up.
+    private var showsWelcome: Bool {
+        guard !isLaunching, !AppTab.skipsWelcome, !store.settings.hasSeenWelcome else { return false }
+        if case .signedOut = store.auth.state { return true }
+        return false
+    }
+
+    private func finishWelcome() {
+        store.updateSettings { $0.hasSeenWelcome = true }
+    }
 
     var body: some View {
         @Bindable var store = store
@@ -59,10 +71,22 @@ struct RootView: View {
             }
         }
         .task {
+            let started = ContinuousClock.now
             await store.sync.loadCachedConfig()
             await store.auth.restore()
+            // Keep the launch screen up long enough to read as a screen, not a flash.
+            let minimum = Duration.milliseconds(700)
+            let elapsed = ContinuousClock.now - started
+            if isLaunching, elapsed < minimum { try? await Task.sleep(for: minimum - elapsed) }
+            isLaunching = false
             await store.sync.refreshCatalog()
         }
+        .overlay {
+            if isLaunching {
+                LaunchView().transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: isLaunching)
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {
@@ -89,11 +113,11 @@ struct RootView: View {
             }
         }
         #endif
-        .fullScreenCover(isPresented: $showsWelcome) {
+        .fullScreenCover(isPresented: Binding(get: { showsWelcome }, set: { _ in })) {
             WelcomeView(showsSignIn: store.auth.isAvailable) {
-                store.updateSettings { $0.hasSeenWelcome = true }; showsWelcome = false
+                finishWelcome()
             } onSignIn: {
-                store.updateSettings { $0.hasSeenWelcome = true }; showsWelcome = false
+                finishWelcome()
                 tab = .profile
             }
             .interactiveDismissDisabled()
