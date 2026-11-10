@@ -6,7 +6,9 @@ import Security
 /// in the Keychain (this device only, after first unlock), never in UserDefaults, logs or exports; the base URL
 /// is not a secret but is kept out of the repo, so it is stored here too. Compiled into DEBUG builds only.
 enum DevCredentialStore {
-    private static let service = "cali.dev"
+    static let appService = "cali.dev"
+    /// Only a test changes this, to keep its own items apart from the ones the running app uses.
+    nonisolated(unsafe) static var service = appService
 
     enum Item: String { case baseURL = "api-base-url", token = "api-jwt" }
 

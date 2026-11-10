@@ -35,4 +35,32 @@ final class SyncServiceTests: XCTestCase {
         XCTAssertTrue(SyncStatusView.reason("active_plan_limit").contains("Gửi lại"))
         XCTAssertFalse(SyncStatusView.reason("body_measurement").contains("kg"), "no value in any sentence")
     }
+
+    // MARK: Catalog state (why the Catalog tab may be out of date)
+
+    private struct FailingCatalog: ExerciseCatalogAPI {
+        let error: SyncTransportError
+        func page(cursor: String?, limit: Int) async throws -> ExerciseCatalogPage { throw error }
+    }
+
+    private func service(baseURL: URL?) throws -> SyncService {
+        let database = try AppDatabase.inMemory()
+        let auth = AuthService(coordinator: database.coordinator, baseURL: baseURL, api: FakeAuthAPI(), store: MemorySessionStore())
+        return SyncService(coordinator: database.coordinator, auth: auth, usesDevCredentials: false)
+    }
+
+    func testCatalogStateSaysNoServerOfflineOrFailedInsteadOfStayingSilent() async throws {
+        let none = try service(baseURL: nil)
+        await none.refreshCatalog()
+        XCTAssertEqual(none.catalogState, .noServer)
+
+        let sync = try service(baseURL: URL(string: "https://api.example.invalid/")!)
+        sync.makeCatalogAPI = { _ in FailingCatalog(error: .offline) }
+        await sync.refreshCatalog()
+        XCTAssertEqual(sync.catalogState, .offline)
+
+        sync.makeCatalogAPI = { _ in FailingCatalog(error: .server(status: 503)) }
+        await sync.refreshCatalog()
+        XCTAssertEqual(sync.catalogState, .failed)
+    }
 }

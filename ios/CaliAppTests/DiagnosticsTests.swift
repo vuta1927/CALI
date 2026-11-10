@@ -5,9 +5,17 @@ import XCTest
 
 /// IOS-012: dev credentials stay in the Keychain; the store reports counts only.
 final class DiagnosticsFlowTests: XCTestCase {
+    /// A device test run must not wipe the address and token the developer pasted for the app, so these tests use their own
+    /// Keychain service.
+    override func setUp() {
+        super.setUp()
+        DevCredentialStore.service = "cali.dev.tests"
+    }
+
     override func tearDown() {
         DevCredentialStore.clear(.token)
         DevCredentialStore.clear(.baseURL)
+        DevCredentialStore.service = DevCredentialStore.appService
         super.tearDown()
     }
 
