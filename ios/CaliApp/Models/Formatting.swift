@@ -4,6 +4,16 @@ import Foundation
 enum Fmt {
     static let vi = Locale(identifier: "vi_VN")
 
+    /// Body weight, always kilograms ("72,4 kg"): the unit is fixed by the kind (ADR-063), not by the load setting.
+    static func bodyKg(_ kg: Decimal) -> String {
+        "\(kg.formatted(.number.precision(.fractionLength(0...2)).locale(vi))) kg"
+    }
+
+    /// "+0,5 kg", "−0,3 kg", "±0 kg".
+    static func signedBodyKg(_ kg: Decimal) -> String {
+        kg == 0 ? "±0 kg" : (kg > 0 ? "+" : "−") + bodyKg(abs(kg))
+    }
+
     /// "2,5", "60" (vi decimal comma, no trailing zeros).
     static func number(_ value: Decimal) -> String {
         value.formatted(.number.precision(.fractionLength(0...2)).locale(vi))

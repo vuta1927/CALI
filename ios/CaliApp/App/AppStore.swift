@@ -21,6 +21,8 @@ final class AppStore {
     private(set) var settings: AppSettings
     /// CON-005 goals of every plan lineage.
     private(set) var goals: [PlanGoal] = []
+    /// CON-007, sensitive (ADR-064): only the app process reads these; nothing here reaches the widget or the AI.
+    private(set) var bodyMeasurements: [BodyMeasurement] = []
     /// CON-008: the criteria config the set form is built from. Only the bundled version 1 exists until the
     /// config is downloaded and cached.
     // TODO(IOS-007): fetch `GET /v1/criteria-config` with If-None-Match, cache the last good copy and pass it
@@ -68,6 +70,7 @@ final class AppStore {
         audit = loaded.audit
         settings = loaded.settings
         goals = loaded.goals
+        bodyMeasurements = loaded.bodyMeasurements
         alertMessage = openError
         Fmt.weightUnit = loaded.settings.weightUnit
         restoreActiveSession()
@@ -321,6 +324,7 @@ final class AppStore {
         audit = loaded.audit
         settings = loaded.settings
         goals = loaded.goals
+        bodyMeasurements = loaded.bodyMeasurements
         Fmt.weightUnit = loaded.settings.weightUnit
     }
 

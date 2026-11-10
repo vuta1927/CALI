@@ -16,12 +16,15 @@ public struct LocalContent: Equatable, Sendable {
     public var settings: AppSettings
     /// CON-005 goals of every lineage, in creation order, without soft-deleted ones.
     public var goals: [PlanGoal]
+    /// CON-007 body measurements without soft-deleted ones, newest measurement first. Sensitive (ADR-064).
+    public var bodyMeasurements: [BodyMeasurement]
 
     public init(
         catalog: [Exercise], plans: [WorkoutPlan], history: [CompletedSession], recommendations: [Recommendation],
-        audit: [AuditEntry], settings: AppSettings, goals: [PlanGoal] = []
+        audit: [AuditEntry], settings: AppSettings, goals: [PlanGoal] = [], bodyMeasurements: [BodyMeasurement] = []
     ) {
         self.goals = goals
+        self.bodyMeasurements = bodyMeasurements
         self.catalog = catalog
         self.plans = plans
         self.history = history
@@ -42,6 +45,8 @@ public struct ContentChange: Sendable {
     public var recommendations: [Recommendation]
     /// CON-005 goals, upserted by id (a set `deletedAt` soft-deletes).
     public var goals: [PlanGoal] = []
+    /// CON-007 measurements, upserted by id (a set `deletedAt` soft-deletes).
+    public var bodyMeasurements: [BodyMeasurement] = []
     public var settings: AppSettings?
     /// `end_reason` of activations this change closes (CON-003: a closed activation records the lifecycle
     /// command that closed it). Written after the plans.
@@ -53,9 +58,10 @@ public struct ContentChange: Sendable {
     public init(
         exercises: [Exercise] = [], plans: [WorkoutPlan] = [], recommendations: [Recommendation] = [],
         settings: AppSettings? = nil, activationEndReasons: [UUID: ActivationEndReason] = [:], goals: [PlanGoal] = [],
-        audit: AuditEntry? = nil
+        bodyMeasurements: [BodyMeasurement] = [], audit: AuditEntry? = nil
     ) {
         self.goals = goals
+        self.bodyMeasurements = bodyMeasurements
         self.exercises = exercises
         self.plans = plans
         self.activationEndReasons = activationEndReasons
@@ -195,6 +201,7 @@ public final class ContentStore: Sendable {
             try upsertPlan(db, plan, now: now)
         }
         try upsertGoals(db, change.goals, now: now)
+        try upsertBodyMeasurements(db, change.bodyMeasurements, now: now)
         for (id, reason) in change.activationEndReasons {
             try db.execute(sql: "UPDATE plan_activations SET end_reason = ?, dirty = 1 WHERE id = ? AND to_date IS NOT NULL",
                            arguments: [reason.rawValue, DBText.id(id)])
@@ -348,6 +355,30 @@ public final class ContentStore: Sendable {
         }
     }
 
+    static func upsertBodyMeasurements(_ db: Database, _ measurements: [BodyMeasurement], now: Date) throws {
+        for m in measurements {
+            try db.execute(
+                sql: """
+                    INSERT INTO body_measurements (id, kind, value, measured_at, created_at, updated_at, deleted_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET value = excluded.value, measured_at = excluded.measured_at,
+                        updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, dirty = 1
+                    """,
+                arguments: [DBText.id(m.id), m.kind.rawValue, NSDecimalNumber(decimal: m.value).stringValue, DBText.time(m.measuredAt),
+                            DBText.time(now), DBText.time(now), m.deletedAt.map(DBText.time)]
+            )
+        }
+    }
+
+    static func loadBodyMeasurements(_ db: Database) throws -> [BodyMeasurement] {
+        try Row.fetchAll(db, sql: "SELECT * FROM body_measurements WHERE deleted_at IS NULL ORDER BY measured_at DESC, rowid DESC").compactMap { row in
+            guard let id = UUID(uuidString: row["id"]), let kind = BodyMeasurementKind(rawValue: row["kind"]),
+                  let value = Decimal(string: row["value"], locale: Locale(identifier: "en_US_POSIX")),
+                  let measuredAt = DBText.date(row["measured_at"]) else { return nil }
+            return BodyMeasurement(id: id, kind: kind, value: value, measuredAt: measuredAt)
+        }
+    }
+
     static func upsertGoals(_ db: Database, _ goals: [PlanGoal], now: Date) throws {
         for goal in goals {
             try db.execute(
@@ -443,7 +474,7 @@ public final class ContentStore: Sendable {
         let goals = try String.fetchAll(db, sql: "SELECT json FROM plan_goals WHERE deleted_at IS NULL ORDER BY created_at, rowid")
             .map { try DBJSON.decode(PlanGoal.self, $0) }
         return LocalContent(catalog: catalog, plans: plans, history: attributed, recommendations: recommendations,
-                            audit: audit, settings: settings, goals: goals)
+                            audit: audit, settings: settings, goals: goals, bodyMeasurements: try loadBodyMeasurements(db))
     }
 
     static func loadPlans(_ db: Database) throws -> [WorkoutPlan] {

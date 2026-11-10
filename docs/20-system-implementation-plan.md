@@ -198,6 +198,14 @@ flowchart TB
 > - **Hoãn:** ghi lùi ngày (ADR-054), lọc theo môn.
 > - **Bằng chứng:** `evidence/IOS-017/README.md`.
 
+> **Trạng thái IOS-018 (2026-11-10):** code và test xong, chờ review. Không đổi API/contract (CON-007 đã duyệt).
+> - **Số đo cơ thể:** Cá nhân → "Số đo cơ thể": thẻ "Gần nhất" kèm chênh lệch có dấu so với lần trước (trung tính, không màu, không nhận xét), biểu đồ diễn biến, danh sách các lần đo (chạm để sửa, nút xoá có xác nhận). Nhập kg, bước ±0,1, thời điểm đo không chọn được tương lai; một nút "Lưu". Nhiều lần đo trong ngày được giữ.
+> - **Quy tắc:** `CaliDomain/BodyMeasurement.swift` (20..500 kg, tối đa 2 chữ số thập phân, từ chối chứ không làm tròn; `measuredAt` không sau hiện tại). Bảng `body_measurements` (migration `v4_body_measurements`, `value` là chuỗi thập phân chính xác, CHECK trùng contract, xoá mềm, cột đồng bộ `server_version`/`dirty`).
+> - **Riêng tư (ADR-064):** không công tắc chia sẻ; giá trị không vào audit (chỉ "Cân nặng"), không vào log, widget, Live Activity, thông báo hay AI. `tools/validate_ios_project_config.py` thất bại nếu `BodyMeasurement`/`bodyKg` xuất hiện trong `CaliActivityWidget`, `Shared`, `CaliApp/Services`.
+> - **Quyết định:** cân nặng luôn hiển thị bằng kg (ADR-063: đơn vị cố định theo kind); cài đặt kg/lb chỉ áp cho mức tạ.
+> - **Hoãn:** đồng bộ `body_measurement` (chờ lớp sync iOS), chỉ số `body` (ADR-065), opt-in chia sẻ sau pilot.
+> - **Bằng chứng:** `evidence/IOS-018/README.md`.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

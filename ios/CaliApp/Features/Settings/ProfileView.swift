@@ -24,6 +24,15 @@ struct ProfileView: View {
                         }
                     }
                     CardDivider()
+                    NavigationLink { BodyMeasurementsView() } label: {
+                        CardRow(systemImage: "scalemass", title: "Số đo cơ thể") {
+                            if let latest = store.weightEntries.first {
+                                Text(Fmt.bodyKg(latest.value)).font(.subheadline.monospacedDigit()).foregroundStyle(Color.caliSecondary)
+                            }
+                            Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+                        }
+                    }
+                    CardDivider()
                     NavigationLink { AuditLogView() } label: {
                         CardRow(systemImage: "list.bullet", title: "Nhật ký thay đổi") {
                             Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)

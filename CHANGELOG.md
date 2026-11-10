@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- IOS-018 body weight (iOS only; CON-007 is already accepted, no API/contract change).
+  - **Domain** (`BodyMeasurement.swift`): `BodyMeasurementKind` (weight, 20..500, 2 decimals), `BodyMeasurementRules` (more than 2 decimals refused, not rounded; future `measuredAt` refused; newest-first entries; change since the previous entry).
+  - **CaliCore:** migration `v4_body_measurements` (exact decimal text, contract CHECKs, soft delete, sync columns); `ContentChange.bodyMeasurements`.
+  - **App:** Profile → "Số đo cơ thể" (latest value with signed neutral change, Swift Charts trend, list with edit and confirmed delete, one "Lưu"); `saveBodyMeasurement`/`deleteBodyMeasurement` carry a `commandId` and an audit row without the value. Always kilograms, independent of the kg/lb load setting.
+  - **Privacy (ADR-064):** no share toggle; `validate_ios_project_config.py` fails if body measurement code appears in the widget, `Shared` or `Services`.
+  - **Tests:** CaliDomain 115, CaliCore 62, app 60.
+  - **DEBUG:** `-uiScenario body`, `-uiOpenEditor YES`.
 - IOS-017 history week/month and cross-plan summary (iOS only; no API/contract change).
   - **CaliCore** (`HistoryStats.swift`): `PeriodTotals` (sets and km kept separate), `HistoryPeriods` (same-elapsed-days comparison without today, first period, not-enough-days), `HistoryDayState` (done, stopped early, missed, today, planned), `WeekSummary` (done/scheduled, adherence = done ÷ due, per-plan lines, extra sessions).
   - **App:** History filter chips per plan (deleted plans labelled), missed rows (dashed, not tappable) and today's open row (opens Today), month grouped by week with done/scheduled, km tile; Profile "Tuần này" card sums every followed plan. `scheduledItems(includeEnded:)` keeps what was missed before a plan ended.

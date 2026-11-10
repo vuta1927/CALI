@@ -93,6 +93,9 @@ public enum CaliDatabase {
         migrator.registerMigration("v3_goals") { db in
             try db.execute(sql: goalsSchemaV3)
         }
+        migrator.registerMigration("v4_body_measurements") { db in
+            try db.execute(sql: bodyMeasurementsSchemaV4)
+        }
         return migrator
     }
 
@@ -135,6 +138,24 @@ public enum CaliDatabase {
             dirty INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX plan_goals_lineage ON plan_goals(plan_lineage_id);
+        """
+
+    /// IOS-018: CON-007 `body_measurements` (db/007). `value` is exact decimal text in kilograms (no float round
+    /// trip, no unit column, ADR-063); more than 2 decimals is refused here as well as in the domain. This table is
+    /// sensitive: it is only read by the app process, never through the App Group (ADR-064). Same sync columns as v2.
+    static let bodyMeasurementsSchemaV4 = """
+        CREATE TABLE body_measurements (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('weight')),
+            value TEXT NOT NULL CHECK (CAST(value AS REAL) BETWEEN 20 AND 500 AND value NOT GLOB '*.[0-9][0-9][0-9]*'),
+            measured_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            server_version INTEGER,
+            dirty INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX body_measurements_kind_measured ON body_measurements(kind, measured_at DESC) WHERE deleted_at IS NULL;
         """
 
     static let contentSchemaV2 = """
@@ -281,6 +302,8 @@ enum DBText {
     static func id(_ uuid: UUID) -> String { uuid.uuidString.lowercased() }
 
     static func time(_ date: Date) -> String { formatter().string(from: date) }
+
+    static func date(_ text: String) -> Date? { formatter().date(from: text) }
 
     private static func formatter() -> ISO8601DateFormatter {
         let f = ISO8601DateFormatter()

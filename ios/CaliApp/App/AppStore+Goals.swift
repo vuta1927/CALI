@@ -192,6 +192,8 @@ extension AppStore {
         case "indicatorId": "Chỉ số này không còn dùng được."
         case "target.value", "target.max": "Mức đích chưa hợp lệ."
         case "unlockAfterGoalId": "Thứ tự mở khoá tạo thành vòng lặp."
+        case "value": "Cân nặng cần từ 20 đến 500 kg, tối đa 2 chữ số thập phân."
+        case "measuredAt": "Thời điểm đo không được sau hiện tại."
         case "pinned": "Đã ghim \(GoalRules.pinnedLimit) mục tiêu. Bỏ ghim một mục tiêu khác trước."
         default: "Dữ liệu chưa hợp lệ (\(issue.field))."
         }

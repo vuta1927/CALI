@@ -17,6 +17,8 @@ enum DebugScenario: String {
     case gym, hold
     /// IOS-017 History across two plans: missed days, today's open session, a run session with kilometres.
     case history
+    /// IOS-018 body weight screen with eight entries over five weeks.
+    case body
 
     /// The store starts 10 days ago for `history`, so the plans have days that passed without a session.
     var seedNow: Date { self == .history ? Date().addingTimeInterval(-10 * 86_400) : Date() }
@@ -35,6 +37,12 @@ enum DebugScenario: String {
             return seedGoals(store)
         case .history:
             return seedHistory(store)
+        case .body:
+            let now = Date()
+            for (days, kg) in [(35, "74.2"), (28, "73.8"), (21, "73.5"), (14, "73.1"), (9, "72.9"), (4, "72.6"), (1, "72.4"), (0, "72.1")] {
+                _ = store.saveBodyMeasurement(BodyMeasurement(value: Decimal(string: kg)!, measuredAt: now.addingTimeInterval(-Double(days) * 86_400 - 900)), now: now)
+            }
+            return store.plans.first?.lineageId
         case .gym, .hold:
             let load = self == .gym
             let exerciseId = load ? MockData.backSquat : MockData.tuckPlanche

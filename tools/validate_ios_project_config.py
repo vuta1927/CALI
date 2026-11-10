@@ -23,6 +23,16 @@ def main() -> int:
     if "    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in lines:
         print("AppIcon setting must be target-scoped, not global", file=sys.stderr)
         return 1
+    # ADR-064 / docs/11: body measurements never reach the widget, the Live Activity or notifications.
+    leaks = []
+    for folder in ("ios/CaliActivityWidget", "ios/Shared", "ios/CaliApp/Services"):
+        for source in (ROOT / folder).rglob("*.swift"):
+            text = source.read_text(encoding="utf-8")
+            if any(word in text for word in ("BodyMeasurement", "body_measurement", "bodyMeasurements", "bodyKg")):
+                leaks.append(str(source.relative_to(ROOT)))
+    if leaks:
+        print("Body measurements must stay out of widget/Live Activity/notification code (ADR-064):\n- " + "\n- ".join(leaks), file=sys.stderr)
+        return 1
     print("XcodeGen COAMI asset settings valid")
     return 0
 

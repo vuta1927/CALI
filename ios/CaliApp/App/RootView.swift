@@ -68,6 +68,7 @@ struct RootView: View {
                 case .goals: NavigationStack { GoalsView(lineageId: id) }.environment(store)
                 case .roadmap: NavigationStack { RoadmapView(lineageId: id) }.environment(store)
                 case .progress: NavigationStack { PlanProgressView(lineageId: id) }.environment(store)
+                case .body: NavigationStack { BodyMeasurementsView() }.environment(store)
                 default: RaceResultSheet(plan: plan, plannedDistance: 10_000).environment(store)
                 }
             }
