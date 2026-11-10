@@ -1,4 +1,5 @@
 import CaliDomain
+import CryptoKit
 import Foundation
 import GRDB
 import XCTest
@@ -241,10 +242,36 @@ final class LiveServerTests: XCTestCase {
         XCTAssertEqual(cached, config)
     }
 
+    /// BE-006 end to end: the catalog lists a signed poster URL, the app downloads it through the same host, the hash matches,
+    /// and the file is the exercise's poster. Skips when the test server has no media yet.
+    func testPosterDownloadsFromTheServer() async throws {
+        _ = try api()
+        let base = URL(string: ProcessInfo.processInfo.environment["CALI_LIVE_BASE_URL"]!)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("live-media-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ContentStore(writer: try CaliDatabase.openInMemory())
+        try store.seedIfEmpty(.empty(), now: Date(), timeZone: TimeZone(identifier: "UTC")!)
+        let cache = ExerciseMediaCache(directory: directory)
+        try await ExerciseCatalogRefresher(api: URLSessionExerciseCatalogAPI(baseURL: base), store: store, media: cache).refresh()
+        let withPoster = try store.load().catalog.filter { $0.poster != nil }
+        if withPoster.isEmpty { throw XCTSkip("the test server lists no poster yet") }
+        for exercise in withPoster {
+            let reference = try XCTUnwrap(exercise.poster)
+            XCTAssertTrue(ExerciseMediaCache.isServerCached(reference), exercise.slug)
+            let data = try Data(contentsOf: directory.appendingPathComponent(reference.value))
+            XCTAssertFalse(data.isEmpty)
+            XCTAssertTrue(reference.value.contains(SHA256Hex.of(data)), "the file name is the hash of its bytes")
+        }
+    }
+
     private static func localDay(_ date: Date, _ zone: TimeZone) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
         let p = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", p.year!, p.month!, p.day!)
     }
+}
+
+private enum SHA256Hex {
+    static func of(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 }
