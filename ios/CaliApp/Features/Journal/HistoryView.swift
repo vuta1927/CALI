@@ -254,7 +254,7 @@ struct HistoryView: View {
         let scheduled = period.slots.count
         return VStack(alignment: .leading, spacing: Spacing.s) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: Spacing.m)], spacing: Spacing.m) {
-                StatTile(value: "\(totals.sessionsDone)", label: "Buổi hoàn thành", systemImage: "checkmark.circle", tint: .caliAccent)
+                StatTile(value: "\(totals.sessionsDone)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
                 StatTile(value: "\(totals.setsDone)", label: "Set đạt", systemImage: "square.stack.3d.up")
                 StatTile(value: "\(totals.minutes)", label: "Phút", systemImage: "clock")
                 // Kilometres are their own tile: sets and distance are never added together.

@@ -82,7 +82,7 @@ struct TodayView: View {
             Label("Chưa theo giáo án nào", systemImage: "calendar.badge.plus")
                 .font(.title3.bold())
                 .foregroundStyle(Color.caliText)
-            Text("Bắt đầu theo một giáo án để các buổi tập hiện ở đây. Bạn vẫn có thể thử nhanh bên dưới.")
+            Text("Bắt đầu theo một giáo án để các buổi tập hiện ở đây.")
                 .font(.subheadline)
                 .foregroundStyle(Color.caliSecondary)
             Button("Mở Giáo án", systemImage: "calendar") { tab = .plan }
@@ -96,7 +96,7 @@ struct TodayView: View {
             Label("Hôm nay là ngày nghỉ", systemImage: "moon.zzz")
                 .font(.title3.bold())
                 .foregroundStyle(Color.caliText)
-            Text("Nghỉ ngơi giúp cơ phục hồi. Bạn vẫn có thể tập buổi khác hoặc thử nhanh bên dưới.")
+            Text("Nghỉ ngơi giúp cơ phục hồi. Bạn vẫn có thể tập buổi khác.")
                 .font(.subheadline)
                 .foregroundStyle(Color.caliSecondary)
             if let next = store.nextScheduledDay(now: now), let item = next.items.first {

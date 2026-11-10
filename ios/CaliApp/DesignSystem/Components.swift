@@ -270,8 +270,11 @@ struct StatTile: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)
+                // One line, shrunk when it is long: every tile has the same height, in a stack or in a grid.
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .caliCard(padding: Spacing.m)
         .accessibilityElement(children: .combine)
     }
