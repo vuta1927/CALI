@@ -248,6 +248,71 @@ paths:
               schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
+  # CON-010 begin: voice pack (docs/02 §5, docs/10 §7; ADR-072, ADR-077, ADR-078).
+  /v1/voice-pack:
+    get:
+      tags: [Catalog]
+      summary: Published voice cue pack (pre-rendered TTS) for one locale
+      description: >-
+        CON-010 (ADR-077). Short spoken cues ("Hết giờ nghỉ. Vào set tiếp theo.") rendered once on the
+        server by the publisher TTS job (vbee.vn) and played by the device during a workout, also while
+        it is locked, as a local notification sound (ADR-078). Read-only publisher content with no user
+        data, so no authentication (like the catalog and criteria config). Without `version` returns the
+        latest published pack for `locale`; with `version` returns that published pack. A published pack
+        is immutable: changing a sentence or the voice publishes a new version. Audio URLs are short-lived
+        signed URLs (ADR-072); clients download every cue once, verify `sha256` and keep the files for
+        offline use, so `expiresAt` only bounds the download window. The strong ETag is
+        `"{locale}.v{version}"`; a matching `If-None-Match` returns 304 without a body. Anonymous, so it
+        is rate limited per client IP (429 with Retry-After).
+      operationId: getVoicePack
+      security: []
+      parameters:
+        - name: locale
+          in: query
+          required: true
+          description: 'BCP 47 tag. v1 publishes vi-VN only.'
+          schema: {$ref: '#/components/schemas/VoiceLocale'}
+        - name: version
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1}
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: {type: string, maxLength: 200}
+      responses:
+        '200':
+          description: The voice pack with freshly signed audio URLs
+          headers:
+            ETag:
+              description: Strong validator for locale + pack version.
+              schema: {type: string}
+            Cache-Control:
+              description: >-
+                `private, max-age=60`: the body carries signed URLs, so a shared cache must not keep it
+                past their lifetime; clients revalidate with If-None-Match and keep the downloaded audio.
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VoicePack'}
+        '304':
+          description: Not modified; the cached pack for this ETag is current.
+          headers:
+            ETag:
+              schema: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: >-
+            No pack is published for `locale`, or the requested `version` is not published
+            (`code` = `voice_pack_not_found`). Clients keep their cached pack or fall back to the
+            default notification sound.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  # CON-010 end
   /v1/plans:
     get:
       tags: [Plans]
@@ -1019,6 +1084,64 @@ components:
         v: {type: string, pattern: '^[a-z][a-z0-9_]{0,31}$', description: 'Stored value; never reused with another meaning.'}
         label: {type: string, minLength: 1, maxLength: 60}
         hint: {type: string, maxLength: 120}
+    # CON-010 begin: voice pack (ADR-077, ADR-078).
+    VoiceLocale:
+      type: string
+      pattern: '^[a-z]{2,3}-[A-Z]{2}$'
+      description: 'BCP 47 language-region tag. v1: vi-VN.'
+    VoiceCueKey:
+      type: string
+      pattern: '^[a-z][a-z0-9_]{0,31}(\.[a-z0-9_]{1,32}){1,3}$'
+      description: >-
+        Open vocabulary naming when the device plays the cue (ADR-078). v1 keys: rest.ending_10s,
+        rest.done, rest.done_next_exercise, hold.done, timed.halfway, timed.done, countdown.start,
+        session.done. A key keeps its meaning forever; a client skips keys it does not know and never
+        fails on them.
+    VoicePack:
+      type: object
+      description: >-
+        CON-010 (ADR-077). One published, immutable voice pack (db/011 voice_pack_versions +
+        voice_cues). `voice` is a display label of the TTS voice, never a provider credential.
+      required: [locale, version, publishedAt, voice, cues]
+      additionalProperties: false
+      properties:
+        locale: {$ref: '#/components/schemas/VoiceLocale'}
+        version: {type: integer, minimum: 1}
+        publishedAt: {type: string, format: date-time}
+        voice: {type: string, minLength: 1, maxLength: 60}
+        cues:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items: {$ref: '#/components/schemas/VoiceCue'}
+    VoiceCue:
+      type: object
+      description: >-
+        One spoken sentence. `text` is exactly what the audio says (shown as the notification body and
+        read by VoiceOver); keys are unique within a pack.
+      required: [key, text, audio]
+      additionalProperties: false
+      properties:
+        key: {$ref: '#/components/schemas/VoiceCueKey'}
+        text: {type: string, minLength: 1, maxLength: 80}
+        audio: {$ref: '#/components/schemas/VoiceCueAudio'}
+    VoiceCueAudio:
+      type: object
+      description: >-
+        CAF container, IMA4 mono, so iOS can play it in-app and as a UNNotificationSound (iOS caps
+        notification sounds at 30 s). `url` and `expiresAt` are null when the deployment has no object
+        storage (Development, ADR-072); the client then uses the default sound. `sha256` (lowercase hex)
+        covers the file bytes.
+      required: [url, expiresAt, format, sha256, byteSize, durationMs]
+      additionalProperties: false
+      properties:
+        url: {type: ['string', 'null'], format: uri}
+        expiresAt: {type: ['string', 'null'], format: date-time}
+        format: {type: string, enum: [caf_ima4]}
+        sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        byteSize: {type: integer, minimum: 1, maximum: 1048576}
+        durationMs: {type: integer, minimum: 1, maximum: 30000}
+    # CON-010 end
     GoalStatus:
       type: string
       enum: [active, reached, achieved, missed, archived]

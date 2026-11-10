@@ -365,6 +365,35 @@ try:
                     continue
                 if payload.get('criteriaVersion') not in criteria_versions or not set(payload['criteria']) <= valid_keys:
                     errors.append(f"{path.relative_to(ROOT).as_posix()} mutation {mutation['mutationId']} uses criteria outside fixtures/criteria_config.json")
+
+        # CON-010: the voice cue script (input of the BE-007 TTS job) stays in lockstep with OpenAPI
+        # VoiceLocale/VoiceCueKey/VoiceCue.text and the db/011 checks (ADR-077, ADR-078).
+        script = json.loads((ROOT / 'fixtures/voice_cues.vi-VN.json').read_text(encoding='utf-8'))
+        voice_sql = (ROOT / 'db/011_voice_packs.sql').read_text(encoding='utf-8')
+        key_pattern = schemas['VoiceCueKey']['pattern']
+        locale_pattern = schemas['VoiceLocale']['pattern']
+        text_max = schemas['VoiceCue']['properties']['text']['maxLength']
+        if f"cue_key ~ '{key_pattern}'" not in voice_sql:
+            errors.append('db/011 ck_voice_cues_key drifts from OpenAPI VoiceCueKey pattern')
+        if f"locale ~ '{locale_pattern}'" not in voice_sql:
+            errors.append('db/011 ck_voice_pack_versions_locale drifts from OpenAPI VoiceLocale pattern')
+        if f'char_length(text) BETWEEN 1 AND {text_max}' not in voice_sql:
+            errors.append('db/011 ck_voice_cues_text drifts from OpenAPI VoiceCue.text maxLength')
+        if not re.fullmatch(locale_pattern, script.get('locale', '')):
+            errors.append('fixtures/voice_cues.vi-VN.json locale does not match VoiceLocale')
+        script_keys = [c['key'] for c in script.get('cues', [])]
+        if len(script_keys) != len(set(script_keys)):
+            errors.append('fixtures/voice_cues.vi-VN.json has duplicate cue keys')
+        if len(script_keys) > schemas['VoicePack']['properties']['cues']['maxItems']:
+            errors.append('fixtures/voice_cues.vi-VN.json has more cues than VoicePack.cues maxItems')
+        documented_keys = set(re.findall(r'[a-z][a-z0-9_]*\.[a-z0-9_.]+', schemas['VoiceCueKey']['description'].split('v1 keys:')[1].split('. A key')[0]))
+        if set(script_keys) != documented_keys:
+            errors.append(f'fixtures/voice_cues.vi-VN.json keys {sorted(script_keys)} != OpenAPI VoiceCueKey v1 keys {sorted(documented_keys)}')
+        for cue in script.get('cues', []):
+            if not re.fullmatch(key_pattern, cue['key']):
+                errors.append(f"fixtures/voice_cues.vi-VN.json key {cue['key']} does not match VoiceCueKey")
+            if not 1 <= len(cue['text']) <= text_max:
+                errors.append(f"fixtures/voice_cues.vi-VN.json {cue['key']} text length outside 1..{text_max}")
 except ImportError:
     print('INFO: jsonschema unavailable; skipping JSON Schema semantic checks')
 except Exception as exc:

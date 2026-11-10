@@ -23,6 +23,7 @@
 - Media công khai (BE-006, ADR-072): file nằm trong object store S3-tương thích, không trong PostgreSQL. API chỉ cấp URL presigned GET hết hạn sau 15 phút (cấu hình 60..3600 giây) cho media `is_public` đã `reviewed_at`; URL chứa chữ ký và access key id, không chứa secret, và tên bucket cùng `storage_key` nằm trong path nên khoá phải mờ. Credential của API trên bucket chỉ cần quyền đọc; `Media__Storage__SecretAccessKey` là secret (biến môi trường hoặc user-secrets, không commit, không log, thông báo lỗi cấu hình chỉ nêu tên khoá). Ngoài Development endpoint bắt buộc `https`. Response catalog là `no-store` vì body chứa URL hết hạn; endpoint catalog vẫn ẩn danh và bị rate limit theo IP. Không có binary iOS nào giữ credential của store.
 
 ## 3. Observability
+- Voice pack (CON-010, ADR-077): `GET /v1/voice-pack` ẩn danh vì chỉ chứa nội dung bên phát hành; rate limit theo IP như catalog. Credential vbee (`Tts__Vbee__AppId`, `Tts__Vbee__Token`) chỉ có trên server/job BE-007, là secret (không commit, không log, lỗi cấu hình chỉ nêu tên khoá); app không bao giờ gọi vbee. Job chỉ gửi văn bản trong kịch bản đã duyệt, không bao giờ gửi dữ liệu người dùng (tên, ghi chú, số đo).
 Common correlation: `traceId`, `mutationId`, `sessionId` (UUID only, no name). Metrics:
 - Mobile: crash-free sessions, DB errors, queued outbox count/age, media cache hit, ActivityKit errors, notification permission ratio.
 - Server: API p50/p95 latency, push per-status counts, pull cursor lag, 5xx, DB transaction retries, worker queue age.

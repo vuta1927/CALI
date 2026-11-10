@@ -503,6 +503,41 @@ public sealed class PayloadContractTests : IClassFixture<OpenApiContractTests.Sp
         sql.ShouldContain("criteria ?| ARRAY[" + string.Join(", ", reserved.Select(r => $"'{r}'")) + "]");
     }
 
+    // ---- CON-010 voice pack ----
+
+    [Fact]
+    public void Voice_pack_is_a_public_read_only_endpoint_keyed_by_locale()
+    {
+        // ADR-077: publisher content, no user data; only the TTS job publishes, so GET only.
+        var path = _spec.Paths["/v1/voice-pack"]!;
+        path.Operations!.Keys.Select(m => m.Method).ShouldBe(["GET"]);
+        var operation = path.Operations[HttpMethod.Get];
+        operation.Security.ShouldNotBeNull();
+        operation.Security.ShouldBeEmpty();
+        operation.Parameters!.Select(p => p.Name).ShouldBe(["locale", "version", "If-None-Match"], ignoreOrder: true);
+        operation.Parameters!.Single(p => p.Name == "locale").Required.ShouldBeTrue();
+        operation.Responses!.Keys.ShouldBe(["200", "304", "400", "404", "429"], ignoreOrder: true);
+        operation.Responses["200"]!.Headers!.Keys.ShouldBe(["ETag", "Cache-Control"], ignoreOrder: true);
+        operation.Responses["200"]!.Content!["application/json"].Schema.ShouldBeOfType<OpenApiSchemaReference>()
+            .Reference.Id.ShouldBe("VoicePack");
+        Schema("VoicePack").Required!.ShouldBe(["locale", "version", "publishedAt", "voice", "cues"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Voice_cue_audio_never_exposes_the_storage_key_and_fits_a_notification_sound()
+    {
+        // ADR-072: only a signed URL leaves the server. ADR-078: iOS notification sounds are capped at 30 s.
+        var audio = Schema("VoiceCueAudio");
+        audio.Properties!.Keys.ShouldBe(["url", "expiresAt", "format", "sha256", "byteSize", "durationMs"], ignoreOrder: true);
+        audio.Properties["durationMs"].Maximum.ShouldBe("30000");
+        Values(audio.Properties["format"]).ShouldBe(["caf_ima4"]);
+        var sql = File.ReadAllText(Path.Combine(RepoPaths.DbDirectory, "011_voice_packs.sql"));
+        sql.ShouldContain("duration_ms BETWEEN 1 AND 30000");
+        sql.ShouldContain("format IN ('caf_ima4')");
+        sql.ShouldContain($"cue_key ~ '{Schema("VoiceCueKey").Pattern}'");
+        sql.ShouldContain("ck_voice_pack_immutable");
+    }
+
     private HashSet<string> Enum(string schema) => Values(Schema(schema));
 
     // Microsoft.OpenApi reads a YAML `null` enum member as a sentinel string; nullable enums keep only real values.
