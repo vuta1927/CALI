@@ -33,9 +33,11 @@ enum SyncPayloads {
             finishedAt = s.finishedAt ?? s.abandonedAt
             phaseStartedAt = s.phaseStartedAt
             phaseDeadlineAt = s.phaseDeadlineAt
-            let current = s.executions.indices.contains(s.currentExecutionIndex) ? s.executions[s.currentExecutionIndex] : nil
-            currentExecutionId = s.phase.isTerminal ? nil : current?.id
-            currentSetIndex = s.phase.isTerminal ? nil : s.currentSetIndex
+            // The server checks `currentExecutionId` before the write, and an execution needs its session first: sending the
+            // pointer on the create made each row wait for the other (found against the real server). The outbox only
+            // carries the create and the terminal state, so the live position stays on the device.
+            currentExecutionId = nil
+            currentSetIndex = nil
             pausedAt = s.phase == .paused ? s.pausedAt : nil
             accumulatedExerciseMs = s.accumulatedExerciseMs
             abandonReason = s.abandonReason

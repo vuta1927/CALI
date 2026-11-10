@@ -30,6 +30,7 @@ final class SyncPayloadConformanceTests: XCTestCase {
         XCTAssertFalse(executions.isEmpty)
         XCTAssertEqual(sets.count, 1)
         sessions.forEach { assertConforms($0, to: "workout_session_payload") }
+        XCTAssertTrue(sessions.allSatisfy { $0["currentExecutionId"] == nil || $0["currentExecutionId"] is NSNull }, "the pointer would wait for an execution that waits for the session")
         executions.forEach { assertConforms($0, to: "exercise_execution_payload") }
         sets.forEach { assertConforms($0, to: "set_result_payload") }
         XCTAssertEqual(sets[0]["actualHoldMs"] as? Int, 12_000)

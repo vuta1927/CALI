@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- IOS-007 fix found against a real test server (iOS only; no API/contract change).
+  - the session payload no longer carries `currentExecutionId`/`currentSetIndex`. The server checks that pointer before the write and an execution needs its session first, so every new session and its executions waited for each other (`dependency_missing` forever). Fake-API tests could not show this. Opt-in `LiveServerTests` (env `CALI_LIVE_BASE_URL`/`CALI_LIVE_TOKEN`, skipped otherwise) now covers session create → abandon → pull against a real server.
 - IOS-007 slice 3: content on the outbox, applying pulled content, conflict decisions (iOS only; no API/contract change).
   - **Push of content:** `ContentOutbox` queues dirty plans, activations, phases, workouts, planned exercises, goals and body measurements as contract payloads, parents first, in the same transaction as `ContentStore.apply` and at the start of each sync run (so bundled, imported and earlier rows go out once there is an account). A row whose payload equals the last one queued is not queued again; soft deletes send `{id, deletedAt}`; a workout or exercise removed from a plan sends a delete (children first) only if the server may know it; `dirty` is cleared when the acknowledgement still matches the row. `planned_workouts.focus` is not in the contract and stays on the device.
   - **Pull applies:** `ContentApplier` writes `sync_inbox` rows into the content tables (any order within a page; unknown parent, unknown exercise, undecodable target, out-of-range weight stay in the inbox). A change waits while this device has an edit of that entity in flight; stale changes (older than an acknowledged version) are dropped. The app reloads its content after an apply.
