@@ -15,7 +15,7 @@ enum AppTab: String, Hashable {
     /// DEBUG only: `-uiSkipWelcome YES` hides the first-launch sheet without changing stored settings.
     static var skipsWelcome: Bool {
         #if DEBUG
-        UserDefaults.standard.bool(forKey: "uiSkipWelcome")
+        UserDefaults.standard.bool(forKey: "uiSkipWelcome") || DebugScenario.launch != nil
         #else
         false
         #endif
@@ -28,6 +28,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = AppTab.launchTab
     @State private var debugRacePlan: UUID?
+    /// The welcome screen opens on every launch (not once per install); it is dismissed for the rest of the session.
+    @State private var showsWelcome = !AppTab.skipsWelcome
 
     var body: some View {
         @Bindable var store = store
@@ -87,11 +89,11 @@ struct RootView: View {
             }
         }
         #endif
-        .fullScreenCover(isPresented: welcomeBinding) {
+        .fullScreenCover(isPresented: $showsWelcome) {
             WelcomeView(showsSignIn: store.auth.isAvailable) {
-                store.updateSettings { $0.hasSeenWelcome = true }
+                store.updateSettings { $0.hasSeenWelcome = true }; showsWelcome = false
             } onSignIn: {
-                store.updateSettings { $0.hasSeenWelcome = true }
+                store.updateSettings { $0.hasSeenWelcome = true }; showsWelcome = false
                 tab = .profile
             }
             .interactiveDismissDisabled()
@@ -107,10 +109,6 @@ struct RootView: View {
         } message: {
             Text(store.alertMessage ?? "")
         }
-    }
-
-    private var welcomeBinding: Binding<Bool> {
-        Binding(get: { !store.settings.hasSeenWelcome && !AppTab.skipsWelcome }, set: { _ in })
     }
 
     private var alertBinding: Binding<Bool> {
