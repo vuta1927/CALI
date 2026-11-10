@@ -232,7 +232,7 @@ struct WeekDayDot: View {
                     .strokeBorder(isToday ? Color.caliAccent
                                   : (missed ? Color.caliSecondary
                                      : (scheduled ? Color.caliAccentInk : Color.caliSecondary.opacity(0.35))),
-                                  style: StrokeStyle(lineWidth: isToday ? 2 : (scheduled ? 1.5 : 1), dash: missed ? [3, 3] : []))
+                                  style: StrokeStyle(lineWidth: isToday ? 3 : (scheduled ? 1.5 : 1), dash: missed ? [3, 3] : []))
                 if completed {
                     Image(systemName: "checkmark")
                         .font(.caption.bold())
@@ -241,6 +241,10 @@ struct WeekDayDot: View {
                     Image(systemName: "minus")
                         .font(.caption2.bold())
                         .foregroundStyle(Color.caliSecondary)
+                } else if scheduled && !abandoned {
+                    Circle()
+                        .fill(Color.caliAccentInk)
+                        .frame(width: 6, height: 6)
                 } else if abandoned {
                     Image(systemName: "flag.fill")
                         .font(.caption2)
@@ -250,8 +254,11 @@ struct WeekDayDot: View {
             .frame(width: 32, height: 32)
             if let dateLabel {
                 Text(dateLabel)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Color.caliSecondary)
+                    .font(.caption.monospacedDigit().weight(isToday ? .bold : .regular))
+                    .foregroundStyle(isToday ? Color.caliOnAccent : Color.caliSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(isToday ? Color.caliAccent : Color.clear, in: Capsule())
             }
         }
         .frame(maxWidth: .infinity)
