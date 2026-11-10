@@ -4,7 +4,9 @@ import CaliCore
 import Foundation
 import OSLog
 import SwiftUI
-import UserNotifications
+// UNUserNotificationCenter's async getters return types Apple has not marked Sendable; under Swift 6 that
+// is an error on Xcode 16.4. Only counts, identifiers and fire dates are read from them below.
+@preconcurrency import UserNotifications
 
 /// IOS-012, dev build only (the whole file is compiled out of Release): database state, sync outbox, pending
 /// notifications, current Live Activity, the unified log of this process, dev API credentials, and an export.
