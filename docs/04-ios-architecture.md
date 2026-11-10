@@ -83,6 +83,7 @@ Triggers: app foreground, after local mutation, network path available, BGAppRef
 - Download videos on Wi-Fi by default with user override; use URLSession background configuration for downloads, AVPlayer for playback.
 - Cache index tracks state `NOT_PRESENT / DOWNLOADING / READY / FAILED`, bytes, SHA-256, lastAccessed, pinnedUntil.
 - Pin media for today/next workout; never evict pinned media while active session; fallback to poster + technique cues.
+- Voice pack (CON-010, ADR-077/078): fetched after catalog refresh with `If-None-Match`; each cue downloaded once, sha256-verified and copied to `Library/Sounds/cali-voice-{locale}-v{version}-{key}.caf` (the only folder `UNNotificationSound(named:)` reads); the previous version is kept until the new one is complete, then removed. `VoiceCueService` sits beside `NotificationService` in `SideEffects`: in foreground it plays the file, otherwise the cue rides on the scheduled notification.
 
 ## 7. Dependency direction
 `Features -> Application services -> Domain protocols <- Data/Infra`. Domain reducer must not import SwiftUI, WidgetKit, URLSession or LLM. Use dependency injection to allow a fake clock, mock notification scheduler, fake repository.

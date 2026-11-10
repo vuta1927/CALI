@@ -29,6 +29,11 @@
 | T-16 | logout/login another user | inspect session and sync | no cross-account history leak |
 | T-17 | wall-clock moved backward | during hold/rest and resume | detect discrepancy, do not invent actual hold |
 | T-18 | Large Dynamic Type | home/player/rest screen | primary actions visible and accessible |
+| T-19 | voice pack cached, phone locked in pocket | rest 60s ends | `rest.ending_10s` then `rest.done` audible once each; set/rest state unchanged until user acts (CON-010) |
+| T-20 | app foreground, music playing | hold target reached | `hold.done` plays once, music ducks then resumes; no duplicate from the notification |
+| T-21 | voice pack never downloaded / airplane mode | rest ends | default notification sound; workout unaffected |
+| T-22 | rest +30s / pause during rest | wait past old deadline | no cue at old deadline; cue at new deadline only |
+| T-23 | ringer switch silent, Focus on | locked rest ends | documented iOS behavior recorded in device matrix (ADR-078 limitation) |
 
 ## 3. Acceptance by epic
 - **Player**: all legal transitions + invalid transitions tested; no data loss with process termination after commit.

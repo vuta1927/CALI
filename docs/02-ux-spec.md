@@ -75,6 +75,24 @@ Open from preview/player/rest; timer continues; video loop muted by default; dow
 ### Final session confirmation
 After confirming the final planned set, navigate to `REVIEWING_SUMMARY`; user can add a note then tap `Finish Session`. Only then does session become `COMPLETED` and eligible for AI review.
 
+### 5.1 Voice cues (CON-010, ADR-077, ADR-078)
+Điện thoại thường nằm trong túi hoặc trên ghế/máy tập, nên mỗi cảnh báo có một câu nói ngắn. Câu là TTS sinh sẵn trên server và tải về máy (voice pack); cue chỉ nhắc, không bao giờ tự xác nhận kết quả.
+
+| Key | Câu (vi-VN v1) | Khi nào phát |
+|---|---|---|
+| `countdown.start` | Ba, hai, một, bắt đầu. | Đầu `preCountdown(3s)` khi bắt đầu set (chỉ khi bật countdown) |
+| `hold.done` | Đủ thời gian. Có thể thả. | Hold chạm mục tiêu; set vẫn chờ người dùng **Confirm** |
+| `timed.halfway` | Đã được một nửa. | Nửa thời gian của set có mục tiêu thời gian (timed_reps, interval, duration) ≥ 20 s |
+| `timed.done` | Hết giờ. Dừng lại. | Hết thời gian mục tiêu của set đó |
+| `rest.ending_10s` | Còn mười giây nghỉ. | Còn 10 s nghỉ, chỉ khi rest ≥ 20 s |
+| `rest.done` | Hết giờ nghỉ. Vào set tiếp theo. | Hết nghỉ, set kế tiếp cùng bài |
+| `rest.done_next_exercise` | Hết giờ nghỉ. Chuyển sang bài mới. | Hết nghỉ, bài kế tiếp khác bài |
+| `session.done` | Xong buổi tập. Làm tốt lắm. | Sau khi người dùng bấm `Finish Session` (chỉ foreground) |
+
+- Mỗi deadline đổi (`+30s`, pause, resume, bỏ set) thì huỷ và đặt lại cue cùng lúc với notification, không phát trùng.
+- Cài đặt: "Âm thanh nhắc" bật/tắt, độc lập với haptic; mặc định bật. Không có pack/file thì dùng âm báo mặc định.
+- Câu viết ngắn (≤ 80 ký tự, nên ≤ 3 giây), nói rõ việc cần làm; không chứa lời khuyên y tế.
+
 ### Session recovery
 On launch show "Tiếp tục buổi tập" and last stable state. Handle expired deadline: display `Đã hết thời gian — xác nhận kết quả` not auto-complete.
 

@@ -1,0 +1,13 @@
+{
+  "locale": "vi-VN",
+  "cues": [
+    {"key": "rest.ending_10s", "text": "Còn mười giây nghỉ."},
+    {"key": "rest.done", "text": "Hết giờ nghỉ. Vào set tiếp theo."},
+    {"key": "rest.done_next_exercise", "text": "Hết giờ nghỉ. Chuyển sang bài mới."},
+    {"key": "hold.done", "text": "Đủ thời gian. Có thể thả."},
+    {"key": "timed.halfway", "text": "Đã được một nửa."},
+    {"key": "timed.done", "text": "Hết giờ. Dừng lại."},
+    {"key": "countdown.start", "text": "Ba, hai, một, bắt đầu."},
+    {"key": "session.done", "text": "Xong buổi tập. Làm tốt lắm."}
+  ]
+}

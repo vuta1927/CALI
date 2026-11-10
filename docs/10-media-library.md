@@ -43,5 +43,9 @@ See [local data and QA rules](17-content-editing.md).
 - If offline video unavailable: display poster, text cues and optional re-download badge; workout remains usable.
 - Provide captions/alt descriptions, including side/front camera indication.
 
+## 5.1 Voice pack (CON-010, ADR-077)
+- Spoken workout cues are pre-rendered TTS audio (vbee.vn) published as an immutable voice pack per `(locale, version)` (db/011). The sentence script is `fixtures/voice_cues.vi-VN.json`; the publisher job (BE-007) renders, converts to CAF IMA4 mono (≤ 30 s, ≤ 1 MB), stores under an opaque key such as `voice/{locale}/v{version}/{key}.caf` and publishes all cues in one transaction.
+- `GET /v1/voice-pack?locale=vi-VN` returns the pack with signed URLs (ADR-072) and sha256; the client keeps only the verified files, never the URLs. Without object storage (Development) `url` is null and the client uses the default sound.
+
 ## 6. Media acquisition acceptance
 The demo fixture exercises `Tuck Planche`, `Pull-up`, `Dips`, `L-sit`, `Squat`, `Ring Support` may ship with **explicitly marked placeholder assets** until licenses/production videos are secured. Never claim placeholders are exercise-correct without technique review.
