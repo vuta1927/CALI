@@ -10,6 +10,7 @@
 
 ## 2. Controls
 - Sign in with Apple token validation: issuer, audience, signature via current JWKS, expiry, nonce; map verified `sub` to user; issue short-lived API JWT + rotated refresh token.
+  - Implemented in BE-005 (ADR-071): RS256 only; nonce = lowercase hex SHA-256 of the raw nonce the app sends, and a nonce works once; refresh tokens are opaque, stored only as SHA-256, single use, and a reused one revokes its whole session; every refusal is one generic 401 and the reason is logged as a code only (never a token, nonce or Apple `sub`); access tokens are not checked against the database, so a revoked session lives at most one access-token lifetime (15 minutes). Secrets: `Auth__AccessTokenSigningKey` (new). CI runs gitleaks and `dotnet list package --vulnerable --include-transitive` (`security.yml`).
 - Backend accepts authenticated user ID only from validated token; all queries scoped, rate limited, action authorization enforced server-side. Validate `entityId` foreign keys belong to same user.
 - HTTPS TLS; no disabled certificate validation in release; ATS enforced.
 - iOS Keychain for refresh/access tokens (where stored); appropriate file protection for local DB. Locked widget extension access must be security-tested; design minimum shared data.

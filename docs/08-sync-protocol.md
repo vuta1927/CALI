@@ -102,6 +102,7 @@ The entity version is always `serverVersion` on the change, never a payload fiel
 - Keep client UUIDs; push guest entities as new to authenticated user, map local account scope, do not coalesce by title/date.
 - If user has cloud data: pull to local, flag only true UUID conflicts, retain local unsynced rows until ack.
 - On sign-out: stop sync immediately, revoke tokens, allow keep/delete guest-local data choice; avoid data leakage between accounts.
+- Session tokens (BE-005, ADR-071): `POST /v1/auth/apple` returns an access token (15 minutes) and a single-use refresh token. The client must send refreshes one at a time and keep only the newest refresh token, because presenting a spent one (including a retry after a lost response) revokes the whole session and the user signs in with Apple again. A sync pull or push that answers 401 means the access token expired: refresh once, then retry the same request. There is no server-side sign-out endpoint yet; sign-out today means the client forgets its tokens (the refresh token stays valid until it expires).
 
 ## 7. Deletes and retention
 - Every delete writes a tombstone with `deletedAt`, never hard-delete while unsynced.

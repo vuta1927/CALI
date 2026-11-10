@@ -58,6 +58,8 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 
 **BE-006 (2026-11-10, PO duyệt ADR-072):** catalog trả `url` presigned (AWS SigV4, object store S3-tương thích như Cloudflare R2) cùng `urlExpiresAt` cho media công khai đã duyệt; hạn mặc định 15 phút, response `no-store`. Đã kiểm chứng với một server S3-tương thích thật; **chưa thử với R2/S3 thật**. Chưa có công cụ ingestion (upload file, tạo `exercise_media`), nên môi trường chưa có media thì `url` vẫn null. Secret mới `Media__Storage__SecretAccessKey` (và endpoint, bucket, access key id) ngoài Development.
 
+**B4 (2026-11-10, PO duyệt ADR-071):** BE-005 có `POST /v1/auth/apple` và `POST /v1/auth/refresh`: kiểm tra token Apple (RS256, JWKS cache, `iss`/`aud`/`exp`/nonce), nonce dùng một lần, access JWT 15 phút ký bằng secret mới `Auth__AccessTokenSigningKey`, refresh token một lần dùng, chỉ lưu hash, dùng lại ⇒ revoke cả phiên. Mọi từ chối là cùng một 401. Thêm gitleaks và quét package có lỗ hổng (`security.yml`). Chưa thử với token Apple thật (`TODO(BE-004-APPLE)`), chưa có đăng xuất/thu hồi và gắn dữ liệu guest (IOS-008).
+
 | Task | Owner | Depends | Output / DoD |
 |---|---|---|---|
 | BE-001 | BE | CON-001 | .NET modular monolith, auth stubs/prod validation, OpenAPI implementation |

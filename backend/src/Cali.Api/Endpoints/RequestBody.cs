@@ -16,8 +16,8 @@ internal static class RequestBody
                 && media.MediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)))
         && (media.Charset.Length == 0 || media.Charset.Equals("utf-8", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Reads at most <see cref="MaxBodyBytes"/>; null when the body is larger (chunked uploads have no Content-Length).</summary>
-    internal static async Task<byte[]?> ReadAsync(Stream body, CancellationToken cancellationToken)
+    /// <summary>Reads at most <paramref name="maxBytes"/> (default <see cref="MaxBodyBytes"/>); null when the body is larger (chunked uploads have no Content-Length).</summary>
+    internal static async Task<byte[]?> ReadAsync(Stream body, CancellationToken cancellationToken, int maxBytes = MaxBodyBytes)
     {
         ArgumentNullException.ThrowIfNull(body);
         using var buffer = new MemoryStream();
@@ -25,7 +25,7 @@ internal static class RequestBody
         int read;
         while ((read = await body.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            if (buffer.Length + read > MaxBodyBytes)
+            if (buffer.Length + read > maxBytes)
             {
                 return null;
             }

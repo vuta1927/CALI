@@ -50,6 +50,7 @@ internal static class CaliApi
         services.AddScoped<SyncPush>();
         services.AddCaliSyncPull();
         services.AddCaliAuthentication();
+        services.AddCaliAuthSessions();
         services.AddCaliRateLimiting();
         services.AddCaliTelemetry(builder.Configuration);
 
@@ -77,6 +78,7 @@ internal static class CaliApi
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains(ReadyTag) })
             .AllowAnonymous().DisableRateLimiting();
 
+        app.MapAuthEndpoints();
         app.MapMeEndpoints();
         app.MapCatalogEndpoints();
         app.MapPlanEndpoints();

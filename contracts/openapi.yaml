@@ -22,6 +22,14 @@ paths:
     post:
       tags: [Identity]
       summary: Exchange validated Apple identity token for application tokens
+      description: >-
+        BE-005, ADR-071. The server checks the Apple identity token (RS256 signature against Apple's published keys,
+        issuer `https://appleid.apple.com`, audience = the app bundle id, expiry and the `nonce` claim) and maps its
+        `sub` to a user, creating one on the first sign-in. `nonce` is the RAW random string; the app must give Apple
+        its lowercase hex SHA-256 as the authorization request nonce, because Apple copies that value into the token
+        and the server compares it with the hash of `nonce`. A nonce works once: replaying a token or reusing a
+        nonce is 401. Every refusal is the same 401 with no reason. The response is never cached. Anonymous, rate
+        limited per client IP. 503 means Apple's keys could not be fetched; retry later.
       security: []
       operationId: authenticateWithApple
       requestBody:
@@ -37,14 +45,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request body is larger than 16 KiB
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not application/json
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Apple's signing keys cannot be fetched, or Sign in with Apple is not configured; retry later
+          headers:
+            Retry-After:
+              description: Delay before retry in seconds
+              schema: {type: integer, minimum: 1}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
   /v1/auth/refresh:
     post:
       tags: [Identity]
       summary: Rotate refresh token
+      description: >-
+        BE-005, ADR-071. Every refresh token works once: the response carries the next one and the presented one is
+        spent. Presenting a spent token again (a replay, or a client that retried after losing the response) revokes
+        the whole session, so the client must send one refresh at a time and keep the newest token. Unknown, expired,
+        revoked, reused and malformed tokens are all the same 401 with no reason. `deviceId`, when the session was
+        started with one, must match it. The response is never cached. Anonymous (the refresh token is the credential),
+        rate limited per client IP.
       operationId: refreshAuthToken
       security: []
       requestBody:
@@ -60,8 +96,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request body is larger than 16 KiB
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '415':
+          description: Content-Type is not application/json
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/me:
@@ -550,22 +598,33 @@ components:
       type: object
       required: [identityToken, nonce]
       properties:
-        identityToken: {type: string, minLength: 10}
-        nonce: {type: string, minLength: 8}
-        deviceId: {type: string, format: uuid}
+        identityToken: {type: string, minLength: 10, maxLength: 8192}
+        nonce:
+          type: string
+          minLength: 8
+          maxLength: 256
+          description: Raw random string. The app gives Apple its lowercase hex SHA-256 (ADR-071).
+        deviceId:
+          type: string
+          format: uuid
+          description: The sync device id; a later refresh that sends a different one is refused.
     RefreshTokenRequest:
       type: object
       required: [refreshToken]
       properties:
-        refreshToken: {type: string, minLength: 10}
+        refreshToken: {type: string, minLength: 10, maxLength: 128}
         deviceId: {type: string, format: uuid}
     AuthTokens:
       type: object
       required: [accessToken, refreshToken, expiresInSeconds, user]
       properties:
-        accessToken: {type: string}
-        refreshToken: {type: string}
-        expiresInSeconds: {type: integer, minimum: 1}
+        accessToken:
+          type: string
+          description: Short-lived bearer JWT (15 minutes by default). Sessions are not checked per request, so a revoked session stays usable until this expires.
+        refreshToken:
+          type: string
+          description: Opaque single-use token (43 characters). Store only the newest one (Keychain).
+        expiresInSeconds: {type: integer, minimum: 1, description: Lifetime of `accessToken`.}
         user: {$ref: '#/components/schemas/UserProfile'}
     UserProfile:
       type: object
