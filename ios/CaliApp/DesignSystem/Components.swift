@@ -255,12 +255,15 @@ struct StatTile: View {
     let label: String
     var systemImage: String?
     var tint: Color = .caliText
+    @ScaledMetric(relativeTo: .body) private var iconHeight: CGFloat = 24
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             if let systemImage {
+                // Symbols differ in height; a fixed frame keeps the value and the label on one line across tiles.
                 Image(systemName: systemImage)
                     .foregroundStyle(tint)
+                    .frame(height: iconHeight, alignment: .leading)
             }
             Text(value)
                 .font(.title2.bold().monospacedDigit())
