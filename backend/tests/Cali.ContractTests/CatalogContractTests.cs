@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Cali.Api.Endpoints;
 using Cali.Application.Catalog;
 using Cali.Domain.Catalog;
+using Cali.Infrastructure.Media;
 using Cali.Tests.Shared;
 using Microsoft.OpenApi;
 
@@ -42,7 +43,54 @@ public sealed class CatalogContractTests : IClassFixture<OpenApiContractTests.Sp
 
         SchemaValidator.ShouldMatch(json, Schema("ExercisePage"), "ExercisePage");
         json.GetRawText().ShouldNotContain("internal/key");
-        json.GetProperty("items")[0].GetProperty("media")[0].GetProperty("url").ValueKind.ShouldBe(JsonValueKind.Null);
+        // No signer (no object storage): url and urlExpiresAt are both null, never a storage key.
+        var item = json.GetProperty("items")[0].GetProperty("media")[0];
+        item.GetProperty("url").ValueKind.ShouldBe(JsonValueKind.Null);
+        item.GetProperty("urlExpiresAt").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void Signed_media_urls_match_the_schema_and_expire_with_urlExpiresAt()
+    {
+        var signer = new S3PresignedUrlSigner(new S3StorageOptions
+        {
+            Endpoint = new Uri("https://store.example.com"),
+            Bucket = "cali-media",
+            Region = "auto",
+            AccessKeyId = "AKIATESTKEY",
+            SecretAccessKey = "contract-test-secret-value",
+            Lifetime = TimeSpan.FromMinutes(15),
+        });
+        var issuedAt = new DateTimeOffset(2026, 11, 9, 12, 0, 0, TimeSpan.Zero);
+        var media = new CatalogMedia(Guid.NewGuid(), "poster", 2, "internal/key/poster-v2.webp", "image/webp", new string('a', 64), 2048, null, "CC-BY-4.0", null);
+        var unsignable = new CatalogMedia(Guid.NewGuid(), "preview", 1, "../escape", "video/mp4", new string('b', 64), null, 8000, "CC-BY-4.0", null);
+        var page = new ExercisePageResponse([ExerciseResponse.From(Exercise("static_hold", [media, unsignable]), signer, issuedAt)], NextCursor: null, HasMore: false);
+
+        var json = JsonSerializer.SerializeToElement(page, Web);
+
+        SchemaValidator.ShouldMatch(json, Schema("ExercisePage"), "ExercisePage");
+        var items = json.GetProperty("items")[0].GetProperty("media");
+        var signed = items[0];
+        signed.GetProperty("url").GetString().ShouldStartWith("https://store.example.com/cali-media/internal/key/poster-v2.webp?X-Amz-Algorithm=");
+        signed.GetProperty("urlExpiresAt").GetDateTimeOffset().ShouldBe(issuedAt.AddMinutes(15));
+        // A key the server will not sign degrades to "no url", with a matching null expiry.
+        items[1].GetProperty("url").ValueKind.ShouldBe(JsonValueKind.Null);
+        items[1].GetProperty("urlExpiresAt").ValueKind.ShouldBe(JsonValueKind.Null);
+        json.GetRawText().ShouldNotContain("contract-test-secret-value");
+        json.GetRawText().ShouldNotContain("../escape");
+    }
+
+    [Fact]
+    public void The_spec_documents_signed_urls_with_an_expiry_and_no_storage_key()
+    {
+        var media = Schema("ExerciseMedia");
+
+        media.Properties!.Keys.ShouldContain("url");
+        media.Properties.Keys.ShouldContain("urlExpiresAt");
+        media.Required!.ShouldNotContain("url");
+        media.Required!.ShouldNotContain("urlExpiresAt");
+        media.Properties.Keys.ShouldNotContain("storageKey");
+        media.Properties["urlExpiresAt"].Format.ShouldBe("date-time");
     }
 
     [Fact]

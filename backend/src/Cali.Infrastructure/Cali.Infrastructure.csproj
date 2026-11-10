@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Cali.UnitTests" />
+    <InternalsVisibleTo Include="Cali.IntegrationTests" />
   </ItemGroup>
 </Project>
