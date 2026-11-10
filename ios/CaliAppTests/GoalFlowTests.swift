@@ -133,7 +133,11 @@ final class GoalFlowTests: XCTestCase {
     @MainActor
     func testProgressAndAdherenceComeFromSavedSets() throws {
         let store = try makeStore()
-        let pair = try repsItem(store)
+        var pair = try repsItem(store)
+        // The session counts for adherence only on the workout's scheduled day, so schedule it for today
+        // (otherwise this test passes or fails depending on the weekday it runs on).
+        pair.workout.weekday = store.today().isoWeekday
+        XCTAssertTrue(store.updateWorkout(pair.workout, in: store.starterPlan.lineageId))
         _ = try record(store, pair, reps: 9)
         let row = try XCTUnwrap(store.exerciseProgress(of: store.starterPlan).first { $0.exercise.id == pair.item.exerciseId })
         XCTAssertEqual(row.summary.current, 9)

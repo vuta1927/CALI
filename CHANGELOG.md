@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- IOS-017 history week/month and cross-plan summary (iOS only; no API/contract change).
+  - **CaliCore** (`HistoryStats.swift`): `PeriodTotals` (sets and km kept separate), `HistoryPeriods` (same-elapsed-days comparison without today, first period, not-enough-days), `HistoryDayState` (done, stopped early, missed, today, planned), `WeekSummary` (done/scheduled, adherence = done ÷ due, per-plan lines, extra sessions).
+  - **App:** History filter chips per plan (deleted plans labelled), missed rows (dashed, not tappable) and today's open row (opens Today), month grouped by week with done/scheduled, km tile; Profile "Tuần này" card sums every followed plan. `scheduledItems(includeEnded:)` keeps what was missed before a plan ended.
+  - **Tests:** CaliCore 59, app 54 (simulator + iPhone 15). `GoalFlowTests` adherence test no longer depends on the weekday.
+  - **DEBUG:** `-uiScenario history`, `-uiScrollEnd YES`.
 - IOS-016 gym load and dynamic set form (iOS only; CON-006 and CON-008 are already accepted, no API/contract change).
   - **Domain** (`Criteria.swift`): `CriteriaConfig` (bundled v1 equals `fixtures/criteria_config.json`, `resolve(cached:)` falls back to it), `applicable(exerciseId:type:)`, `CriteriaValidation` (known tokens, ≤ 20 keys, ≤ 8192 bytes, reserved keys refused), `WeightUnit` kg/lb conversion. `ConfirmSet`/`SetActuals` carry `painReported`, `criteriaVersion`, `criteria` (both-or-neither).
   - **CaliCore:** `LoggedSet` and `AppSettings.weightUnit` (old settings JSON decodes as kg).

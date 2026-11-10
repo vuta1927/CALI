@@ -11,6 +11,16 @@ struct ScheduledItem: Identifiable, Hashable {
 
     var id: String { "\(plan.lineageId)|\(workout.id)|\(date)" }
     var isDone: Bool { outcome == .completed }
+    var slot: ScheduleSlot {
+        ScheduleSlot(lineageId: plan.lineageId, planTitle: plan.title, workoutTitle: workout.title, date: date, outcome: outcome)
+    }
+}
+
+/// A plan the History filter offers (IOS-017); a deleted plan keeps its sessions and shows "(đã xoá)" (MP-10).
+struct HistoryPlanOption: Identifiable, Hashable {
+    let lineageId: UUID
+    let title: String
+    var id: UUID { lineageId }
 }
 
 /// What to do with another followed plan so a new one fits under the limit (MP-04, docs/19 §4.3).
@@ -114,11 +124,14 @@ extension AppStore {
     // MARK: Schedule across plans
 
     /// Planned workouts of every plan on `from...through`, I4 outcomes included, sorted by day then plan order.
-    func scheduledItems(from: LocalDate, through: LocalDate, now: Date = Date()) -> [ScheduledItem] {
+    /// `includeEnded` adds ended and archived plans for their past days, so History can show what was missed
+    /// before a plan ended. Future days always come from plans still followed.
+    func scheduledItems(from: LocalDate, through: LocalDate, includeEnded: Bool = false, now: Date = Date()) -> [ScheduledItem] {
         let today = today(now)
         let refs = completedRefs()
         var ranked: [(rank: Int, item: ScheduledItem)] = []
-        for (rank, plan) in visiblePlans.enumerated() where plan.endedAt == nil && plan.archivedAt == nil {
+        for (rank, plan) in visiblePlans.enumerated() where includeEnded || (plan.endedAt == nil && plan.archivedAt == nil) {
+            let isLive = plan.endedAt == nil && plan.archivedAt == nil
             var days: [(workoutId: UUID, date: LocalDate, outcome: PlannedOccurrence.Outcome)] = []
             if from <= today {
                 let adherence = PlanSchedule.adherence(lineageId: plan.lineageId, program: plan.program, activations: plan.activations,
@@ -128,7 +141,7 @@ extension AppStore {
                 }
             }
             let futureFrom = max(from, today.adding(days: 1))
-            if futureFrom <= through {
+            if isLive, futureFrom <= through {
                 let future = PlanSchedule.occurrences(program: plan.program, activations: plan.activations, slots: plan.slots,
                                                       from: futureFrom, through: through)
                 for occurrence in future { days.append((occurrence.plannedWorkoutId, occurrence.date, .pending)) }
@@ -143,6 +156,29 @@ extension AppStore {
             return lhs.rank < rhs.rank
         }
         return ranked.map(\.item)
+    }
+
+    /// Plans the History filter lists: every plan with recorded sessions, plus plans still followed.
+    func historyPlanOptions(now: Date = Date()) -> [HistoryPlanOption] {
+        var seen = Set<UUID>()
+        var options: [HistoryPlanOption] = []
+        let withSessions = Set(history.compactMap(\.planLineageId))
+        let candidates = followedPlans(now: now).map(\.lineageId)
+            + visiblePlans.map(\.lineageId).filter(withSessions.contains)
+            + history.compactMap(\.planLineageId)
+        for lineage in candidates where seen.insert(lineage).inserted {
+            guard let plan = plan(lineage) else { continue }
+            options.append(HistoryPlanOption(lineageId: lineage, title: plan.deletedAt == nil ? plan.title : "\(plan.title) (đã xoá)"))
+        }
+        return options
+    }
+
+    /// The "Tuần này" card: planned sessions of every followed plan against what was recorded (docs/19 §8).
+    func weekSummary(now: Date = Date()) -> WeekSummary {
+        let today = today(now)
+        let monday = monday(of: today)
+        let slots = scheduledItems(from: monday, through: monday.adding(days: 6), now: now).map(\.slot)
+        return WeekSummary(slots: slots, sessions: sessionsThisWeek(now: now), today: today)
     }
 
     func scheduledItems(on day: LocalDate, now: Date = Date()) -> [ScheduledItem] {

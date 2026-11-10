@@ -240,6 +240,8 @@ struct WeekDayDot: View {
     let scheduled: Bool
     var dateLabel: String?
     var abandoned = false
+    /// Scheduled in the past and not done: a dashed outline with a dash, never red (UX-10).
+    var missed = false
 
     var body: some View {
         VStack(spacing: Spacing.s) {
@@ -250,11 +252,16 @@ struct WeekDayDot: View {
                 Circle()
                     .fill(completed ? Color.caliAccent : ((scheduled || abandoned) ? Color.caliSurfaceRaised : Color.clear))
                 Circle()
-                    .strokeBorder(isToday ? Color.caliAccent : Color.caliSurfaceRaised, lineWidth: isToday ? 2 : 1)
+                    .strokeBorder(isToday ? Color.caliAccent : (missed ? Color.caliSecondary : Color.caliSurfaceRaised),
+                                  style: StrokeStyle(lineWidth: isToday ? 2 : 1, dash: missed ? [3, 3] : []))
                 if completed {
                     Image(systemName: "checkmark")
                         .font(.caption.bold())
                         .foregroundStyle(Color.caliOnAccent)
+                } else if missed {
+                    Image(systemName: "minus")
+                        .font(.caption2.bold())
+                        .foregroundStyle(Color.caliSecondary)
                 } else if abandoned {
                     Image(systemName: "flag.fill")
                         .font(.caption2)
@@ -270,7 +277,7 @@ struct WeekDayDot: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(Fmt.weekdayLong(day)): \(completed ? "đã tập" : abandoned ? "dừng sớm" : (scheduled ? "có lịch" : "nghỉ"))")
+        .accessibilityLabel("\(Fmt.weekdayLong(day)): \(completed ? "đã tập" : abandoned ? "dừng sớm" : missed ? "bỏ lỡ" : (scheduled ? "có lịch" : "nghỉ"))")
     }
 }
 

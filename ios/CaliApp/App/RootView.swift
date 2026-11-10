@@ -41,7 +41,7 @@ struct RootView: View {
                 NavigationStack { CatalogView() }
             }
             Tab("Lịch sử", systemImage: "chart.line.uptrend.xyaxis", value: AppTab.history) {
-                NavigationStack { HistoryView() }
+                NavigationStack { HistoryView(tab: $tab) }
             }
             Tab("Cá nhân", systemImage: "person.crop.circle", value: AppTab.profile) {
                 NavigationStack { ProfileView(tab: $tab) }

@@ -189,6 +189,15 @@ flowchart TB
 > - **Hoãn:** tải cấu hình có ETag và cache (`TODO(IOS-007)`, backend chưa sẵn sàng); lọc theo `focusTags` chờ PO chốt bộ tag.
 > - **Bằng chứng:** `evidence/IOS-016/README.md`.
 
+> **Trạng thái IOS-017 (2026-11-10):** code và test xong, chờ review. Không đổi API/contract.
+> - **Lịch sử tuần/tháng (UX-10):** nhìn qua mọi giáo án; thanh lọc "Tất cả" + từng giáo án (giáo án đã xoá vẫn lọc được, nhãn "(đã xoá)"). Trạng thái ngày: hoàn thành, dừng sớm (cảnh báo, không đỏ), **bỏ lỡ** (theo lịch giáo án nhưng không có buổi hoàn thành; viền nét đứt, không bấm được), **hôm nay** (còn mở, bấm để sang Hôm nay), ngày tương lai chỉ là chấm. Trạng thái không chỉ dựa vào màu (icon, kiểu viền). Tháng nhóm theo tuần kèm "x/y buổi", chạm một ngày để lọc.
+> - **Tổng kỳ và so sánh:** buổi, set, phút và km là các ô riêng, không cộng set với km. Kỳ đang diễn ra so với **cùng số ngày đã trôi qua** của kỳ trước và không tính hôm nay; kỳ cũ nhất ghi "Kỳ đầu tiên có dữ liệu"; ngày đầu của kỳ chưa có gì để so thì nói rõ. Dòng "Theo lịch x/y" chỉ đếm buổi trong lịch; buổi tự do không tính vào lịch.
+> - **Thẻ "Tuần này" ở Cá nhân:** buổi xong/lịch, phút, km, chuyên cần chung (xong ÷ đến hạn: ngày đã qua và buổi đã xong; buổi bỏ lỡ chỉ hạ con số, không tô đỏ), mỗi giáo án một dòng ("Calisthenics 3/3"), "thêm n buổi ngoài lịch" nếu có.
+> - **Quy tắc:** logic thuần trong `CaliCore/HistoryStats.swift` (`PeriodTotals`, `HistoryPeriods`, `HistoryDayState`, `WeekSummary`), có test; lịch bỏ lỡ lấy từ `PlanSchedule.adherence` (I4), gồm cả giáo án đã kết thúc cho các ngày đã qua.
+> - **Sửa test:** `GoalFlowTests.testProgressAndAdherenceComeFromSavedSets` (IOS-015) phụ thuộc thứ trong tuần; nay xếp buổi tập vào ngày hôm nay.
+> - **Hoãn:** ghi lùi ngày (ADR-054), lọc theo môn.
+> - **Bằng chứng:** `evidence/IOS-017/README.md`.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

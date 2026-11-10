@@ -350,3 +350,12 @@ extension Fmt {
         day.year == currentYear ? "\(day.day)/\(day.month)" : "\(day.day)/\(day.month)/\(day.year)"
     }
 }
+
+extension LocalDate {
+    /// Midnight of this calendar day in `timeZone`.
+    func startOfDay(in timeZone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? Date(timeIntervalSince1970: 0)
+    }
+}

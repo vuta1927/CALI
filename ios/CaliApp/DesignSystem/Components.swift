@@ -265,6 +265,8 @@ struct StatTile: View {
             Text(value)
                 .font(.title2.bold().monospacedDigit())
                 .foregroundStyle(Color.caliText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)

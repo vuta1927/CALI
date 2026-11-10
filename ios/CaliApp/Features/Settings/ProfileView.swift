@@ -1,10 +1,10 @@
+import CaliCore
 import CaliDomain
 import SwiftUI
 
 /// "Cá nhân" tab (UX-10, mockup `profile`): this week, AI + audit entries, workout settings, data, app.
 ///
-/// The mockup's per-discipline breakdown (Calisthenics / Chạy / Gym) needs multi-plan and running
-/// (IOS-015/016); the week card shows the recorded sessions only.
+/// The week card sums every followed plan and breaks the schedule down per plan (IOS-017).
 struct ProfileView: View {
     @Environment(AppStore.self) private var store
     @Binding var tab: AppTab
@@ -100,28 +100,51 @@ struct ProfileView: View {
         }
     }
 
+    /// "Tuần này" across every followed plan (IOS-017): sessions done / scheduled, minutes, km, adherence and a line per plan.
+    /// Sets are not shown here: a set count and a distance are never added together.
     private var weekCard: some View {
         let now = Date()
-        let done = store.sessionsThisWeek(now: now)
-        let monday = store.monday(of: store.today(now))
-        let scheduled = store.scheduledItems(from: monday, through: monday.adding(days: 6), now: now).count
+        let week = store.weekSummary(now: now)
         var calendar = Calendar.current
         calendar.firstWeekday = 2
-        let week = calendar.dateInterval(of: .weekOfYear, for: now)
+        let interval = calendar.dateInterval(of: .weekOfYear, for: now)
         return VStack(alignment: .leading, spacing: Spacing.m) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Tuần này").font(.headline).foregroundStyle(Color.caliText)
                 Spacer()
-                if let week {
-                    Text(Fmt.range(week.start, week.end.addingTimeInterval(-1)))
+                if let interval {
+                    Text(Fmt.range(interval.start, interval.end.addingTimeInterval(-1)))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(Color.caliSecondary)
                 }
             }
             HStack(spacing: Spacing.m) {
-                StatTile(value: "\(done.count)/\(scheduled)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
-                StatTile(value: "\(done.reduce(0) { $0 + $1.durationMinutes })", label: "Phút", systemImage: "clock")
-                StatTile(value: "\(done.reduce(0) { $0 + $1.completedSetCount })", label: "Set", systemImage: "square.stack.3d.up")
+                StatTile(value: "\(week.done)/\(week.scheduled)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
+                StatTile(value: "\(week.minutes)", label: "Phút", systemImage: "clock")
+                if week.distanceMeters > 0 {
+                    StatTile(value: Fmt.km(week.distanceMeters), label: "Quãng đường", systemImage: "figure.run")
+                }
+            }
+            if let percent = week.adherencePercent {
+                Text("Chuyên cần chung \(percent)%\(week.extraSessions > 0 ? " · thêm \(week.extraSessions) buổi ngoài lịch" : "")")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(Color.caliSecondary)
+            } else if week.extraSessions > 0 {
+                Text("\(week.extraSessions) buổi ngoài lịch").font(.footnote).foregroundStyle(Color.caliSecondary)
+            }
+            if week.perPlan.count > 1 {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    ForEach(week.perPlan) { line in
+                        HStack {
+                            Label(line.title, systemImage: "calendar").lineLimit(1)
+                            Spacer()
+                            Text("\(line.done)/\(line.scheduled)").monospacedDigit()
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(Color.caliSecondary)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
             }
             Button("Xem trong Lịch sử") { tab = .history }
                 .buttonStyle(.caliLink)

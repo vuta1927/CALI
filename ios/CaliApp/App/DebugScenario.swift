@@ -15,6 +15,11 @@ enum DebugScenario: String {
     case overview, goals, roadmap, progress
     /// IOS-016 set result form of a gym load set / a calisthenics hold, with the criteria of the bundled config.
     case gym, hold
+    /// IOS-017 History across two plans: missed days, today's open session, a run session with kilometres.
+    case history
+
+    /// The store starts 10 days ago for `history`, so the plans have days that passed without a session.
+    var seedNow: Date { self == .history ? Date().addingTimeInterval(-10 * 86_400) : Date() }
 
     static var launch: DebugScenario? { UserDefaults.standard.string(forKey: "uiScenario").flatMap(Self.init(rawValue:)) }
 
@@ -28,6 +33,8 @@ enum DebugScenario: String {
         switch self {
         case .overview, .goals, .roadmap, .progress:
             return seedGoals(store)
+        case .history:
+            return seedHistory(store)
         case .gym, .hold:
             let load = self == .gym
             let exerciseId = load ? MockData.backSquat : MockData.tuckPlanche
@@ -49,6 +56,37 @@ enum DebugScenario: String {
             _ = store.startPlan(id, from: today)
             return id
         }
+    }
+
+    /// A second plan "Chạy bán marathon" followed since the store's start, plus one completed run session today.
+    @MainActor
+    private func seedHistory(_ store: AppStore) -> UUID? {
+        let past = seedNow
+        guard let run = store.createPlan(PlanDraft(title: "Chạy bán marathon", discipline: .running), now: past) else { return nil }
+        let workouts = [1, 3, 5, 7].map { weekday in
+            PlannedWorkout(id: UUID(), weekday: weekday, title: weekday == 7 ? "Chạy dài 12 km" : "Chạy nhẹ 8 km", focus: "",
+                           exercises: [PlannedExercise(id: UUID(), exerciseId: MockData.easyRun, setCount: 1,
+                                                       target: .distance(distanceMeters: weekday == 7 ? 12_000 : 8_000, durationSeconds: nil), restSeconds: 0)])
+        }
+        for workout in workouts { _ = store.updateWorkout(workout, in: run) }
+        _ = store.startPlan(run, from: store.today(past), now: past)
+        // One run today: linked to the plan's workout when it is scheduled today, otherwise a free run.
+        let linked = workouts.first { $0.weekday == store.today().isoWeekday }
+        let item = (linked ?? workouts[0]).exercises[0]
+        let sessionId = UUID()
+        let spec = ExecutionSpec(id: UUID(), plannedExerciseId: item.id, exerciseId: item.exerciseId, catalogVersion: MockData.catalogVersion,
+                                 setCount: 1, target: item.target, restSeconds: 0)
+        let commands: [Command] = [
+            .createSession(CreateSession(commandId: UUID(), sessionId: sessionId, plannedWorkoutId: linked?.id, executions: [spec])),
+            .startSet(StartSet(commandId: UUID(), countdownSeconds: 0)), .stopSet(SimpleCommand(commandId: UUID())),
+            .confirmSet(ConfirmSet(commandId: UUID(), setResultId: UUID(), executionId: spec.id, setIndex: 1, status: .completed,
+                                   actualDistanceMeters: 8_250, actualDurationSeconds: 2_538)),
+            .finishSession(SimpleCommand(commandId: UUID())),
+        ]
+        _ = try? store.recordSession(commands, sessionTitle: linked?.title ?? "Chạy nhẹ 8 km",
+                                     audit: AuditEntry(id: UUID(), at: Date(), action: "Ghi buổi tập", detail: "Chạy nhẹ"))
+        store.reloadContent()
+        return nil
     }
 
     /// Phases, three goals (a pinned one that the recorded session reaches, a pinned one still pursued, a

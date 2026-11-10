@@ -1,28 +1,37 @@
+import CaliCore
 import CaliDomain
 import SwiftUI
 
-/// "Lịch sử" tab (UX-08, mockup `history`): week / month view of recorded sessions.
+/// "Lịch sử" tab (UX-10, mockup `history`): week / month view of sessions across every plan, with a plan filter.
 ///
-/// Only recorded sessions are shown. "Bỏ lỡ" days and the per-plan filter need plan activation
-/// history and running sessions, which come with IOS-015/016; until then nothing is inferred.
+/// Sessions are a log, independent of plans (docs/02 §3.1). Missed days come from the plan schedule
+/// (`PlanSchedule.adherence`, I4), shown dashed and not tappable; "today" opens Today; future days are dots only.
 struct HistoryView: View {
     @Environment(AppStore.self) private var store
+    @Binding var tab: AppTab
     @State private var mode: Mode = .week
     @State private var weekOffset = 0
     @State private var monthOffset = 0
     @State private var selectedDay: Date?
+    /// Plan lineage to show; nil = "Tất cả" (cross-plan totals).
+    @State private var planFilter: UUID?
 
     enum Mode: Hashable { case week, month }
 
     private var calendar: Calendar {
         var c = Calendar(identifier: .gregorian)
         c.firstWeekday = 2
+        c.timeZone = store.calendar.timeZone
         c.locale = Fmt.vi
         return c
     }
 
+    private var kind: HistoryPeriodKind { mode == .week ? .week : .month }
+
     var body: some View {
         let now = Date()
+        let options = store.historyPlanOptions(now: now)
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
                 Picker("Chế độ xem", selection: $mode) {
@@ -31,11 +40,23 @@ struct HistoryView: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: mode) { selectedDay = nil }
+                if options.count > 1 { filterBar(options) }
                 if mode == .week { weekView(now: now) } else { monthView(now: now) }
                 SampleFooter(showsSample: store.showsSampleData)
+                Color.clear.frame(height: 1).id("history-end")
             }
             .padding(.horizontal, Spacing.l)
             .padding(.bottom, Spacing.xl)
+        }
+        #if DEBUG
+        // `-uiScrollEnd YES` scrolls to the bottom for screenshots of the list below the summary.
+        .task {
+            if UserDefaults.standard.bool(forKey: "uiScrollEnd") {
+                try? await Task.sleep(for: .seconds(1))
+                withAnimation(nil) { proxy.scrollTo("history-end", anchor: .bottom) }
+            }
+        }
+        #endif
         }
         .caliScreen()
         .navigationTitle("Lịch sử")
@@ -45,152 +66,213 @@ struct HistoryView: View {
                 ToolbarItem(placement: .primaryAction) { MockBadge() }
             }
         }
+        .onChange(of: options) { _, new in
+            if let id = planFilter, !new.contains(where: { $0.lineageId == id }) { planFilter = nil }
+        }
     }
 
-    // MARK: Periods
+    private func filterBar(_ options: [HistoryPlanOption]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s) {
+                FilterChip(title: "Tất cả", isSelected: planFilter == nil) { planFilter = nil }
+                ForEach(options) { option in
+                    FilterChip(title: option.title, isSelected: planFilter == option.lineageId) {
+                        planFilter = planFilter == option.lineageId ? nil : option.lineageId
+                    }
+                }
+            }
+        }
+        .accessibilityLabel("Lọc theo giáo án")
+    }
+
+    // MARK: Data of a period
+
+    /// Sessions and planned workouts of `interval`, narrowed to the plan filter.
+    private struct PeriodData {
+        var sessions: [CompletedSession]
+        var slots: [ScheduleSlot]
+    }
+
+    private func local(_ date: Date) -> LocalDate { LocalDate.today(at: date, in: calendar.timeZone) }
+
+    private func matchesFilter(_ session: CompletedSession) -> Bool { planFilter == nil || session.planLineageId == planFilter }
 
     private func sessions(_ interval: DateInterval) -> [CompletedSession] {
-        store.history.filter { $0.startedAt >= interval.start && $0.startedAt < interval.end }.sorted { $0.startedAt > $1.startedAt }
+        store.history.filter { matchesFilter($0) && $0.startedAt >= interval.start && $0.startedAt < interval.end }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
-    private func week(_ offset: Int, now: Date) -> DateInterval {
-        let current = calendar.dateInterval(of: .weekOfYear, for: now)!
-        let start = calendar.date(byAdding: .weekOfYear, value: -offset, to: current.start)!
-        return DateInterval(start: start, end: calendar.date(byAdding: .day, value: 7, to: start)!)
+    private func data(_ interval: DateInterval, now: Date) -> PeriodData {
+        let last = local(interval.end.addingTimeInterval(-1))
+        let slots = store.scheduledItems(from: local(interval.start), through: last, includeEnded: true, now: now)
+            .map(\.slot).filter { planFilter == nil || $0.lineageId == planFilter }
+        return PeriodData(sessions: sessions(interval), slots: slots)
     }
 
-    private func month(_ offset: Int, now: Date) -> DateInterval {
-        let current = calendar.dateInterval(of: .month, for: now)!
-        let start = calendar.date(byAdding: .month, value: -offset, to: current.start)!
-        return calendar.dateInterval(of: .month, for: start)!
+    private func state(of day: Date, in data: PeriodData, now: Date) -> HistoryDayState {
+        let date = local(day)
+        return HistoryDayState.of(
+            day: date,
+            sessions: data.sessions.filter { calendar.isDate($0.startedAt, inSameDayAs: day) },
+            slots: data.slots.filter { $0.date == date },
+            today: store.today(now))
     }
 
-    /// Oldest offset that still has data (navigation stops there).
-    private func maxOffset(_ component: Calendar.Component, now: Date) -> Int {
-        guard let oldest = store.history.map(\.startedAt).min() else { return 0 }
-        let a = calendar.dateInterval(of: component, for: oldest)!.start
-        let b = calendar.dateInterval(of: component, for: now)!.start
-        return max(0, calendar.dateComponents([component], from: a, to: b).value(for: component) ?? 0)
-    }
+    private var oldestSession: Date? { store.history.map(\.startedAt).min() }
 
     // MARK: Week
 
     @ViewBuilder
     private func weekView(now: Date) -> some View {
-        let interval = week(weekOffset, now: now)
-        let list = sessions(interval)
+        let interval = HistoryPeriods.interval(.week, offset: weekOffset, now: now, calendar: calendar)
+        let period = data(interval, now: now)
         let days = (0..<7).map { calendar.date(byAdding: .day, value: $0, to: interval.start)! }
         let subtitle = weekOffset == 0 ? "Tuần này" : weekOffset == 1 ? "Tuần trước" : "\(weekOffset) tuần trước"
+        let maxOffset = HistoryPeriods.maxOffset(.week, oldest: oldestSession, now: now, calendar: calendar)
         PeriodNavigator(title: Fmt.range(interval.start, days[6]), subtitle: subtitle,
-                        canGoBack: weekOffset < maxOffset(.weekOfYear, now: now), canGoForward: weekOffset > 0) { step in
+                        canGoBack: weekOffset < maxOffset, canGoForward: weekOffset > 0) { step in
             weekOffset += step
         }
         HStack(spacing: 0) {
             ForEach(days, id: \.self) { day in
-                let state = dayState(day, in: list)
+                let st = state(of: day, in: period, now: now)
                 WeekDayDot(day: Fmt.isoWeekday(day, calendar: calendar), isToday: calendar.isDate(day, inSameDayAs: now),
-                           completed: state == .done, scheduled: state == .planned,
-                           dateLabel: "\(calendar.component(.day, from: day))", abandoned: state == .partial)
+                           completed: st == .done, scheduled: st == .planned || st == .today,
+                           dateLabel: "\(calendar.component(.day, from: day))", abandoned: st == .stoppedEarly, missed: st == .missed)
             }
         }
         .caliCard(padding: Spacing.m)
-        summary(list, comparison: weekComparison(now: now))
-        sessionList(title: "Các buổi tập", list, empty: weekOffset == 0 ? "Tuần này chưa có buổi tập nào" : "Tuần này không có buổi tập nào")
-    }
-
-    /// Current week: compare Mon…yesterday with the same days last week (today may not be trained yet).
-    private func weekComparison(now: Date) -> Comparison? {
-        let cur = week(weekOffset, now: now)
-        guard weekOffset < maxOffset(.weekOfYear, now: now) else { return nil }
-        let prev = week(weekOffset + 1, now: now)
-        if weekOffset == 0 {
-            let today = calendar.startOfDay(for: now)
-            let days = calendar.dateComponents([.day], from: cur.start, to: today).day ?? 0
-            let prevEnd = calendar.date(byAdding: .day, value: days, to: prev.start)!
-            let label = days == 0 ? "tuần trước" : "cùng kỳ tuần trước (T2–\(Fmt.weekdayShort(days)))"
-            return Comparison(current: sessions(DateInterval(start: cur.start, end: today)),
-                              previous: sessions(DateInterval(start: prev.start, end: prevEnd)), label: label)
-        }
-        return Comparison(current: sessions(cur), previous: sessions(prev), label: "tuần trước")
+        summary(period, comparison: comparisonText(now: now))
+        entryList(title: "Các buổi tập", entries(period, now: now),
+                  empty: weekOffset == 0 ? "Tuần này chưa có buổi tập nào" : "Tuần này không có buổi tập nào")
     }
 
     // MARK: Month
 
     @ViewBuilder
     private func monthView(now: Date) -> some View {
-        let interval = month(monthOffset, now: now)
-        let list = sessions(interval)
+        let interval = HistoryPeriods.interval(.month, offset: monthOffset, now: now, calendar: calendar)
+        let period = data(interval, now: now)
         let subtitle = monthOffset == 0 ? "Tháng này" : monthOffset == 1 ? "Tháng trước" : " "
         let c = calendar.dateComponents([.month, .year], from: interval.start)
+        let maxOffset = HistoryPeriods.maxOffset(.month, oldest: oldestSession, now: now, calendar: calendar)
         PeriodNavigator(title: "Tháng \(c.month ?? 0), \(String(c.year ?? 0))", subtitle: subtitle,
-                        canGoBack: monthOffset < maxOffset(.month, now: now), canGoForward: monthOffset > 0) { step in
+                        canGoBack: monthOffset < maxOffset, canGoForward: monthOffset > 0) { step in
             monthOffset += step
             selectedDay = nil
         }
-        MonthGrid(interval: interval, calendar: calendar, now: now, selected: $selectedDay) { dayState($0, in: list) }
-        summary(list, comparison: monthComparison(now: now))
+        MonthGrid(interval: interval, calendar: calendar, now: now, selected: $selectedDay) { state(of: $0, in: period, now: now) }
+        summary(period, comparison: comparisonText(now: now))
         if let day = selectedDay {
-            let dayList = list.filter { calendar.isDate($0.startedAt, inSameDayAs: day) }
+            let dayData = PeriodData(sessions: period.sessions.filter { calendar.isDate($0.startedAt, inSameDayAs: day) },
+                                     slots: period.slots.filter { $0.date == local(day) })
+            let list = entries(dayData, now: now)
             VStack(alignment: .leading, spacing: Spacing.m) {
                 HStack(alignment: .firstTextBaseline) {
                     SectionHeader(title: "\(Fmt.weekdayLong(Fmt.isoWeekday(day, calendar: calendar))), \(Fmt.dayMonthShort(day))")
                     Button("Xem cả tháng") { selectedDay = nil }.buttonStyle(.caliLink)
                 }
-                if dayList.isEmpty { EmptyPeriod(text: "Ngày nghỉ, không có buổi tập") }
-                ForEach(dayList) { HistoryRow(session: $0) }
+                if list.isEmpty { EmptyPeriod(text: "Ngày nghỉ, không có buổi tập") }
+                ForEach(list) { entryRow($0) }
             }
         } else {
-            let weeks = Dictionary(grouping: list) { calendar.dateInterval(of: .weekOfYear, for: $0.startedAt)!.start }
-            if weeks.isEmpty { EmptyPeriod(text: monthOffset == 0 ? "Tháng này chưa có buổi tập nào" : "Tháng này không có buổi tập nào") }
+            let list = entries(period, now: now)
+            if list.isEmpty { EmptyPeriod(text: monthOffset == 0 ? "Tháng này chưa có buổi tập nào" : "Tháng này không có buổi tập nào") }
+            let weeks = Dictionary(grouping: list) { calendar.dateInterval(of: .weekOfYear, for: $0.date(in: calendar))!.start }
             ForEach(weeks.keys.sorted(by: >), id: \.self) { start in
                 let end = calendar.date(byAdding: .day, value: 6, to: start)!
-                sessionList(title: Fmt.range(start, end), weeks[start, default: []], empty: "")
+                let slots = period.slots.filter { $0.date >= local(start) && $0.date <= local(end) }
+                let done = (weeks[start] ?? []).filter { $0.isDoneSession }.count
+                // Month view groups by week and shows done/scheduled per week (docs/02 §3.1).
+                entryList(title: Fmt.range(start, end), weeks[start, default: []], empty: "",
+                          trailing: slots.isEmpty ? nil : "\(done)/\(slots.count) buổi")
             }
         }
     }
 
-    private func monthComparison(now: Date) -> Comparison? {
-        guard monthOffset < maxOffset(.month, now: now) else { return nil }
-        let cur = month(monthOffset, now: now)
-        let prev = month(monthOffset + 1, now: now)
-        if monthOffset == 0 {
-            let today = calendar.startOfDay(for: now)
-            let days = calendar.dateComponents([.day], from: cur.start, to: today).day ?? 0
-            let prevEnd = min(calendar.date(byAdding: .day, value: days, to: prev.start)!, prev.end)
-            let pm = calendar.component(.month, from: prev.start)
-            let label = days == 0 ? "tháng trước" : "cùng kỳ tháng trước (1–\(days)/\(pm))"
-            return Comparison(current: sessions(DateInterval(start: cur.start, end: today)),
-                              previous: sessions(DateInterval(start: prev.start, end: prevEnd)), label: label)
+    // MARK: Entries
+
+    /// A row of the list: a recorded session, a scheduled one that was missed, or today's that is still open.
+    private enum Entry: Identifiable {
+        case session(CompletedSession)
+        case missed(ScheduleSlot)
+        case today(ScheduleSlot)
+
+        var id: String {
+            switch self {
+            case .session(let s): "s-\(s.id)"
+            case .missed(let s): "m-\(s.lineageId)-\(s.date)-\(s.workoutTitle)"
+            case .today(let s): "t-\(s.lineageId)-\(s.date)-\(s.workoutTitle)"
+            }
         }
-        return Comparison(current: sessions(cur), previous: sessions(prev), label: "tháng trước")
+
+        var isDoneSession: Bool {
+            if case .session(let s) = self { return s.status == .completed }
+            return false
+        }
+
+        func date(in calendar: Calendar) -> Date {
+            switch self {
+            case .session(let s): s.startedAt
+            case .missed(let s), .today(let s): s.date.startOfDay(in: calendar.timeZone)
+            }
+        }
     }
 
-    // MARK: Shared pieces
-
-    private func dayState(_ day: Date, in list: [CompletedSession]) -> DayState {
-        let onDay = list.filter { calendar.isDate($0.startedAt, inSameDayAs: day) }
-        if onDay.contains(where: { $0.status == .completed }) { return .done }
-        if !onDay.isEmpty { return .partial }
-        let today = calendar.startOfDay(for: Date())
-        let local = LocalDate.today(at: day, in: calendar.timeZone)
-        if day >= today, !store.scheduledItems(on: local).isEmpty { return .planned }
-        return .none
+    private func entries(_ period: PeriodData, now: Date) -> [Entry] {
+        let today = store.today(now)
+        var list = period.sessions.map(Entry.session)
+        for slot in period.slots {
+            if slot.outcome == .missed { list.append(.missed(slot)) }
+            if slot.outcome == .pending, slot.date == today { list.append(.today(slot)) }
+        }
+        return list.sorted { $0.date(in: calendar) > $1.date(in: calendar) }
     }
 
-    private func summary(_ list: [CompletedSession], comparison: Comparison?) -> some View {
-        let done = list.filter { $0.status == .completed }
-        let abandoned = list.count - done.count
+    @ViewBuilder
+    private func entryRow(_ entry: Entry) -> some View {
+        switch entry {
+        case .session(let session): HistoryRow(session: session)
+        case .missed(let slot): MissedRow(slot: slot)
+        case .today(let slot): TodayRow(slot: slot) { tab = .today }
+        }
+    }
+
+    @ViewBuilder
+    private func entryList(title: String, _ list: [Entry], empty: String, trailing: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            SectionHeader(title: title, trailing: trailing ?? "\(list.filter { if case .session = $0 { true } else { false } }.count) buổi")
+            if list.isEmpty && !empty.isEmpty { EmptyPeriod(text: empty) }
+            ForEach(list) { entryRow($0) }
+        }
+    }
+
+    // MARK: Totals and comparison
+
+    private func summary(_ period: PeriodData, comparison: String) -> some View {
+        let totals = PeriodTotals(period.sessions)
+        let scheduled = period.slots.count
         return VStack(alignment: .leading, spacing: Spacing.s) {
-            HStack(spacing: Spacing.m) {
-                StatTile(value: "\(done.count)", label: "Buổi hoàn thành", systemImage: "checkmark.circle", tint: .caliAccent)
-                StatTile(value: "\(list.reduce(0) { $0 + $1.completedSetCount })", label: "Set đạt", systemImage: "square.stack.3d.up")
-                StatTile(value: "\(list.reduce(0) { $0 + $1.durationMinutes })", label: "Phút", systemImage: "clock")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: Spacing.m)], spacing: Spacing.m) {
+                StatTile(value: "\(totals.sessionsDone)", label: "Buổi hoàn thành", systemImage: "checkmark.circle", tint: .caliAccent)
+                StatTile(value: "\(totals.setsDone)", label: "Set đạt", systemImage: "square.stack.3d.up")
+                StatTile(value: "\(totals.minutes)", label: "Phút", systemImage: "clock")
+                // Kilometres are their own tile: sets and distance are never added together.
+                if totals.distanceMeters > 0 {
+                    StatTile(value: Fmt.km(totals.distanceMeters), label: "Quãng đường", systemImage: "figure.run")
+                }
             }
             VStack(alignment: .leading, spacing: 2) {
-                if abandoned > 0 {
-                    Text("\(abandoned) dừng sớm").font(.footnote).foregroundStyle(Color.caliSecondary)
+                if scheduled > 0 {
+                    // Planned sessions only: a free session is not counted against the schedule.
+                    Text("Theo lịch: \(period.slots.filter { $0.outcome == .completed }.count)/\(scheduled) buổi")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(Color.caliSecondary)
                 }
-                Text(comparison?.text ?? "Kỳ đầu tiên có dữ liệu")
+                if totals.sessionsStoppedEarly > 0 {
+                    Text("\(totals.sessionsStoppedEarly) dừng sớm").font(.footnote).foregroundStyle(Color.caliSecondary)
+                }
+                Text(comparison)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(Color.caliSecondary)
             }
@@ -198,31 +280,103 @@ struct HistoryView: View {
         }
     }
 
-    @ViewBuilder
-    private func sessionList(title: String, _ list: [CompletedSession], empty: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            SectionHeader(title: title, trailing: "\(list.count) buổi")
-            if list.isEmpty && !empty.isEmpty { EmptyPeriod(text: empty) }
-            ForEach(list) { HistoryRow(session: $0) }
+    /// docs/02 §3.1: the period in progress is compared with the same elapsed days of the one before, today left out.
+    private func comparisonText(now: Date) -> String {
+        let offset = mode == .week ? weekOffset : monthOffset
+        let oldest = store.history.filter(matchesFilter).map(\.startedAt).min()
+        switch HistoryPeriods.comparison(kind, offset: offset, oldest: oldest, now: now, calendar: calendar) {
+        case .firstPeriod:
+            return "Kỳ đầu tiên có dữ liệu"
+        case .notEnoughDays:
+            return "Chưa có ngày nào trôi qua để so với \(mode == .week ? "tuần" : "tháng") trước"
+        case .compare(let current, let previous, let days):
+            let label: String
+            if let days {
+                if mode == .week {
+                    label = "cùng kỳ tuần trước (T2–\(Fmt.weekdayShort(days)))"
+                } else {
+                    label = "cùng kỳ tháng trước (1–\(days)/\(calendar.component(.month, from: previous.start)))"
+                }
+            } else {
+                label = mode == .week ? "tuần trước" : "tháng trước"
+            }
+            let a = PeriodTotals(sessions(current)), b = PeriodTotals(sessions(previous))
+            var parts = ["\(Self.signed(a.sessionsDone - b.sessionsDone)) buổi", "\(Self.signed(a.setsDone - b.setsDone)) set",
+                         "\(Self.signed(a.minutes - b.minutes)) phút"]
+            if a.distanceMeters > 0 || b.distanceMeters > 0 {
+                parts.append("\(Self.signedKm(a.distanceMeters - b.distanceMeters))")
+            }
+            return "So với \(label): " + parts.joined(separator: " · ")
         }
-    }
-}
-
-enum DayState { case none, done, partial, planned }
-
-private struct Comparison {
-    let current: [CompletedSession]
-    let previous: [CompletedSession]
-    let label: String
-
-    var text: String {
-        let d = current.filter { $0.status == .completed }.count - previous.filter { $0.status == .completed }.count
-        let s = current.reduce(0) { $0 + $1.completedSetCount } - previous.reduce(0) { $0 + $1.completedSetCount }
-        let m = current.reduce(0) { $0 + $1.durationMinutes } - previous.reduce(0) { $0 + $1.durationMinutes }
-        return "So với \(label): \(Self.signed(d)) buổi · \(Self.signed(s)) set · \(Self.signed(m)) phút"
     }
 
     static func signed(_ n: Int) -> String { n > 0 ? "+\(n)" : n < 0 ? "−\(-n)" : "±0" }
+
+    static func signedKm(_ meters: Int) -> String {
+        meters == 0 ? "±0 km" : (meters > 0 ? "+" : "−") + Fmt.km(abs(meters))
+    }
+}
+
+/// A planned session whose day passed with no completed session: dashed, not tappable, never red (UX-10).
+private struct MissedRow: View {
+    @Environment(AppStore.self) private var store
+    let slot: ScheduleSlot
+
+    var body: some View {
+        HStack(spacing: Spacing.m) {
+            Image(systemName: "minus.circle")
+                .font(.title3)
+                .foregroundStyle(Color.caliSecondary)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(slot.workoutTitle).font(.headline).foregroundStyle(Color.caliText).lineLimit(1)
+                Text("\(Fmt.weekdayLong(slot.date.isoWeekday)), \(Fmt.dayMonthShort(slot.date.startOfDay(in: store.calendar.timeZone)))")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(Color.caliSecondary)
+                HStack(spacing: 6) {
+                    TagChip(text: "Bỏ lỡ", systemImage: "minus")
+                    Label(slot.planTitle, systemImage: "calendar").font(.caption).foregroundStyle(Color.caliSecondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.m)
+        .overlay {
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .strokeBorder(Color.caliSecondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Bỏ lỡ: \(slot.workoutTitle), giáo án \(slot.planTitle)")
+    }
+}
+
+/// Today's planned session that has not been done; opens the Today tab.
+private struct TodayRow: View {
+    let slot: ScheduleSlot
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: "figure.run.circle")
+                    .font(.title3)
+                    .foregroundStyle(Color.caliAccentInk)
+                    .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text(slot.workoutTitle).font(.headline).foregroundStyle(Color.caliText).lineLimit(1)
+                    HStack(spacing: 6) {
+                        TagChip(text: "Hôm nay", systemImage: "calendar.badge.clock", tint: .caliAccentInk)
+                        Label(slot.planTitle, systemImage: "calendar").font(.caption).foregroundStyle(Color.caliSecondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+            }
+            .caliCard(padding: Spacing.m)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Hôm nay: \(slot.workoutTitle), giáo án \(slot.planTitle). Mở Hôm nay")
+    }
 }
 
 private struct PeriodNavigator: View {
@@ -266,7 +420,7 @@ private struct MonthGrid: View {
     let calendar: Calendar
     let now: Date
     @Binding var selected: Date?
-    let state: (Date) -> DayState
+    let state: (Date) -> HistoryDayState
 
     var body: some View {
         let days = calendar.range(of: .day, in: .month, for: interval.start)!.map { calendar.date(byAdding: .day, value: $0 - 1, to: interval.start)! }
@@ -282,6 +436,10 @@ private struct MonthGrid: View {
                 legend(Color.caliAccent, "Hoàn thành")
                 legend(Color.caliWarning, "Dừng sớm")
                 legend(Color.caliSecondary, "Theo lịch")
+                HStack(spacing: 6) {
+                    Circle().strokeBorder(Color.caliSecondary, style: StrokeStyle(lineWidth: 1.5, dash: [2, 2])).frame(width: 8, height: 8)
+                    Text("Bỏ lỡ")
+                }
             }
             .font(.caption)
             .foregroundStyle(Color.caliSecondary)
@@ -301,7 +459,7 @@ private struct MonthGrid: View {
                 Text("\(calendar.component(.day, from: day))")
                     .font(.subheadline.monospacedDigit().weight(isToday ? .bold : .regular))
                     .foregroundStyle(st == .done ? Color.caliOnAccent : Color.caliText)
-                Circle().fill(dotColor(st)).frame(width: 5, height: 5).opacity(st == .none || st == .done ? 0 : 1)
+                dot(st)
             }
             .frame(maxWidth: .infinity, minHeight: minTapTarget)
             .background(st == .done ? Color.caliAccent : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -315,20 +473,27 @@ private struct MonthGrid: View {
         .accessibilityLabel("\(Fmt.weekdayLong(Fmt.isoWeekday(day, calendar: calendar))) \(Fmt.dayMonthShort(day))\(label(st))")
     }
 
-    private func dotColor(_ st: DayState) -> Color {
+    /// Status never relies on colour alone: a missed day is a hollow dashed ring, a planned one a filled dot.
+    @ViewBuilder
+    private func dot(_ st: HistoryDayState) -> some View {
         switch st {
-        case .partial: .caliWarning
-        case .planned: .caliSecondary
-        default: .clear
+        case .stoppedEarly: Circle().fill(Color.caliWarning).frame(width: 5, height: 5)
+        case .planned: Circle().fill(Color.caliSecondary).frame(width: 5, height: 5)
+        case .today: Circle().fill(Color.caliAccent).frame(width: 5, height: 5)
+        case .missed:
+            Circle().strokeBorder(Color.caliSecondary, style: StrokeStyle(lineWidth: 1, dash: [2, 2])).frame(width: 6, height: 6)
+        case .rest, .done: Circle().fill(Color.clear).frame(width: 5, height: 5)
         }
     }
 
-    private func label(_ st: DayState) -> String {
+    private func label(_ st: HistoryDayState) -> String {
         switch st {
         case .done: ", hoàn thành"
-        case .partial: ", dừng sớm"
+        case .stoppedEarly: ", dừng sớm"
         case .planned: ", theo lịch"
-        case .none: ""
+        case .today: ", hôm nay có lịch"
+        case .missed: ", bỏ lỡ"
+        case .rest: ""
         }
     }
 

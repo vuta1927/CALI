@@ -5,13 +5,22 @@ import SwiftUI
 // (tests use `@testable import CaliApp`).
 @main
 struct CaliAppMain: App {
-    @State private var store = AppStore(persists: !CaliAppMain.isRunningTests && !CaliAppMain.isDebugScenario)
+    @State private var store = AppStore(persists: !CaliAppMain.isRunningTests && !CaliAppMain.isDebugScenario, now: CaliAppMain.seedNow)
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(store)
         }
+    }
+
+    /// DEBUG scenarios may start the store in the past so missed days exist; always `Date()` in release builds.
+    private static var seedNow: Date {
+        #if DEBUG
+        DebugScenario.launch?.seedNow ?? Date()
+        #else
+        Date()
+        #endif
     }
 
     private static var isDebugScenario: Bool {
