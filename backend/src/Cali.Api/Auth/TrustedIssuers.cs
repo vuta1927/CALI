@@ -11,7 +11,11 @@ public sealed record TrustedIssuer(string Issuer, IReadOnlyList<SecurityKey> Sig
 /// </summary>
 public static class TrustedIssuers
 {
-    public static IReadOnlyList<TrustedIssuer> Build(IConfiguration configuration, IHostEnvironment environment, ILogger logger)
+    /// <param name="accessTokens">
+    /// When given, the access-token issuer minted after Sign in with Apple (ADR-071) is trusted in every environment.
+    /// </param>
+    public static IReadOnlyList<TrustedIssuer> Build(
+        IConfiguration configuration, IHostEnvironment environment, ILogger logger, AuthTokenSettings? accessTokens = null)
     {
         var issuers = new List<TrustedIssuer>();
 
@@ -29,9 +33,13 @@ public static class TrustedIssuers
             }
         }
 
-        // TODO(BE-005): register the CALI access-token issuer minted after Sign in with Apple exchange
-        // (POST /v1/auth/apple). Expiry: remove this TODO when BE-005 lands; until then non-Development
-        // environments trust no issuer and reject every bearer token.
+        // The CALI access-token issuer (POST /v1/auth/apple and /v1/auth/refresh). Its key is bound to this issuer
+        // like every other key, and it is a different key from the dev one.
+        if (accessTokens is not null)
+        {
+            issuers.Add(new TrustedIssuer(AccessTokenDefaults.Issuer, [new SymmetricSecurityKey(accessTokens.AccessTokenKey)]));
+        }
+
         return issuers;
     }
 }

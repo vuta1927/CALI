@@ -33,6 +33,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Cali: Host=db;Port=5432;Database=${POSTGRES_DB:-cali};Username=${POSTGRES_USER:-cali};Password=${POSTGRES_PASSWORD}
       Auth__DevTokens__SigningKey: ${CALI_DEV_TOKEN_SIGNING_KEY:-}
+      Auth__Apple__ClientId: ${CALI_APPLE_CLIENT_ID:-}
       Telemetry__Exporter: ${CALI_TELEMETRY_EXPORTER:-none}
     ports:
       - "127.0.0.1:${CALI_API_HOST_PORT:-8080}:8080"

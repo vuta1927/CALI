@@ -56,6 +56,8 @@ IDs are stable; each task has owner, dependency, demo and tests. **Do not** para
 
 **B3 (2026-11-09, PO duyệt ADR-070):** BE-004 có `GET /v1/sync/pull`: feed lịch sử thay đổi của user theo `seq`, cursor và `changeId` ký HMAC gắn với user (sai/bị sửa/của user khác ⇒ 400), cursor hết hạn retention 180 ngày hoặc vượt feed ⇒ 410 `cursor_expired`, không cursor là initial sync. Tombstone đi qua feed. Chưa có job dọn log (`TODO(OPS-001)`) và chưa đo p95 pull; `ai_analysis`/`ai_recommendation` chưa vào feed. Khoá `Sync__CursorSigningKey` là secret mới ngoài Development.
 
+**B4 (2026-11-10, PO duyệt ADR-071):** BE-005 có `POST /v1/auth/apple` và `POST /v1/auth/refresh`: kiểm tra token Apple (RS256, JWKS cache, `iss`/`aud`/`exp`/nonce), nonce dùng một lần, access JWT 15 phút ký bằng secret mới `Auth__AccessTokenSigningKey`, refresh token một lần dùng, chỉ lưu hash, dùng lại ⇒ revoke cả phiên. Mọi từ chối là cùng một 401. Thêm gitleaks và quét package có lỗ hổng (`security.yml`). Chưa thử với token Apple thật (`TODO(BE-004-APPLE)`), chưa có đăng xuất/thu hồi và gắn dữ liệu guest (IOS-008).
+
 | Task | Owner | Depends | Output / DoD |
 |---|---|---|---|
 | BE-001 | BE | CON-001 | .NET modular monolith, auth stubs/prod validation, OpenAPI implementation |

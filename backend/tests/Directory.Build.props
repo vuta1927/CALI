@@ -16,5 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Shared/RepoPaths.cs" Link="Shared/RepoPaths.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/AppleTestTokens.cs" Link="Shared/AppleTestTokens.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/AuthTestConfig.cs" Link="Shared/AuthTestConfig.cs" />
   </ItemGroup>
 </Project>

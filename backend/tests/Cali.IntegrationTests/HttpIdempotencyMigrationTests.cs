@@ -25,7 +25,9 @@ public sealed class HttpIdempotencyMigrationTests(PostgresFixture postgres)
             .Run(cs, RepoPaths.DbDirectory, includeDevelopmentScripts: true);
 
         result.Successful.ShouldBeTrue(result.Error?.ToString());
-        result.AppliedScripts.ShouldBe(["009_http_idempotency.sql"]);
+        // Later migrations (db/010 and on) also run in this upgrade, so assert on this slice only.
+        result.AppliedScripts.ShouldContain("009_http_idempotency.sql");
+        result.AppliedScripts.ShouldNotContain("008_criteria_config.sql");
         (await ScalarAsync<long>(cs, "SELECT count(*) FROM training_plans")).ShouldBe(1);
         (await ScalarAsync<string>(cs, "SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_training_plans_user_created'"))
             .ShouldContain("(user_id, created_at, id) WHERE (deleted_at IS NULL)");
