@@ -21,6 +21,9 @@ BRAND = ROOT / "brand"
 IOS_ASSETS = ROOT / "ios/CaliApp/Assets.xcassets"
 CATALOG = BRAND / "05-integration/ios/COAMIBrand.xcassets"
 
+# Package files this repo changed on purpose (README gained a "Trong repo này" section).
+EDITED_IN_REPO = {"README.md"}
+
 # iOS asset -> its source in the package (must be byte-identical).
 IOS_COPIES = {
     IOS_ASSETS / "AppIcon.appiconset" / name: CATALOG / "COAMIAppIcon.appiconset" / name
@@ -41,8 +44,12 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha256_variants(path: Path) -> set[str]:
+    """Checksums of the file as is and with CRLF line endings: the package was made on Windows,
+    git stores text as LF, and the manifest holds the CRLF hashes. Binary files only match as is."""
+    data = path.read_bytes()
+    crlf = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    return {hashlib.sha256(data).hexdigest(), hashlib.sha256(crlf).hexdigest()}
 
 
 def check_manifest() -> int:
@@ -55,7 +62,9 @@ def check_manifest() -> int:
             path = BRAND / row["path"]
             if not path.is_file():
                 fail(f"missing file from manifest: {row['path']}")
-            if sha256(path) != row["sha256"]:
+            if row["path"] in EDITED_IN_REPO:
+                continue
+            if row["sha256"] not in sha256_variants(path):
                 fail(f"checksum mismatch: {row['path']}")
             count += 1
     return count
