@@ -17,6 +17,7 @@ struct CaliAppMain: App {
         WindowGroup {
             RootView()
                 .environment(store)
+                .preferredColorScheme(store.settings.appearance.colorScheme)
         }
     }
 

@@ -135,12 +135,10 @@ struct WelcomeView: View {
                         .foregroundStyle(Color.caliSecondary)
                 }
                 VStack(alignment: .leading, spacing: Spacing.l) {
-                    WelcomeRow(systemImage: "wifi.slash", title: "Chạy hoàn toàn offline",
-                               text: "Mọi dữ liệu nằm trên iPhone của bạn. Chưa kết nối máy chủ.")
-                    WelcomeRow(systemImage: "flask", title: "Có dữ liệu mẫu",
-                               text: "Giáo án, lịch sử và đề xuất AI ban đầu là dữ liệu mẫu, được gắn nhãn \"Dữ liệu mẫu\". Ảnh bài tập là ảnh tạm (PLACEHOLDER).")
-                    WelcomeRow(systemImage: "clock", title: "Thử nhanh trong 3 phút",
-                               text: "Ở tab Hôm nay, chọn \"Buổi thử nhanh\" để đi qua đủ 5 loại bài: giữ tĩnh, số lần, theo thời gian, interval và kỹ năng.")
+                    WelcomeRow(systemImage: "wifi.slash", title: "Tập được cả khi offline",
+                               text: "Mọi buổi tập lưu trên iPhone trước. Khi đã đăng nhập và có mạng, dữ liệu được đồng bộ với máy chủ.")
+                    WelcomeRow(systemImage: "square.grid.2x2", title: "Bắt đầu từ trống",
+                               text: "Bài tập lấy từ máy chủ. Giáo án, lịch sử và mục tiêu là của bạn. Bài nào chưa có ảnh sẽ hiện ảnh tạm (PLACEHOLDER).")
                     WelcomeRow(systemImage: "cross.case", title: "An toàn là trên hết",
                                text: "COAMI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
                 }

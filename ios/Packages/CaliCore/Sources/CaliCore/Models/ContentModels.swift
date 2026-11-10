@@ -452,6 +452,19 @@ public struct AuditEntry: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+/// Light, dark, or whatever the system uses. Chosen in Profile; stored on this device only.
+public enum AppearanceMode: String, Codable, Sendable, CaseIterable {
+    case system, light, dark
+
+    public var label: String {
+        switch self {
+        case .system: "Theo hệ thống"
+        case .light: "Sáng"
+        case .dark: "Tối"
+        }
+    }
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
     public var countdownSeconds: Int = 3
     public var hapticsEnabled = true
@@ -460,12 +473,13 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var hasSeenWelcome = false
     /// ADR-046: load is stored in kg; this only changes how it is shown and typed.
     public var weightUnit: WeightUnit = .kg
+    public var appearance: AppearanceMode = .system
 
     private enum CodingKeys: String, CodingKey {
-        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, hasSeenWelcome, weightUnit
+        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, hasSeenWelcome, weightUnit, appearance
     }
 
-    /// Settings saved by an older build have no `weightUnit`.
+    /// Settings saved by an older build have no `weightUnit` or `appearance`.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         countdownSeconds = try c.decodeIfPresent(Int.self, forKey: .countdownSeconds) ?? 3
@@ -474,13 +488,17 @@ public struct AppSettings: Codable, Hashable, Sendable {
         liveActivityEnabled = try c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
         hasSeenWelcome = try c.decodeIfPresent(Bool.self, forKey: .hasSeenWelcome) ?? false
         weightUnit = try c.decodeIfPresent(WeightUnit.self, forKey: .weightUnit) ?? .kg
+        // An unknown value from a newer build falls back to the system setting instead of failing the whole settings row.
+        appearance = (try? c.decodeIfPresent(AppearanceMode.self, forKey: .appearance)).flatMap { $0 } ?? .system
     }
 
     public init(
         countdownSeconds: Int = 3, hapticsEnabled: Bool = true, notificationsEnabled: Bool = true,
-        liveActivityEnabled: Bool = true, hasSeenWelcome: Bool = false, weightUnit: WeightUnit = .kg
+        liveActivityEnabled: Bool = true, hasSeenWelcome: Bool = false, weightUnit: WeightUnit = .kg,
+        appearance: AppearanceMode = .system
     ) {
         self.weightUnit = weightUnit
+        self.appearance = appearance
         self.countdownSeconds = countdownSeconds
         self.hapticsEnabled = hapticsEnabled
         self.notificationsEnabled = notificationsEnabled

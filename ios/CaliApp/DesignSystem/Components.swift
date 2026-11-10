@@ -255,12 +255,15 @@ struct StatTile: View {
     let label: String
     var systemImage: String?
     var tint: Color = .caliText
+    @ScaledMetric(relativeTo: .body) private var iconHeight: CGFloat = 24
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             if let systemImage {
+                // Symbols differ in height; a fixed frame keeps the value and the label on one line across tiles.
                 Image(systemName: systemImage)
                     .foregroundStyle(tint)
+                    .frame(height: iconHeight, alignment: .leading)
             }
             Text(value)
                 .font(.title2.bold().monospacedDigit())
@@ -270,8 +273,11 @@ struct StatTile: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)
+                // One line, shrunk when it is long: every tile has the same height, in a stack or in a grid.
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .caliCard(padding: Spacing.m)
         .accessibilityElement(children: .combine)
     }

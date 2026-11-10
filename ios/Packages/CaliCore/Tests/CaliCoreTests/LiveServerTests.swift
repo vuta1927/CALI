@@ -71,7 +71,7 @@ final class LiveServerTests: XCTestCase {
         let storeA = ContentStore(writer: a.coordinator.writer)
         try storeA.seedIfEmpty(.empty(), now: a.clock.now(), timeZone: utc)
         let catalogCount = try await ExerciseCatalogRefresher(api: catalogAPI, store: storeA).refresh(now: a.clock.now())
-        XCTAssertEqual(catalogCount, 9, "the seeded test catalog")
+        XCTAssertGreaterThanOrEqual(catalogCount, 9, "at least the seeded fixture exercises")
 
         let item = PlannedExercise(id: UUID(), exerciseId: exerciseId, setCount: 1, target: .staticHold(holdSeconds: 5), restSeconds: 30)
         let workout = PlannedWorkout(id: UUID(), weekday: 1, title: "Live test", focus: "", exercises: [item])

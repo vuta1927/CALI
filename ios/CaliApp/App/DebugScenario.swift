@@ -30,7 +30,7 @@ enum DebugScenario: String {
     /// Returns the plan whose race result sheet should open.
     @MainActor
     func apply(to store: AppStore) -> UUID? {
-        store.updateSettings { $0.notificationsEnabled = false; $0.liveActivityEnabled = false; $0.countdownSeconds = 0 }
+        store.updateSettings { $0.notificationsEnabled = false; $0.liveActivityEnabled = false; $0.countdownSeconds = 0; $0.hasSeenWelcome = true }
         let run = PlannedExercise(id: UUID(), exerciseId: MockData.easyRun, setCount: 1,
                                   target: .distance(distanceMeters: self == .run ? 5_000 : 10_000, durationSeconds: self == .run ? nil : 3_000),
                                   restSeconds: 0)

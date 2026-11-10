@@ -65,6 +65,16 @@ struct ProfileView: View {
                 .caliCard(padding: Spacing.l)
                 .padding(.bottom, Spacing.s)
 
+                group("Giao diện", footer: "Chọn sáng hoặc tối, hoặc để COAMI theo cài đặt của iPhone. Chỉ áp dụng trên máy này.") {
+                    CardRow(title: "Chế độ hiển thị") {
+                        Picker("Chế độ hiển thị", selection: setting(\.appearance)) {
+                            ForEach(AppearanceMode.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(.caliAccentInk)
+                    }
+                }
+
                 group("Buổi tập", footer: "Thông báo chỉ để nhắc và có thể đến trễ. COAMI không bao giờ tự đánh dấu set hoàn thành — bạn luôn xác nhận kết quả.") {
                     CardRow(title: "Đếm ngược trước set") {
                         Text(store.settings.countdownSeconds == 0 ? "Tắt" : "\(store.settings.countdownSeconds) giây")

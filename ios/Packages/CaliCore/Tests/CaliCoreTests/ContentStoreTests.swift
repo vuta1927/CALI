@@ -251,3 +251,32 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(try f.coordinator.counts().outbox, 0)
     }
 }
+
+/// The appearance choice is stored with the settings; rows from before it existed, or from a newer build, still load.
+final class AppearanceSettingsTests: XCTestCase {
+    func testDefaultsToSystemAndRoundTrips() throws {
+        XCTAssertEqual(AppSettings().appearance, .system)
+        var settings = AppSettings()
+        settings.appearance = .dark
+        let data = try JSONEncoder().encode(settings)
+        XCTAssertEqual(try JSONDecoder().decode(AppSettings.self, from: data).appearance, .dark)
+    }
+
+    func testOldAndUnknownValuesFallBackToSystem() throws {
+        let old = Data(#"{"countdownSeconds":3}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(AppSettings.self, from: old).appearance, .system)
+        let future = Data(#"{"countdownSeconds":5,"appearance":"sepia"}"#.utf8)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: future)
+        XCTAssertEqual(decoded.appearance, .system)
+        XCTAssertEqual(decoded.countdownSeconds, 5, "the rest of the row is kept")
+    }
+
+    func testChoiceIsPersistedByTheContentStore() throws {
+        let store = ContentStore(writer: try CaliDatabase.openInMemory())
+        try store.seedIfEmpty(.empty(), now: t0, timeZone: TimeZone(identifier: "UTC")!)
+        var settings = try store.load().settings
+        settings.appearance = .light
+        try store.apply(ContentChange(settings: settings), now: t0)
+        XCTAssertEqual(try store.load().settings.appearance, .light)
+    }
+}
