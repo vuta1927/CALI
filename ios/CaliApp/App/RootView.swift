@@ -87,9 +87,14 @@ struct RootView: View {
             }
         }
         #endif
-        .sheet(isPresented: welcomeBinding) {
-            WelcomeView { store.updateSettings { $0.hasSeenWelcome = true } }
-                .interactiveDismissDisabled()
+        .fullScreenCover(isPresented: welcomeBinding) {
+            WelcomeView(showsSignIn: store.auth.isAvailable) {
+                store.updateSettings { $0.hasSeenWelcome = true }
+            } onSignIn: {
+                store.updateSettings { $0.hasSeenWelcome = true }
+                tab = .profile
+            }
+            .interactiveDismissDisabled()
         }
         .alert("Không thể thực hiện", isPresented: alertBinding) {
             Button("Đóng", role: .cancel) { store.alertMessage = nil }
@@ -110,72 +115,5 @@ struct RootView: View {
 
     private var alertBinding: Binding<Bool> {
         Binding(get: { store.alertMessage != nil }, set: { if !$0 { store.alertMessage = nil } })
-    }
-}
-
-/// First-launch explainer: what the POC is, what is sample data, and the safety disclaimer.
-struct WelcomeView: View {
-    let onContinue: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.xl) {
-                HStack(spacing: Spacing.m) {
-                    COAMISymbol()
-                        .frame(width: 56, height: 56)
-                    COAMIWordmark(includesTagline: true)
-                }
-                .padding(.top, Spacing.xl)
-                VStack(alignment: .leading, spacing: Spacing.m) {
-                    Text("Tập rõ ràng. Tiến bộ bền vững.")
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(Color.caliText)
-                    Text("COAMI đồng hành cùng bạn từ giáo án, hướng dẫn trực quan đến từng set và khoảng nghỉ — kể cả khi offline.")
-                        .font(.title3)
-                        .foregroundStyle(Color.caliSecondary)
-                }
-                VStack(alignment: .leading, spacing: Spacing.l) {
-                    WelcomeRow(systemImage: "wifi.slash", title: "Tập được cả khi offline",
-                               text: "Mọi buổi tập lưu trên iPhone trước. Khi đã đăng nhập và có mạng, dữ liệu được đồng bộ với máy chủ.")
-                    WelcomeRow(systemImage: "square.grid.2x2", title: "Bắt đầu từ trống",
-                               text: "Bài tập lấy từ máy chủ. Giáo án, lịch sử và mục tiêu là của bạn. Bài nào chưa có ảnh sẽ hiện ảnh tạm (PLACEHOLDER).")
-                    WelcomeRow(systemImage: "cross.case", title: "An toàn là trên hết",
-                               text: "COAMI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
-                }
-            }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.xl)
-        }
-        .safeAreaInset(edge: .bottom) {
-            Button("Bắt đầu", action: onContinue)
-                .buttonStyle(.caliPrimary)
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
-                .background(LinearGradient(colors: [Color.caliCanvas.opacity(0), Color.caliCanvas], startPoint: .top, endPoint: .center))
-        }
-        .background(COAMIScreenBackground())
-    }
-}
-
-private struct WelcomeRow: View {
-    let systemImage: String
-    let title: String
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(Color.caliAccentInk)
-                .frame(width: 32)
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(Color.caliText)
-                Text(text)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.caliSecondary)
-            }
-        }
     }
 }
