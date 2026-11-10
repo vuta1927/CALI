@@ -213,6 +213,12 @@ flowchart TB
 > - **Hoãn:** nối base URL/JWT vào client thật (IOS-007); outbox hiện chưa có mutation nội dung (`TODO(IOS-007)`).
 > - **Bằng chứng:** `evidence/IOS-012/README.md`.
 
+> **Trạng thái IOS-004h (2026-11-10):** code và test xong, chờ review; đã chạy trên iPhone 15. Không đổi code Player, API hay contract: domain và coordinator đã có T-04/T-09 từ IOS-001; slice này khoá hành vi ở tầng player và đo ngân sách.
+> - **Test mới** (`CaliAppTests/PlayerHardeningTests`, 7): T-01 (poster, đích, 4 set, không cần mạng), T-03 (hết giờ giữ → `awaitingResult`, không có set result, không có mutation outbox; câu trả lời của người dùng là thứ được lưu, ADR-009), T-04 (bấm Lưu hai lần → 1 set result, 1 mutation `set_result`), T-06 (cả buổi offline: 3 set + 2 mutation `workout_session`, mọi dòng `pending`), nghỉ +30s đúng 30 giây, bỏ buổi giữ set đã xác nhận và cho bắt đầu buổi mới, đo confirm-set.
+> - **Ngân sách docs/14 "confirm-set < 100ms p95":** 60 set liên tiếp, DB file WAL. iPhone 15: p50 5,1 ms, p95 5,5 ms, max 5,6 ms (đạt). Simulator: p50 5,7 ms, p95 6,0 ms, max 34 ms.
+> - **Còn lại:** bằng chứng thiết bị (video + export Diagnostics) theo docs/16.
+> - **Bằng chứng:** `evidence/IOS-004h/README.md`.
+
 > **Trạng thái CON-002 (2026-11-08):** fixture reducer **sẵn sàng review**, **chưa được duyệt**. Đã đọc lại `fixtures/reducer/*.json` theo docs/03 §4 và ADR-016..033, không thấy chỗ lệch giữa vector, reducer và docs/03 nên không sửa reducer. Thêm 3 file: `pause_resume_edge_cases.json` (30 bước), `skip_set.json` (22 bước), `abandon_from_every_phase.json` (32 bước). `ReducerFixtureTests` đọc toàn bộ 12 file; `swift test` trong Docker `swift:6.2-noble` (giống `swift-domain.yml`): 73 test, 0 lỗi. Trạng thái và bảng phạm vi ở `fixtures/reducer/README.md`. **Cập nhật 2026-11-09:** PO đã duyệt CON-002 (ADR-069).
 
 **Nhánh NO-GO của POC-002:**

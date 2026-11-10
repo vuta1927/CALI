@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- IOS-004h player hardening tests (iOS only; no player, API or contract change).
+  - `PlayerHardeningTests` (7): T-01, T-03 (target reached never completes the set, ADR-009), T-04 (one result, one `set_result` mutation), T-06 (full workout offline, everything `pending`), rest +30 s, abandon, and the confirm-set budget.
+  - Confirm-set with an on-disk WAL database, 60 sets (budget < 100 ms p95): iPhone 15 p50 5.1 ms, p95 5.5 ms, max 5.6 ms; simulator p95 6.0 ms.
+  - Tests: app 69 on the iPhone 15 (none skipped); on the unsigned simulator 1 is skipped.
 - IOS-012 Diagnostics screen (dev build only; no API/contract change).
   - **CaliCore** (`Diagnostics.swift`): `DatabaseDiagnostics` (migrations, rows/dirty per table, outbox by state, cursor scopes; counts only), `LogRedactor`, `DiagnosticsReport`.
   - **App (`#if DEBUG`):** Profile → "Diagnostics (dev)": app/DB info, pending notifications, Live Activity, process log from `OSLogStore`, dev base URL + JWT (Keychain), Export. The export is redacted as a whole.
