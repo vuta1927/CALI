@@ -32,6 +32,14 @@ struct ProfileView: View {
                             Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
                         }
                     }
+                    #if DEBUG
+                    CardDivider()
+                    NavigationLink { DiagnosticsView() } label: {
+                        CardRow(systemImage: "stethoscope", title: "Diagnostics (dev)") {
+                            Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+                        }
+                    }
+                    #endif
                     CardDivider()
                     NavigationLink { AuditLogView() } label: {
                         CardRow(systemImage: "list.bullet", title: "Nhật ký thay đổi") {

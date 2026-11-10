@@ -19,6 +19,8 @@ enum DebugScenario: String {
     case history
     /// IOS-018 body weight screen with eight entries over five weeks.
     case body
+    /// IOS-012 dev Diagnostics screen.
+    case diagnostics
 
     /// The store starts 10 days ago for `history`, so the plans have days that passed without a session.
     var seedNow: Date { self == .history ? Date().addingTimeInterval(-10 * 86_400) : Date() }
@@ -37,6 +39,8 @@ enum DebugScenario: String {
             return seedGoals(store)
         case .history:
             return seedHistory(store)
+        case .diagnostics:
+            return store.plans.first?.lineageId
         case .body:
             let now = Date()
             for (days, kg) in [(35, "74.2"), (28, "73.8"), (21, "73.5"), (14, "73.1"), (9, "72.9"), (4, "72.6"), (1, "72.4"), (0, "72.1")] {

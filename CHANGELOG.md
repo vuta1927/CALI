@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- IOS-012 Diagnostics screen (dev build only; no API/contract change).
+  - **CaliCore** (`Diagnostics.swift`): `DatabaseDiagnostics` (migrations, rows/dirty per table, outbox by state, cursor scopes; counts only), `LogRedactor`, `DiagnosticsReport`.
+  - **App (`#if DEBUG`):** Profile → "Diagnostics (dev)": app/DB info, pending notifications, Live Activity, process log from `OSLogStore`, dev base URL + JWT (Keychain), Export. The export is redacted as a whole.
+  - **Guard:** `validate_ios_project_config.py` requires `#if DEBUG` in `Features/Diagnostics`.
+  - **Tests:** CaliCore 64, app 62 (Keychain test needs a signed build, skipped on the unsigned simulator).
+  - **DEBUG:** `-uiScenario diagnostics`.
 - IOS-018 body weight (iOS only; CON-007 is already accepted, no API/contract change).
   - **Domain** (`BodyMeasurement.swift`): `BodyMeasurementKind` (weight, 20..500, 2 decimals), `BodyMeasurementRules` (more than 2 decimals refused, not rounded; future `measuredAt` refused; newest-first entries; change since the previous entry).
   - **CaliCore:** migration `v4_body_measurements` (exact decimal text, contract CHECKs, soft delete, sync columns); `ContentChange.bodyMeasurements`.

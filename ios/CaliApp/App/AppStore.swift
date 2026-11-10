@@ -38,6 +38,10 @@ final class AppStore {
     var alertMessage: String?
 
     @ObservationIgnored private let database: AppDatabase
+    #if DEBUG
+    /// Counts and states for the dev-only Diagnostics screen (IOS-012).
+    func databaseDiagnostics() throws -> DatabaseDiagnostics { try DatabaseDiagnostics.read(database.coordinator.writer) }
+    #endif
     @ObservationIgnored private let notifications = NotificationService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
 

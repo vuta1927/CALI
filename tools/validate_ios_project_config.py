@@ -33,6 +33,12 @@ def main() -> int:
     if leaks:
         print("Body measurements must stay out of widget/Live Activity/notification code (ADR-064):\n- " + "\n- ".join(leaks), file=sys.stderr)
         return 1
+    # IOS-012: the Diagnostics screen and the dev credential store must not ship in Release builds.
+    for source in (ROOT / "ios/CaliApp/Features/Diagnostics").glob("*.swift"):
+        lines = source.read_text(encoding="utf-8").splitlines()
+        if not lines or lines[0].strip() != "#if DEBUG" or lines[-1].strip() != "#endif":
+            print(f"{source.relative_to(ROOT)} must be wrapped in #if DEBUG ... #endif (IOS-012)", file=sys.stderr)
+            return 1
     print("XcodeGen COAMI asset settings valid")
     return 0
 
