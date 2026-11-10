@@ -1,0 +1,108 @@
+{
+  "source": {
+    "file": "coami-approved-orange-brand-board.png",
+    "width": 1448,
+    "height": 1086,
+    "sha256": "d0b0cdb09db4f50c6a6c8cab0dd4d442c1036addf479496b69f28c3bfa55129a"
+  },
+  "tracing": {
+    "brand-mark": {
+      "source_box_xyxy": [
+        195,
+        65,
+        510,
+        415
+      ],
+      "kind": "orange",
+      "path_count": 6,
+      "silhouette_IoU": 0.993505,
+      "boundary_distance_p95_source_px": 1.0,
+      "boundary_distance_max_source_px": 1.4
+    },
+    "wordmark": {
+      "source_box_xyxy": [
+        527,
+        140,
+        1250,
+        300
+      ],
+      "kind": "dark",
+      "path_count": 5,
+      "silhouette_IoU": 0.992591,
+      "boundary_distance_p95_source_px": 0.0,
+      "boundary_distance_max_source_px": 1.0
+    },
+    "wordmark-accent": {
+      "source_box_xyxy": [
+        527,
+        140,
+        1250,
+        300
+      ],
+      "kind": "orange",
+      "path_count": 1,
+      "silhouette_IoU": 0.984266,
+      "boundary_distance_p95_source_px": 1.0,
+      "boundary_distance_max_source_px": 1.0
+    },
+    "tagline": {
+      "source_box_xyxy": [
+        534,
+        318,
+        1246,
+        354
+      ],
+      "kind": "tag",
+      "path_count": 25,
+      "silhouette_IoU": 0.935826,
+      "boundary_distance_p95_source_px": 0.0,
+      "boundary_distance_max_source_px": 1.4
+    },
+    "app-C": {
+      "source_box_xyxy": [
+        205,
+        535,
+        420,
+        768
+      ],
+      "kind": "app-orange",
+      "path_count": 1,
+      "silhouette_IoU": 0.994402,
+      "boundary_distance_p95_source_px": 0.0,
+      "boundary_distance_max_source_px": 1.0
+    },
+    "app-details": {
+      "source_box_xyxy": [
+        270,
+        590,
+        392,
+        705
+      ],
+      "kind": "white",
+      "path_count": 5,
+      "silhouette_IoU": 0.977334,
+      "boundary_distance_p95_source_px": 1.0,
+      "boundary_distance_max_source_px": 1.4
+    }
+  },
+  "checks": [
+    "All PNGs decode successfully",
+    "All default/optional opaque icon PNGs are square RGB",
+    "All transparent logo exports contain actual alpha",
+    "All SVGs parse and render; no embedded raster or live fonts",
+    "All asset catalog image references resolve",
+    "Storyboard XML parses; Xcode build not run",
+    "Non-tagline silhouettes match thresholded source with IoU > 0.97",
+    "ZIP validation performed separately after creation"
+  ],
+  "counts": {
+    "png": 202,
+    "svg": 41
+  },
+  "limitations": [
+    "Raster tracing cannot recover an original master vector exactly.",
+    "Gradient is reconstructed; raster lighting and texture are not copied.",
+    "Colors are sampled/normalized from PNG, not recovered original design tokens.",
+    "The Xcode catalog/storyboard and Icon Composer inputs need Mac/device validation."
+  ]
+}
