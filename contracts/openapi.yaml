@@ -109,7 +109,9 @@ paths:
           schema: {type: integer, minimum: 1, maximum: 100, default: 50}
       description: >-
         BE-001. Only published exercises; media lists the newest public, reviewed version per kind.
-        `url` stays null until signed media URLs land (BE-006). Anonymous, rate limited per client IP.
+        BE-006 (ADR-072): each media item carries a short-lived signed `url` and its `urlExpiresAt`;
+        fetch it with a plain GET, no credentials. The response is `Cache-Control: no-store` because
+        those URLs expire. Anonymous, rate limited per client IP.
       responses:
         '200':
           description: Page of approved exercises
@@ -127,6 +129,9 @@ paths:
       summary: Exercise details and media metadata
       operationId: getExercise
       security: []
+      description: >-
+        Media `url` values are short-lived signed URLs (BE-006, ADR-072) and the response is
+        `Cache-Control: no-store`.
       parameters:
         - $ref: '#/components/parameters/ExerciseId'
       responses:
@@ -614,7 +619,19 @@ components:
           type: string
           enum: [thumbnail, poster, preview, tutorial, correct, incorrect]
         contentVersion: {type: integer, minimum: 1}
-        url: {type: [string, 'null'], format: uri}
+        url:
+          type: [string, 'null']
+          format: uri
+          description: >-
+            Short-lived signed read URL for the file (ADR-072); plain GET, no credentials, may be fetched
+            with Range requests. Null when this deployment has no object storage; then keep the bundled
+            or cached copy. Contains no credential, only a signature. Check `sha256` after download.
+        urlExpiresAt:
+          type: [string, 'null']
+          format: date-time
+          description: >-
+            When `url` stops working; null exactly when `url` is null. Request the exercise again for a
+            fresh URL (do not cache the response past this instant).
         mimeType: {type: string}
         sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
         sizeBytes: {type: [integer, 'null'], minimum: 0}

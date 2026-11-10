@@ -56,6 +56,15 @@ user-secrets or environment variables only (`ConnectionStrings__Cali`, `Auth__De
 at least 32 bytes, required outside Development; in Development it is derived from the dev token key when unset).
 `Sync__ChangeLogRetentionDays` (default 180) is how long a pull cursor stays valid.
 
+Catalog media URLs (BE-006, ADR-072) are signed against an S3-compatible bucket (Cloudflare R2, AWS S3, MinIO):
+`Media__Storage__Endpoint` (origin only, `https` outside Development), `Media__Storage__Bucket`,
+`Media__Storage__Region` (default `auto`; AWS S3 needs the bucket's region), `Media__Storage__AccessKeyId` and
+`Media__Storage__SecretAccessKey` (secret; use a read-only credential for that bucket). All four are required outside
+Development; in Development, setting none of them keeps `url: null`, and setting some but not all is an error.
+`Media__UrlLifetimeSeconds` (default 900, 60..3600) is how long a signed URL works. For local work any S3-compatible
+server on `http://localhost:<port>` works in Development (the integration tests use Scality CloudServer). Uploading
+files and creating `exercise_media` rows is the ingestion tool, which does not exist yet.
+
 ## Migrations
 
 DbUp applies `db/*.sql` in filename order, one transaction per script, journaled in `public.schema_versions`.

@@ -2,6 +2,7 @@ using Cali.Api.Auth;
 using Cali.Api.Endpoints;
 using Cali.Api.Errors;
 using Cali.Api.Health;
+using Cali.Api.Media;
 using Cali.Api.RateLimiting;
 using Cali.Api.Telemetry;
 using Cali.Application.Catalog;
@@ -43,6 +44,7 @@ internal static class CaliApi
         services.AddScoped<ListExercises>();
         services.AddScoped<GetExercise>();
         services.AddScoped<GetCriteriaConfig>();
+        services.AddCaliMedia();
         services.AddScoped<ListPlans>();
         services.AddScoped<CreatePlan>();
         services.AddScoped<SyncPush>();

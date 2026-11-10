@@ -218,6 +218,12 @@ COMMIT  (lỗi validation ⇒ ROLLBACK riêng mutation đó, trả 'rejected')
 - **Tests:** phân trang không mất/trùng khi có ghi đồng thời; cursor của user khác ⇒ 400/401; tombstone xuất hiện; 410 khi hết hạn.
 - **Đã làm (B3, ADR-070 Accepted):** khác kế hoạch ở bốn điểm. (1) Cursor của user khác/bị sửa là **400** (401 dành cho token). (2) `changeId` cùng dạng với cursor nên dùng được làm cursor. (3) 410 khi `seq` vượt `last_seq`, dòng tại `seq` không còn, hoặc dòng cũ hơn retention; pull không cursor không bao giờ 410. (4) **Chưa có job dọn log**: ADR-070 chỉ ghi hợp đồng nén log (giữ dòng mới nhất của entity còn sống) cho `TODO(OPS-001)`; test mô phỏng nén bằng SQL. Tests: `PullTests` (unit), `SyncContractTests`, `SyncPullTests` (integration, gồm 3 thiết bị push song song trong khi một client pull). p95 pull chưa đo.
 
+### BE-006 — Signed media URLs (catalog)
+- Catalog trả `url` + `urlExpiresAt` cho media `is_public` đã `reviewed_at`; `storage_key` ở lại server. Object store S3-tương thích; URL là presigned GET AWS SigV4 tính cục bộ (không SDK, không gọi mạng) sau `IMediaUrlSigner`.
+- Config `Media__Storage__{Endpoint,Bucket,Region,AccessKeyId,SecretAccessKey}`, `Media__UrlLifetimeSeconds` (900, giới hạn 60..3600). Ngoài Development phải đủ và `https`.
+- **Tests:** vector chữ ký trong tài liệu AWS; mã hoá key; hạn; cấu hình sai không lộ giá trị; catalog ký đúng và không ký media riêng tư/chưa duyệt; `no-store`; một server S3 thật chấp nhận URL, trả Range, từ chối URL bị sửa/hết hạn/sai secret.
+- **Đã làm (ADR-072 Accepted):** khác kế hoạch ở ba điểm. (1) Thêm `urlExpiresAt` vào `ExerciseMedia` để client biết khi nào xin URL mới. (2) Hai endpoint catalog luôn `Cache-Control: no-store` vì body chứa URL hết hạn (catalog không còn cache được ở CDN). (3) Không làm upload/ingestion. Chưa thử với R2/S3 thật.
+
 ### B4 — Auth thật + hardening (IOS-008 phía BE, OPS-001 một phần)
 - `POST /v1/auth/apple`: validate issuer/audience/signature (JWKS cache + refresh)/exp/nonce; map `sub` → user; access JWT ngắn hạn + refresh token **lưu hash**, rotate, phát hiện reuse ⇒ revoke family.
 - `POST /v1/auth/refresh`.
