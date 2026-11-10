@@ -132,9 +132,13 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: Spacing.l) {
                 HStack(spacing: 0) {
                     ForEach(1...7, id: \.self) { day in
+                        let isScheduled = items.contains { $0.date.isoWeekday == day }
+                        let isDone = doneWeekdays.contains(day)
                         WeekDayDot(
-                            day: day, isToday: day == today.isoWeekday, completed: doneWeekdays.contains(day),
-                            scheduled: items.contains { $0.date.isoWeekday == day }
+                            day: day, isToday: day == today.isoWeekday, completed: isDone,
+                            scheduled: isScheduled,
+                            dateLabel: "\(monday.adding(days: day - 1).day)",
+                            missed: isScheduled && !isDone && day < today.isoWeekday
                         )
                     }
                 }
@@ -225,8 +229,10 @@ struct WeekDayDot: View {
                 Circle()
                     .fill(completed ? Color.caliAccent : ((scheduled || abandoned) ? Color.caliSurfaceRaised : Color.clear))
                 Circle()
-                    .strokeBorder(isToday ? Color.caliAccent : (missed ? Color.caliSecondary : Color.caliSurfaceRaised),
-                                  style: StrokeStyle(lineWidth: isToday ? 2 : 1, dash: missed ? [3, 3] : []))
+                    .strokeBorder(isToday ? Color.caliAccent
+                                  : (missed ? Color.caliSecondary
+                                     : (scheduled ? Color.caliAccentInk : Color.caliSecondary.opacity(0.35))),
+                                  style: StrokeStyle(lineWidth: isToday ? 2 : (scheduled ? 1.5 : 1), dash: missed ? [3, 3] : []))
                 if completed {
                     Image(systemName: "checkmark")
                         .font(.caption.bold())
