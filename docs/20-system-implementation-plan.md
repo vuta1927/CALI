@@ -213,6 +213,9 @@ flowchart TB
 > - **Hoãn:** nối base URL/JWT vào client thật (IOS-007); outbox hiện chưa có mutation nội dung (`TODO(IOS-007)`).
 > - **Bằng chứng:** `evidence/IOS-012/README.md`.
 
+> **Trạng thái IOS-008 (2026-11-10):** client xong, chờ review; chỉ kiểm chứng với token giả (không có tài khoản Apple trả phí). `SessionManager` (một refresh một lúc, giữ refresh token mới nhất trong Keychain), `AppleNonce`, `AccountScope` (gắn hoặc giữ dữ liệu khách; tài khoản khác bị từ chối khi dữ liệu cũ còn), màn Cá nhân → Tài khoản, đăng xuất giữ/xoá dữ liệu (ADR-076). `resetAll` sửa để xoá cả số đo/mục tiêu/giai đoạn.
+> - **Còn mở:** entitlement `com.apple.developer.applesignin` + token Apple thật (`TODO(BE-004-APPLE)`, hết hạn khi QA-002 chạy đăng nhập thật); T-16 chưa chạy với backend.
+>
 > **Trạng thái IOS-007 slice 1 (2026-11-10):** code và test xong phần đẩy phiên/set, chờ review. Chưa kiểm chứng với backend thật (không có E2E; chỉ fake API và `URLProtocol`).
 > - **Đã làm:** payload `workout_session`/`exercise_execution`/`set_result` đúng schema (có test đối chiếu), `OutboxSyncEngine`, `URLSessionSyncAPI`, dòng "Đồng bộ" ở Cá nhân (ADR-075). Rule mockup giữ nguyên: không có trạng thái đồng bộ trong luồng lưu.
 > - **Slice 2 (pull) xong:** pull theo cursor, mỗi trang áp dụng và lưu cursor trong một transaction, `410` chỉ reset cursor (giữ outbox), thay đổi chưa có nơi áp dụng nằm trong `sync_inbox` (migration `v6_sync_inbox`), màn "Đồng bộ" hiện lần nhận gần nhất và số thay đổi chưa áp dụng.

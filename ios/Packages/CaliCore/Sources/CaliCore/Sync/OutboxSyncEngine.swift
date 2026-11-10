@@ -8,6 +8,7 @@ public struct SyncDeviceIdentity: Sendable {
     let writer: any DatabaseWriter
 
     public init(writer: any DatabaseWriter) { self.writer = writer }
+    public init(coordinator: WorkoutCoordinator) { writer = coordinator.writer }
 
     public func current() async throws -> UUID {
         try await writer.write { db in

@@ -50,7 +50,7 @@ public struct URLSessionSyncAPI: SyncAPI {
 
     private func send(method: String, path: String, query: [URLQueryItem], body: Data?) async throws -> (Data, HTTPURLResponse) {
         var token: String
-        do { token = try await tokens.accessToken() } catch { throw SyncTransportError.unauthorized }
+        do { token = try await tokens.accessToken() } catch let error as SyncTransportError { throw error } catch { throw SyncTransportError.unauthorized }
         var attempt = 0
         while true {
             var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
@@ -77,6 +77,8 @@ public struct URLSessionSyncAPI: SyncAPI {
                 do {
                     try await tokens.refreshAccessToken()
                     token = try await tokens.accessToken()
+                } catch let error as SyncTransportError {
+                    throw error // offline stays offline: it is not a reason to sign in again
                 } catch {
                     throw SyncTransportError.unauthorized
                 }

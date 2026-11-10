@@ -40,6 +40,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CALI_API_BASE_URL: ""
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # Only the app copy of ios/Shared/POCLiveActivityIntents.swift calls the coordinator (ADR-013).
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) CALI_APP_PROCESS"
@@ -50,6 +51,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CaliBuildSHA: $(CALI_BUILD_SHA)
+        # Release API base URL (https). Empty = no server: the app stays local-only. Set it per build, never commit a real host.
+        CaliAPIBaseURL: $(CALI_API_BASE_URL)
         NSSupportsLiveActivities: true
         UILaunchScreen: {}
         UIApplicationSceneManifest:

@@ -53,6 +53,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.sync.syncSoon() }
         }
+        .task { await store.auth.restore() }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {

@@ -162,7 +162,7 @@ public final class ContentStore: Sendable {
     public func resetAll(to seed: ContentSeed, now: Date = Date(), timeZone: TimeZone = .current) throws {
         try writer.immediateTransaction { db in
             for table in [
-                "planned_exercises", "planned_workouts", "plan_activations", "training_plans", "exercises",
+                "planned_exercises", "planned_workouts", "plan_activations", "plan_phases", "plan_goals", "body_measurements", "training_plans", "exercises",
                 "session_history", "recommendations", "audit_log", "app_settings", "set_results",
                 "local_session_state", "sync_outbox", "sync_versions", "sync_inbox", "sync_cursor", "processed_commands",
             ] {
