@@ -51,9 +51,15 @@ struct RootView: View {
         }
         .tint(.caliAccentInk)
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { store.sync.syncSoon() }
+            if phase == .active {
+                store.sync.syncSoon()
+                Task { await store.sync.refreshCatalog() }
+            }
         }
-        .task { await store.auth.restore() }
+        .task {
+            await store.auth.restore()
+            await store.sync.refreshCatalog()
+        }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {

@@ -83,14 +83,19 @@ public enum ContentApplyResult: Equatable, Sendable {
 }
 
 /// Initial content for an empty database (bundled catalog, starter plan, labelled sample data).
+/// `empty` has none of them: the catalog and the plans then come from the server.
 public struct ContentSeed: Sendable {
     public var catalog: [Exercise]
-    public var plan: WorkoutPlan
+    public var plan: WorkoutPlan?
     public var sampleHistory: [CompletedSession]
     public var sampleRecommendations: [Recommendation]
     public var settings: AppSettings
 
-    public init(catalog: [Exercise], plan: WorkoutPlan, sampleHistory: [CompletedSession], sampleRecommendations: [Recommendation], settings: AppSettings = AppSettings()) {
+    public static func empty(settings: AppSettings = AppSettings()) -> ContentSeed {
+        ContentSeed(catalog: [], plan: nil, sampleHistory: [], sampleRecommendations: [], settings: settings)
+    }
+
+    public init(catalog: [Exercise], plan: WorkoutPlan?, sampleHistory: [CompletedSession], sampleRecommendations: [Recommendation], settings: AppSettings = AppSettings()) {
         self.catalog = catalog
         self.plan = plan
         self.sampleHistory = sampleHistory
@@ -184,12 +189,15 @@ public final class ContentStore: Sendable {
 
     /// The seed's starter plan is followed from today unless it brings its own activations (BR-10).
     static func writeSeed(_ db: Database, _ seed: ContentSeed, now: Date, timeZone: TimeZone) throws {
-        var plan = seed.plan
-        if plan.activations.isEmpty, plan.deletedAt == nil {
-            plan.activations = [PlanActivation(id: UUID(), fromDate: LocalDate.today(at: now, in: timeZone), timezone: timeZone.identifier)]
+        var plans: [WorkoutPlan] = []
+        if var plan = seed.plan {
+            if plan.activations.isEmpty, plan.deletedAt == nil {
+                plan.activations = [PlanActivation(id: UUID(), fromDate: LocalDate.today(at: now, in: timeZone), timezone: timeZone.identifier)]
+            }
+            if plan.createdAt == nil { plan.createdAt = now }
+            plans = [plan]
         }
-        if plan.createdAt == nil { plan.createdAt = now }
-        try write(db, ContentChange(exercises: seed.catalog, plans: [plan], recommendations: seed.sampleRecommendations, settings: seed.settings),
+        try write(db, ContentChange(exercises: seed.catalog, plans: plans, recommendations: seed.sampleRecommendations, settings: seed.settings),
                   now: now, timeZone: timeZone)
         for session in seed.sampleHistory {
             try insertHistory(db, session, source: "sample")

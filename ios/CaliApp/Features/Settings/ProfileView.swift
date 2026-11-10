@@ -92,9 +92,9 @@ struct ProfileView: View {
                     Toggle("Live Activity trên màn khoá", isOn: setting(\.liveActivityEnabled)).frame(minHeight: 52)
                 }
 
-                group("Dữ liệu", footer: (store.auth.allowsSync ? "Dữ liệu lưu trên iPhone này trước, rồi đồng bộ với tài khoản khi có mạng." : "Dữ liệu chỉ lưu trên iPhone này (chưa đồng bộ máy chủ).") + " Khôi phục sẽ xoá lịch sử, giáo án đã sửa và quyết định đề xuất.") {
+                group("Dữ liệu", footer: (store.auth.allowsSync ? "Dữ liệu lưu trên iPhone này trước, rồi đồng bộ với tài khoản khi có mạng." : "Dữ liệu chỉ lưu trên iPhone này (chưa đồng bộ máy chủ).") + " Xoá dữ liệu trên máy sẽ bỏ lịch sử, giáo án và thay đổi chưa gửi; danh mục bài tập và dữ liệu đã có trên máy chủ được tải lại.") {
                     Button { confirmReset = true } label: {
-                        CardRow(title: "Khôi phục dữ liệu mẫu", tint: .caliError) { EmptyView() }
+                        CardRow(title: "Xoá dữ liệu trên máy", tint: .caliError) { EmptyView() }
                     }
                     .buttonStyle(.plain)
                 }
@@ -123,12 +123,20 @@ struct ProfileView: View {
         .caliScreen()
         .navigationTitle("Cá nhân")
         .toolbarTitleDisplayMode(.large)
-        .confirmationDialog("Khôi phục dữ liệu mẫu?", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("Xoá và khôi phục", role: .destructive) { store.resetDemoData() }
+        .confirmationDialog("Xoá dữ liệu trên máy?", isPresented: $confirmReset, titleVisibility: .visible) {
+            Button("Xoá dữ liệu", role: .destructive) { store.clearLocalData() }
             Button("Huỷ", role: .cancel) {}
         } message: {
-            Text(store.activeSessionInProgress ? "Buổi tập đang dở cũng sẽ bị huỷ." : "Không thể hoàn tác.")
+            Text(Self.clearMessage(pending: store.sync.status.pending, workoutActive: store.activeSessionInProgress))
         }
+    }
+
+    static func clearMessage(pending: Int, workoutActive: Bool) -> String {
+        var parts: [String] = []
+        if pending > 0 { parts.append("\(pending) thay đổi chưa gửi sẽ mất.") }
+        if workoutActive { parts.append("Buổi tập đang dở cũng sẽ bị huỷ.") }
+        parts.append("Không thể hoàn tác.")
+        return parts.joined(separator: " ")
     }
 
     /// "Tuần này" across every followed plan (IOS-017): sessions done / scheduled, minutes, km, adherence and a line per plan.

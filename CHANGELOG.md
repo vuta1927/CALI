@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- iOS starts empty and reads its catalog from the server (PO decision 2026-11-10, all builds). No contract change.
+  - **CaliCore:** `ContentSeed.empty`; `ExerciseCatalogAPI`/`URLSessionExerciseCatalogAPI` (`GET /v1/exercises`, anonymous, paged; an exercise of an unknown type is skipped) and `ExerciseCatalogRefresher` (server fields over the local row, local-only fields kept; an empty or unreachable server never empties the phone).
+  - **App:** the real app (on-disk store) seeds no starter plan, sample history, sample recommendations or bundled catalog; in-memory stores and tests keep them. The catalog refreshes at launch, when the app becomes active and before each sync; new exercises also trigger a sync so pulled plans that waited for them apply. The quick test and the sample plan are offered only if their exercises are in the catalog. Profile: "Khôi phục dữ liệu mẫu" became "Xoá dữ liệu trên máy" (clears everything, next sync pulls from the start).
+  - **Limits:** the server has no level, muscle names, mistakes or poster, so fetched exercises show level "Cơ bản", focus tags as muscles and a placeholder poster until IOS-006. Never synced (offline, no server address) the catalog is empty and no workout can be built: this is the offline-first cost of the decision.
+  - **Dev credentials:** DEBUG builds read launch arguments `-caliDevBaseURL` and `-caliDevToken` into the Keychain (`devicectl device process launch ... -- -caliDevBaseURL <url> -caliDevToken <jwt>`), so Diagnostics needs no typing. Nothing is stored in the repo or binary.
+  - **Tests:** CaliCore 139, app 86.
 - IOS-007 fix found against a real test server (iOS only; no API/contract change).
   - the session payload no longer carries `currentExecutionId`/`currentSetIndex`. The server checks that pointer before the write and an execution needs its session first, so every new session and its executions waited for each other (`dependency_missing` forever). Fake-API tests could not show this. Opt-in `LiveServerTests` (env `CALI_LIVE_BASE_URL`/`CALI_LIVE_TOKEN`, skipped otherwise) now covers session create → abandon → pull against a real server.
 - IOS-008: Sign in with Apple client and guest → account attach (iOS only; no API/contract change). Tested with fake tokens only.
