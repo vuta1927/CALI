@@ -26,7 +26,9 @@ struct PlanCreateView: View {
                     Section("Bắt đầu từ") {
                         Picker("Bắt đầu từ", selection: $draft.method) {
                             Text("Trống").tag(PlanDraft.Method.blank)
-                            Text("Giáo án mẫu").tag(PlanDraft.Method.template)
+                            if store.canUse(PlannedWorkout(id: UUID(), weekday: 1, title: "", focus: "", exercises: MockData.plan.workouts.flatMap(\.exercises))) {
+                                Text("Giáo án mẫu").tag(PlanDraft.Method.template)
+                            }
                         }
                         .pickerStyle(.segmented)
                         .accessibilityLabel("Bắt đầu từ")

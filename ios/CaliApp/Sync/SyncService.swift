@@ -17,6 +17,7 @@ final class SyncService {
     @ObservationIgnored private let auth: AuthService?
     @ObservationIgnored private var debounce: Task<Void, Never>?
     @ObservationIgnored private var running: Task<Void, Never>?
+    @ObservationIgnored private var isRefreshingCatalog = false
     /// Called after pulled changes or a "use the server's version" decision changed local content.
     @ObservationIgnored var onContentChanged: (() -> Void)?
 
@@ -60,7 +61,20 @@ final class SyncService {
         }
     }
 
+    /// The published exercise catalog (anonymous). Offline or failing it changes nothing; new exercises also unblock pulled
+    /// plans that were waiting for them, so a sync follows.
+    func refreshCatalog() async {
+        guard let base = auth?.baseURL, !isRefreshingCatalog else { return }
+        isRefreshingCatalog = true
+        defer { isRefreshingCatalog = false }
+        let refresher = ExerciseCatalogRefresher(api: URLSessionExerciseCatalogAPI(baseURL: base), coordinator: coordinator)
+        guard let changed = try? await refresher.refresh(), changed > 0 else { return }
+        onContentChanged?()
+        syncSoon()
+    }
+
     func syncNow() async {
+        await refreshCatalog()
         guard isConfigured, !isSyncing else { refresh(); return }
         isSyncing = true
         let client = self.client

@@ -63,7 +63,10 @@ final class AppStore {
     /// - Parameters:
     ///   - persists: `false` uses a fresh in-memory database (unit tests hosted in the app).
     ///   - database: an explicit database (tests that simulate a relaunch share one).
-    init(persists: Bool = true, now: Date = Date(), database: AppDatabase? = nil) {
+    ///   - starterContent: the bundled starter plan, sample history and catalog. Default: only for in-memory stores and tests that
+    ///     pass a database; the real app starts empty and takes its catalog from the server.
+    init(persists: Bool = true, now: Date = Date(), database: AppDatabase? = nil, starterContent: Bool? = nil) {
+        let starter = starterContent ?? (database != nil || !persists)
         var openError: String?
         if let database {
             self.database = database
@@ -75,12 +78,16 @@ final class AppStore {
         }
         let loaded: LocalContent
         do {
-            try self.database.content.seedIfEmpty(AppDatabase.seed(now: now), now: now)
-            try self.database.content.insertMissingExercises(MockData.catalog, now: now)
+            if starter {
+                try self.database.content.seedIfEmpty(AppDatabase.seed(now: now), now: now)
+                try self.database.content.insertMissingExercises(MockData.catalog, now: now)
+            } else {
+                try self.database.content.seedIfEmpty(AppDatabase.emptySeed(), now: now)
+            }
             loaded = try self.database.content.load()
         } catch {
             openError = "Không đọc được dữ liệu trên máy (\(error.localizedDescription))."
-            loaded = LocalContent(catalog: MockData.catalog, plans: [MockData.plan], history: [], recommendations: [], audit: [], settings: AppSettings())
+            loaded = LocalContent(catalog: starter ? MockData.catalog : [], plans: starter ? [MockData.plan] : [], history: [], recommendations: [], audit: [], settings: AppSettings())
         }
         catalog = loaded.catalog
         plans = loaded.plans
@@ -120,6 +127,10 @@ final class AppStore {
     // MARK: Lookups
 
     func exercise(_ id: UUID) -> Exercise? { catalog.first { $0.id == id } }
+
+    /// The bundled demo workouts (quick test, sample plan) are offered only when every exercise they use is in the catalog, so a
+    /// catalog that comes from the server never shows a demo with missing exercises.
+    func canUse(_ workout: PlannedWorkout) -> Bool { workout.exercises.allSatisfy { exercise($0.exerciseId) != nil } }
 
     func workout(_ id: UUID) -> PlannedWorkout? {
         if id == MockData.quickTestId { return MockData.quickTest }
@@ -415,6 +426,28 @@ final class AppStore {
             }
         }
         sync.reconfigure()
+    }
+
+    /// Wipes everything on this phone and starts empty: the catalog and the plans then come from the server (the next sync
+    /// pulls from the beginning). Changes not yet sent are lost, so the caller says so first. Ends any active workout.
+    func clearLocalData(now: Date = Date()) {
+        isPlayerPresented = false
+        player = nil
+        notifications.cancelAll()
+        liveActivity.sync(nil, enabled: false)
+        var fresh = AppSettings()
+        fresh.hasSeenWelcome = settings.hasSeenWelcome
+        do {
+            try database.content.resetAll(to: AppDatabase.emptySeed(settings: fresh), now: now)
+            reloadContent()
+            sync.refresh()
+            Task {
+                await sync.refreshCatalog()
+                sync.syncSoon()
+            }
+        } catch {
+            alertMessage = "Không xoá được dữ liệu trên máy. (\(error.localizedDescription))"
+        }
     }
 
     /// Wipes local data and restores the sample plan/history. Ends any active workout first.

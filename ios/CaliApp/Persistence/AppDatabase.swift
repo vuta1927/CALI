@@ -51,6 +51,9 @@ struct AppDatabase {
         AppDatabase(coordinator: WorkoutCoordinator(writer: try CaliDatabase.openInMemory()))
     }
 
+    /// No bundled plan, history or catalog: what the app shows comes from the server (catalog) and from the user.
+    static func emptySeed(settings: AppSettings = AppSettings()) -> ContentSeed { .empty(settings: settings) }
+
     static func seed(now: Date, settings: AppSettings = AppSettings()) -> ContentSeed {
         ContentSeed(catalog: MockData.catalog, plan: MockData.plan, sampleHistory: MockData.sampleHistory(now: now),
                     sampleRecommendations: MockData.sampleRecommendations(), settings: settings)

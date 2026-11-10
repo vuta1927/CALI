@@ -180,3 +180,33 @@ private final class MemorySessionStore: SessionStore, @unchecked Sendable {
     func save(_ session: StoredSession) throws { lock.withLock { value = session } }
     func clear() throws { lock.withLock { value = nil } }
 }
+
+/// The real app starts with no bundled plan, history or catalog; the catalog comes from the server.
+@MainActor
+final class ServerOnlyStartTests: XCTestCase {
+    func testStartsEmptyWithNoDemoOffered() throws {
+        let store = AppStore(persists: false, starterContent: false)
+        XCTAssertTrue(store.plans.isEmpty)
+        XCTAssertTrue(store.catalog.isEmpty)
+        XCTAssertTrue(store.history.isEmpty)
+        XCTAssertTrue(store.recommendations.isEmpty)
+        XCTAssertFalse(store.canUse(MockData.quickTest), "the quick test needs bundled exercises that are not in the catalog")
+    }
+
+    func testClearLocalDataLeavesNothingBehind() throws {
+        let store = AppStore(persists: false)
+        XCTAssertFalse(store.plans.isEmpty)
+        store.clearLocalData()
+        XCTAssertTrue(store.plans.isEmpty)
+        XCTAssertTrue(store.catalog.isEmpty)
+        XCTAssertTrue(store.history.isEmpty)
+        XCTAssertTrue(store.recommendations.isEmpty)
+        XCTAssertTrue(store.weightEntries.isEmpty)
+        XCTAssertEqual(store.sync.status.pending, 0)
+    }
+
+    func testClearMessageNamesWhatIsLost() {
+        XCTAssertTrue(ProfileView.clearMessage(pending: 2, workoutActive: true).contains("2 thay đổi chưa gửi"))
+        XCTAssertTrue(ProfileView.clearMessage(pending: 0, workoutActive: false).contains("Không thể hoàn tác"))
+    }
+}

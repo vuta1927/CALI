@@ -7,6 +7,12 @@ import SwiftUI
 struct CaliAppMain: App {
     @State private var store = AppStore(persists: !CaliAppMain.isRunningTests && !CaliAppMain.isDebugScenario, now: CaliAppMain.seedNow)
 
+    init() {
+        #if DEBUG
+        DevCredentialStore.adoptLaunchArguments()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

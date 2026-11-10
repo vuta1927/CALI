@@ -38,6 +38,14 @@ enum DevCredentialStore {
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
+    /// Launch arguments `-caliDevBaseURL <url>` and `-caliDevToken <jwt>` (from `devicectl ... process launch`) go into the
+    /// Keychain, so a dev build can be pointed at a backend without typing on the phone. They exist only on that command line:
+    /// nothing is stored in the repo, the binary or UserDefaults (an argument is not persisted).
+    static func adoptLaunchArguments(_ defaults: UserDefaults = .standard) {
+        if let url = defaults.string(forKey: "caliDevBaseURL") { write(.baseURL, url) }
+        if let token = defaults.string(forKey: "caliDevToken") { write(.token, token) }
+    }
+
     private static func base(_ item: Item) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: item.rawValue]
     }

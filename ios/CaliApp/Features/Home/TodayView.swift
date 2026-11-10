@@ -22,7 +22,7 @@ struct TodayView: View {
                 }
                 todaySection(now: now)
                 weekSection(now: now)
-                quickTestSection
+                if store.canUse(MockData.quickTest) { quickTestSection }
                 if store.pendingRecommendationCount > 0 {
                     recommendationSection
                 }
