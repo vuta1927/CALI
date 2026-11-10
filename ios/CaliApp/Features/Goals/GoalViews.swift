@@ -283,12 +283,15 @@ struct GoalEditorView: View {
                             .foregroundStyle(Color.caliSecondary)
                     } else {
                         group("Loại mục tiêu") {
-                            HStack {
-                                ForEach(Self.kinds, id: \.0) { kind, label, icon in
-                                    FilterChip(title: label, systemImage: icon, isSelected: draft.kind == kind) {
-                                        draft.kind = kind
-                                        draft.indicatorId = nil
-                                        if kind != .milestone { draft.unlockAfterGoalId = nil }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack {
+                                    ForEach(Self.kinds, id: \.0) { kind, label, icon in
+                                        FilterChip(title: label, systemImage: icon, isSelected: draft.kind == kind) {
+                                            draft.kind = kind
+                                            draft.indicatorId = nil
+                                            if kind != .milestone { draft.unlockAfterGoalId = nil }
+                                        }
+                                        .fixedSize()
                                     }
                                 }
                             }
