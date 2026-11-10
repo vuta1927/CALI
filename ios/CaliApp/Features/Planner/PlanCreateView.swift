@@ -22,19 +22,7 @@ struct PlanCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if !isClone {
-                    Section("Bắt đầu từ") {
-                        Picker("Bắt đầu từ", selection: $draft.method) {
-                            Text("Trống").tag(PlanDraft.Method.blank)
-                            if store.canUse(PlannedWorkout(id: UUID(), weekday: 1, title: "", focus: "", exercises: MockData.plan.workouts.flatMap(\.exercises))) {
-                                Text("Giáo án mẫu").tag(PlanDraft.Method.template)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .accessibilityLabel("Bắt đầu từ")
-                    }
-                    .listRowBackground(Color.caliSurface)
-                } else if case .clone(let source) = draft.method, let original = store.plan(source) {
+                if case .clone(let source) = draft.method, let original = store.plan(source) {
                     Section {
                         Label("Sao chép \(original.workouts.count) buổi từ \"\(original.title)\"", systemImage: "plus.square.on.square")
                     } footer: {

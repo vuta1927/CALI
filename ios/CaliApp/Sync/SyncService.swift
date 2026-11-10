@@ -20,6 +20,8 @@ final class SyncService {
     @ObservationIgnored private var isRefreshingCatalog = false
     /// Called after pulled changes or a "use the server's version" decision changed local content.
     @ObservationIgnored var onContentChanged: (() -> Void)?
+    /// Called with the cached or newly downloaded criteria and indicators (CON-008).
+    @ObservationIgnored var onConfigChanged: ((PublishedConfig) -> Void)?
 
     init(coordinator: WorkoutCoordinator, auth: AuthService? = nil) {
         self.coordinator = coordinator
@@ -67,10 +69,25 @@ final class SyncService {
         guard let base = auth?.baseURL, !isRefreshingCatalog else { return }
         isRefreshingCatalog = true
         defer { isRefreshingCatalog = false }
-        let refresher = ExerciseCatalogRefresher(api: URLSessionExerciseCatalogAPI(baseURL: base), coordinator: coordinator)
+        await refreshConfig(base)
+        let refresher = ExerciseCatalogRefresher(api: URLSessionExerciseCatalogAPI(baseURL: base), coordinator: coordinator,
+                                                media: ExerciseMediaCache(directory: LocalMedia.directory))
         guard let changed = try? await refresher.refresh(), changed > 0 else { return }
         onContentChanged?()
         syncSoon()
+    }
+
+    /// At launch, before any network: the last downloaded config, or the bundled one.
+    func loadCachedConfig() async {
+        onConfigChanged?(await CriteriaConfigStore(coordinator: coordinator).load())
+    }
+
+    /// `GET /v1/criteria-config` with the cached ETag. Offline, 304 or a body this build cannot read keep the copy in use.
+    private func refreshConfig(_ base: URL) async {
+        let store = CriteriaConfigStore(coordinator: coordinator)
+        let refresher = CriteriaConfigRefresher(api: URLSessionCriteriaConfigAPI(baseURL: base), store: store)
+        guard (try? await refresher.refresh()) == true else { return }
+        onConfigChanged?(await store.load())
     }
 
     func syncNow() async {

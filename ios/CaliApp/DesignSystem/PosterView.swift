@@ -3,8 +3,8 @@ import UIKit
 
 /// Exercise identity image (AGENTS rule 2: visual-first).
 ///
-/// Personal media overlays the labeled fallback. Bundled production catalog media remains
-/// TODO(POC-002): replace sample placeholders when the licensed media pipeline is ready.
+/// A server poster (downloaded and kept by `ExerciseMediaCache`, BE-006) or the user's own photo overlays the labeled
+/// fallback. An exercise the server has no published poster for still shows the placeholder.
 struct PosterView: View {
     let exercise: Exercise?
     var height: CGFloat = 180

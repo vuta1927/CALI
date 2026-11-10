@@ -46,21 +46,6 @@ final class ContentEditingTests: XCTestCase {
     }
 
     @MainActor
-    func testCannotInvalidateBundledQuickTestPrescription() throws {
-        let store = AppStore(persists: false)
-        let item = try XCTUnwrap(MockData.quickTest.exercises.first { $0.exerciseId == MockData.pushUp })
-        XCTAssertFalse(store.starterPlan.workouts.contains { $0.exercises.contains { $0.exerciseId == item.exerciseId } })
-        XCTAssertFalse(store.history.contains { $0.exerciseIds.contains(item.exerciseId) })
-        XCTAssertNil(store.player)
-        var exercise = try XCTUnwrap(store.exercise(item.exerciseId))
-        let previous = exercise
-        exercise.type = exercise.type == .reps ? .staticHold : .reps
-        XCTAssertFalse(store.saveExercise(exercise))
-        XCTAssertEqual(store.exercise(item.exerciseId), previous)
-        XCTAssertEqual(store.exercise(item.exerciseId)?.type, item.target.type)
-    }
-
-    @MainActor
     func testInvalidMediaIsRejected() {
         XCTAssertNil(ExerciseMediaReference.remote("file:///private/data"))
         XCTAssertNil(ExerciseMediaReference.remote("javascript:alert(1)"))

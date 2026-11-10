@@ -57,6 +57,7 @@ struct RootView: View {
             }
         }
         .task {
+            await store.sync.loadCachedConfig()
             await store.auth.restore()
             await store.sync.refreshCatalog()
         }

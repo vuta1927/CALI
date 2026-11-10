@@ -184,13 +184,12 @@ private final class MemorySessionStore: SessionStore, @unchecked Sendable {
 /// The real app starts with no bundled plan, history or catalog; the catalog comes from the server.
 @MainActor
 final class ServerOnlyStartTests: XCTestCase {
-    func testStartsEmptyWithNoDemoOffered() throws {
+    func testStartsEmpty() throws {
         let store = AppStore(persists: false, starterContent: false)
         XCTAssertTrue(store.plans.isEmpty)
         XCTAssertTrue(store.catalog.isEmpty)
         XCTAssertTrue(store.history.isEmpty)
         XCTAssertTrue(store.recommendations.isEmpty)
-        XCTAssertFalse(store.canUse(MockData.quickTest), "the quick test needs bundled exercises that are not in the catalog")
     }
 
     func testClearLocalDataLeavesNothingBehind() throws {

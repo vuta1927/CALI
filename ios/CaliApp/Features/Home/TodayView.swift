@@ -2,7 +2,7 @@ import CaliDomain
 import SwiftUI
 
 /// "Hôm nay" tab (UX-02, MP-09): resume banner, event countdowns, today's workouts from every followed
-/// plan, this week, quick test, AI.
+/// plan, this week, AI.
 ///
 /// Mockup blocks that need features not built yet are left out rather than filled with sample
 /// numbers: running card (IOS-016).
@@ -22,7 +22,6 @@ struct TodayView: View {
                 }
                 todaySection(now: now)
                 weekSection(now: now)
-                if store.canUse(MockData.quickTest) { quickTestSection }
                 if store.pendingRecommendationCount > 0 {
                     recommendationSection
                 }
@@ -143,32 +142,6 @@ struct TodayView: View {
                     StatTile(value: "\(doneCount)/\(items.count)", label: "Buổi xong", systemImage: "checkmark.circle", tint: .caliAccent)
                     StatTile(value: "\(done.reduce(0) { $0 + $1.completedSetCount })", label: "Set xong", systemImage: "square.stack.3d.up")
                     StatTile(value: "\(done.reduce(0) { $0 + $1.durationMinutes })", label: "Phút tập", systemImage: "clock")
-                }
-            }
-            .caliCard()
-        }
-    }
-
-    private var quickTestSection: some View {
-        let quick = MockData.quickTest
-        return VStack(alignment: .leading, spacing: Spacing.m) {
-            SectionHeader(title: "Thử nhanh")
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                PosterStack(exercises: store.exercises(of: quick), size: 48)
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(quick.title)
-                            .font(.headline)
-                            .foregroundStyle(Color.caliText)
-                        Text(quick.focus)
-                            .font(.footnote)
-                            .foregroundStyle(Color.caliSecondary)
-                    }
-                    Spacer()
-                    Button("Thử", systemImage: "play.fill") { store.startWorkout(quick) }
-                        .buttonStyle(.caliSecondary)
-                        .fixedSize()
-                        .accessibilityHint("Bắt đầu buổi thử với đủ 5 loại bài tập")
                 }
             }
             .caliCard()
