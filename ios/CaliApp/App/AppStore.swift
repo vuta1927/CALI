@@ -42,6 +42,21 @@ final class AppStore {
     /// Counts and states for the dev-only Diagnostics screen (IOS-012).
     func databaseDiagnostics() throws -> DatabaseDiagnostics { try DatabaseDiagnostics.read(database.coordinator.writer) }
     #endif
+    /// IOS-007: outbox sync and its status (Profile "Đồng bộ").
+    /// IOS-008: Sign in with Apple and the account this device's data belongs to.
+    @ObservationIgnored private(set) lazy var auth: AuthService = {
+        let service = AuthService(coordinator: database.coordinator)
+        service.onSessionChanged = { [weak self] in
+            self?.sync.reconfigure()
+            self?.sync.syncSoon()
+        }
+        return service
+    }()
+    @ObservationIgnored private(set) lazy var sync: SyncService = {
+        let service = SyncService(coordinator: database.coordinator, auth: auth)
+        service.onContentChanged = { [weak self] in self?.reloadContent() }
+        return service
+    }()
     @ObservationIgnored private let notifications = NotificationService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
 
@@ -183,7 +198,10 @@ final class AppStore {
     /// Returns `nil` and shows an alert when the database write failed; nothing changed then.
     func execute(_ command: Command, sessionTitle: String? = nil) -> HandleResult? {
         do {
-            return try database.coordinator.handle(command, sessionTitle: sessionTitle)
+            let result = try database.coordinator.handle(command, sessionTitle: sessionTitle)
+            // Not while a workout runs: the network stays out of the player; rows go out after the session or on foreground.
+            if !result.replayed, result.state?.isActive != true { sync.syncSoon() }
+            return result
         } catch {
             alertMessage = "Không lưu được thao tác trên máy. Hãy thử lại. (\(error.localizedDescription))"
             return nil
@@ -375,6 +393,28 @@ final class AppStore {
         guard commit(ContentChange(settings: copy)) else { return }
         if notificationsTurnedOn { notifications.requestAuthorizationIfNeeded() }
         syncSideEffects()
+    }
+
+    /// Sign-out (docs/08 §6): the tokens go first and the sync in flight finishes, then the user's choice about local data
+    /// is applied. Deleting also ends an active workout, like a reset.
+    func signOut(deleteLocalData: Bool, now: Date = Date()) async {
+        await auth.endSession()
+        await sync.stopAndWait()
+        if deleteLocalData {
+            isPlayerPresented = false
+            player = nil
+            notifications.cancelAll()
+            liveActivity.sync(nil, enabled: false)
+            var fresh = AppSettings()
+            fresh.hasSeenWelcome = settings.hasSeenWelcome
+            do {
+                try auth.wipeLocalData(seed: AppDatabase.seed(now: now, settings: fresh), now: now)
+                reloadContent()
+            } catch {
+                alertMessage = "Không xoá được dữ liệu trên máy. (\(error.localizedDescription))"
+            }
+        }
+        sync.reconfigure()
     }
 
     /// Wipes local data and restores the sample plan/history. Ends any active workout first.

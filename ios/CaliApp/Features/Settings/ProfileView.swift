@@ -32,6 +32,20 @@ struct ProfileView: View {
                             Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
                         }
                     }
+                    CardDivider()
+                    NavigationLink { AccountView() } label: {
+                        CardRow(systemImage: "person.crop.circle", title: "Tài khoản") {
+                            Text(store.auth.allowsSync ? "Đã đăng nhập" : "Chưa đăng nhập").font(.subheadline).foregroundStyle(Color.caliSecondary)
+                            Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+                        }
+                    }
+                    CardDivider()
+                    NavigationLink { SyncStatusView() } label: {
+                        CardRow(systemImage: "arrow.triangle.2.circlepath", title: "Đồng bộ") {
+                            Text(SyncStatusView.summary(store.sync)).font(.subheadline).foregroundStyle(Color.caliSecondary)
+                            Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+                        }
+                    }
                     #if DEBUG
                     CardDivider()
                     NavigationLink { DiagnosticsView() } label: {
@@ -78,7 +92,7 @@ struct ProfileView: View {
                     Toggle("Live Activity trên màn khoá", isOn: setting(\.liveActivityEnabled)).frame(minHeight: 52)
                 }
 
-                group("Dữ liệu", footer: "Dữ liệu chỉ lưu trên iPhone này (chưa đồng bộ máy chủ). Khôi phục sẽ xoá lịch sử, giáo án đã sửa và quyết định đề xuất.") {
+                group("Dữ liệu", footer: (store.auth.allowsSync ? "Dữ liệu lưu trên iPhone này trước, rồi đồng bộ với tài khoản khi có mạng." : "Dữ liệu chỉ lưu trên iPhone này (chưa đồng bộ máy chủ).") + " Khôi phục sẽ xoá lịch sử, giáo án đã sửa và quyết định đề xuất.") {
                     Button { confirmReset = true } label: {
                         CardRow(title: "Khôi phục dữ liệu mẫu", tint: .caliError) { EmptyView() }
                     }

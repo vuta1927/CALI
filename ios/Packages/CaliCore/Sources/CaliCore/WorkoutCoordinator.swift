@@ -288,8 +288,16 @@ public final class WorkoutCoordinator: Sendable {
         let creating = state == nil || state?.sessionId != next.sessionId
         if creating {
             try Self.insert(db, next, title: sessionTitle ?? "")
+            let zone = TimeZone.current
+            let localDate = SyncPayloads.localDate(next.startedAt, timeZone: zone)
+            try db.execute(sql: "UPDATE local_session_state SET local_date = ?, timezone = ? WHERE session_id = ?",
+                           arguments: [localDate, zone.identifier, DBText.id(next.sessionId)])
             try Self.appendOutbox(db, commandId: command.commandId, entityType: "workout_session", entityId: next.sessionId,
-                                  baseVersion: 0, changedAt: now, payload: next)
+                                  baseVersion: 0, changedAt: now, payload: SyncPayloads.WorkoutSession(next, localDate: localDate, timezone: zone.identifier))
+            for (index, spec) in next.executions.enumerated() {
+                try Self.appendOutbox(db, commandId: command.commandId, entityType: "exercise_execution", entityId: spec.id,
+                                      baseVersion: 0, changedAt: now, payload: SyncPayloads.ExerciseExecution(sessionId: next.sessionId, spec: spec, orderIndex: index))
+            }
         } else if let state {
             try Self.update(db, from: state, to: next)
         }
@@ -306,13 +314,16 @@ public final class WorkoutCoordinator: Sendable {
                 ]
             )
             try Self.appendOutbox(db, commandId: command.commandId, entityType: "set_result", entityId: record.setResultId,
-                                  baseVersion: 0, changedAt: now, payload: record)
+                                  baseVersion: 0, changedAt: now, payload: SyncPayloads.SetResult(record))
         }
 
         if !creating, next.phase.isTerminal, state?.phase.isTerminal == false {
-            // TODO(IOS-001): baseVersion must be the server version acknowledged by sync; unknown in the POC.
+            // baseVersion is nil here: the sync engine rebases it to the server version it acknowledged (docs/08 §3).
+            let stored = try Row.fetchOne(db, sql: "SELECT local_date, timezone FROM local_session_state WHERE session_id = ?", arguments: [DBText.id(next.sessionId)])
+            let zone = (stored?["timezone"] as String?).flatMap(TimeZone.init(identifier:)) ?? TimeZone.current
+            let localDate = (stored?["local_date"] as String?) ?? SyncPayloads.localDate(next.startedAt, timeZone: zone)
             try Self.appendOutbox(db, commandId: command.commandId, entityType: "workout_session", entityId: next.sessionId,
-                                  baseVersion: nil, changedAt: now, payload: next)
+                                  baseVersion: nil, changedAt: now, payload: SyncPayloads.WorkoutSession(next, localDate: localDate, timezone: zone.identifier))
         }
         if next.phase.isTerminal, state?.phase.isTerminal != true {
             try Self.insertHistory(db, finished: next)
@@ -432,14 +443,12 @@ public final class WorkoutCoordinator: Sendable {
         _ db: Database, commandId: UUID, entityType: String, entityId: UUID, baseVersion: Int?, changedAt: Date, payload: P
     ) throws {
         let mutationId = CommandIdentity.mutationId(commandId: commandId, entityType: entityType, entityId: entityId)
-        // TODO(IOS-001): payload is the domain value, not yet mapped to contracts/entity-payloads.schema.json;
-        // map and validate against the sync contract before any upload. Expires when sync push is implemented.
         let envelope = OutboxEnvelope(mutationId: mutationId, entityType: entityType, entityId: entityId, action: "upsert",
                                       baseVersion: baseVersion, clientChangedAt: changedAt, payload: payload)
         try db.execute(
             sql: """
-                INSERT INTO sync_outbox (mutation_id, entity_type, entity_id, action, base_version, json, created_at)
-                VALUES (?, ?, ?, 'upsert', ?, ?, ?)
+                INSERT INTO sync_outbox (mutation_id, entity_type, entity_id, action, base_version, json, created_at, payload_version)
+                VALUES (?, ?, ?, 'upsert', ?, ?, ?, 2)
                 """,
             arguments: [DBText.id(mutationId), entityType, DBText.id(entityId), baseVersion, try encode(envelope), DBText.time(changedAt)]
         )

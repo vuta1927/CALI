@@ -128,6 +128,7 @@ public final class ContentStore: Sendable {
         try writer.immediateTransaction { db in
             if let audit = change.audit, try Self.auditExists(db, id: audit.id) { return .duplicate }
             try Self.write(db, change, now: now, timeZone: timeZone)
+            try ContentOutbox.enqueueDirty(db, now: now)
             return .applied
         }
     }
@@ -161,9 +162,9 @@ public final class ContentStore: Sendable {
     public func resetAll(to seed: ContentSeed, now: Date = Date(), timeZone: TimeZone = .current) throws {
         try writer.immediateTransaction { db in
             for table in [
-                "planned_exercises", "planned_workouts", "plan_activations", "training_plans", "exercises",
+                "planned_exercises", "planned_workouts", "plan_activations", "plan_phases", "plan_goals", "body_measurements", "training_plans", "exercises",
                 "session_history", "recommendations", "audit_log", "app_settings", "set_results",
-                "local_session_state", "sync_outbox", "processed_commands",
+                "local_session_state", "sync_outbox", "sync_versions", "sync_inbox", "sync_cursor", "processed_commands",
             ] {
                 try db.execute(sql: "DELETE FROM \(table)")
             }
@@ -294,6 +295,15 @@ public final class ContentStore: Sendable {
         try upsertPhases(db, planId: planId, plan.phases, now: now)
 
         let keepWorkouts = plan.workouts.map { DBText.id($0.id) }
+        let removedWorkouts = try String.fetchAll(db, sql: "SELECT id FROM planned_workouts WHERE plan_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
+                                                  arguments: [planId, try DBJSON.encode(keepWorkouts)]).compactMap(UUID.init(uuidString:))
+        if !removedWorkouts.isEmpty {
+            // Children first: the server deletes in the order sent, and the rows are gone locally after this statement.
+            let exercises = try String.fetchAll(db, sql: "SELECT id FROM planned_exercises WHERE planned_workout_id IN (SELECT value FROM json_each(?))",
+                                                arguments: [try DBJSON.encode(removedWorkouts.map(DBText.id))]).compactMap(UUID.init(uuidString:))
+            try ContentOutbox.enqueueHardDeletes(db, type: "planned_exercise", ids: exercises, now: now)
+            try ContentOutbox.enqueueHardDeletes(db, type: "planned_workout", ids: removedWorkouts, now: now)
+        }
         try db.execute(
             sql: "DELETE FROM planned_workouts WHERE plan_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
             arguments: [planId, try DBJSON.encode(keepWorkouts)]
@@ -310,6 +320,9 @@ public final class ContentStore: Sendable {
                 arguments: [workoutId, planId, workout.weekday, workout.title, workout.focus, workoutIndex]
             )
             let keepExercises = workout.exercises.map { DBText.id($0.id) }
+            let removedExercises = try String.fetchAll(db, sql: "SELECT id FROM planned_exercises WHERE planned_workout_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
+                                                       arguments: [workoutId, try DBJSON.encode(keepExercises)]).compactMap(UUID.init(uuidString:))
+            try ContentOutbox.enqueueHardDeletes(db, type: "planned_exercise", ids: removedExercises, now: now)
             try db.execute(
                 sql: "DELETE FROM planned_exercises WHERE planned_workout_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
                 arguments: [workoutId, try DBJSON.encode(keepExercises)]

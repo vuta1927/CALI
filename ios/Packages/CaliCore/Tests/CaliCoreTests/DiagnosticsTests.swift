@@ -29,7 +29,7 @@ final class DiagnosticsTests: XCTestCase {
                 """)
         }
         let snapshot = try DatabaseDiagnostics.read(db)
-        XCTAssertEqual(snapshot.migrations.last, "v4_body_measurements")
+        XCTAssertEqual(snapshot.migrations.last, "v6_sync_inbox")
         let body = try XCTUnwrap(snapshot.tables.first { $0.name == "body_measurements" })
         XCTAssertEqual(body.rows, 1)
         XCTAssertEqual(body.dirty, 1)

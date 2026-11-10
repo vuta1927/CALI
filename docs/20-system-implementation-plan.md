@@ -213,6 +213,17 @@ flowchart TB
 > - **Hoãn:** nối base URL/JWT vào client thật (IOS-007); outbox hiện chưa có mutation nội dung (`TODO(IOS-007)`).
 > - **Bằng chứng:** `evidence/IOS-012/README.md`.
 
+> **Trạng thái IOS-008 (2026-11-10):** client xong, chờ review; chỉ kiểm chứng với token giả (không có tài khoản Apple trả phí). `SessionManager` (một refresh một lúc, giữ refresh token mới nhất trong Keychain), `AppleNonce`, `AccountScope` (gắn hoặc giữ dữ liệu khách; tài khoản khác bị từ chối khi dữ liệu cũ còn), màn Cá nhân → Tài khoản, đăng xuất giữ/xoá dữ liệu (ADR-076). `resetAll` sửa để xoá cả số đo/mục tiêu/giai đoạn.
+> - **Còn mở:** entitlement `com.apple.developer.applesignin` + token Apple thật (`TODO(BE-004-APPLE)`, hết hạn khi QA-002 chạy đăng nhập thật); T-16 chưa chạy với backend.
+>
+> **Trạng thái IOS-007 slice 1 (2026-11-10):** code và test xong phần đẩy phiên/set, chờ review. Chưa kiểm chứng với backend thật (không có E2E; chỉ fake API và `URLProtocol`).
+> - **Đã làm:** payload `workout_session`/`exercise_execution`/`set_result` đúng schema (có test đối chiếu), `OutboxSyncEngine`, `URLSessionSyncAPI`, dòng "Đồng bộ" ở Cá nhân (ADR-075). Rule mockup giữ nguyên: không có trạng thái đồng bộ trong luồng lưu.
+> - **Slice 2 (pull) xong:** pull theo cursor, mỗi trang áp dụng và lưu cursor trong một transaction, `410` chỉ reset cursor (giữ outbox), thay đổi chưa có nơi áp dụng nằm trong `sync_inbox` (migration `v6_sync_inbox`), màn "Đồng bộ" hiện lần nhận gần nhất và số thay đổi chưa áp dụng.
+> - **Slice 3 xong:** `ContentOutbox` đẩy giáo án/kích hoạt/giai đoạn/buổi/bài/mục tiêu/cân nặng (parents trước, xoá mềm = `{id, deletedAt}`, xoá cứng của buổi/bài gửi delete), `ContentApplier` áp `sync_inbox` vào bảng nội dung (chờ khi máy còn thay đổi chưa xử lý), màn "Đồng bộ" có quyết định cho xung đột (giữ bản trên máy / dùng bản máy chủ) và mục bị từ chối (gửi lại / bỏ qua), câu cố định cho `active_plan_limit`, `plan_count_limit`, `pinned_goal_limit`, `goal_unlock_cycle`.
+> - **Còn mở:** `planned_workouts.focus` không có trong contract nên không đồng bộ (cần CON mới nếu muốn); phiên/set từ server không ghi vào lịch sử local; chưa so sánh được giá trị cân nặng ngay trong màn "Đồng bộ" (ADR-064); `ai_*` chờ IOS-010; chưa kiểm chứng với backend thật.
+> - **Hoãn (cũ):** giáo án/mục tiêu/cân nặng lên outbox, giải quyết xung đột, `active_plan_limit` (slice 3); `TODO(IOS-007)` ở `LegacySnapshotImporter` và nội dung chưa gỡ; auth thật là IOS-008.
+> - **Rủi ro:** phiên có `plannedWorkoutId` chưa có trên server sẽ nhận `dependency_missing` và chờ tới slice 3.
+
 > **Trạng thái IOS-004h (2026-11-10):** code và test xong, chờ review; đã chạy trên iPhone 15. Không đổi code Player, API hay contract: domain và coordinator đã có T-04/T-09 từ IOS-001; slice này khoá hành vi ở tầng player và đo ngân sách.
 > - **Test mới** (`CaliAppTests/PlayerHardeningTests`, 7): T-01 (poster, đích, 4 set, không cần mạng), T-03 (hết giờ giữ → `awaitingResult`, không có set result, không có mutation outbox; câu trả lời của người dùng là thứ được lưu, ADR-009), T-04 (bấm Lưu hai lần → 1 set result, 1 mutation `set_result`), T-06 (cả buổi offline: 3 set + 2 mutation `workout_session`, mọi dòng `pending`), nghỉ +30s đúng 30 giây, bỏ buổi giữ set đã xác nhận và cho bắt đầu buổi mới, đo confirm-set.
 > - **Ngân sách docs/14 "confirm-set < 100ms p95":** 60 set liên tiếp, DB file WAL. iPhone 15: p50 5,1 ms, p95 5,5 ms, max 5,6 ms (đạt). Simulator: p50 5,7 ms, p95 6,0 ms, max 34 ms.
