@@ -26,11 +26,8 @@ struct LaunchView: View {
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .tracking(4)
                     .foregroundStyle(Color.coamiCream)
-                ProgressView()
-                    .tint(Color.coamiCream)
-                    .padding(.top, Spacing.l)
-                    .accessibilityLabel("Đang chuẩn bị")
             }
+            .accessibilityElement(children: .combine)
         }
         .preferredColorScheme(.dark)
     }
