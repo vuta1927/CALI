@@ -46,10 +46,10 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(AuthTestConfig.With(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Cali"] = "Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none;Timeout=1",
-            }));
+            })));
         });
         using var client = factory.CreateClient();
 
@@ -90,10 +90,10 @@ public sealed class OpenApiContractTests : IClassFixture<OpenApiContractTests.Sp
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(AuthTestConfig.With(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Cali"] = "Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none;Timeout=1",
-            }));
+            })));
         });
         _ = factory.Server; // build the host
 

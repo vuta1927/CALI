@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Cali.Infrastructure.Auth;
 using Cali.IntegrationTests.Infrastructure;
+using Cali.Tests.Shared;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -31,11 +32,11 @@ public sealed class AuthTests(PostgresFixture postgres)
     }
 
     private static CaliApiFactory Factory(string environment, string connectionString, string signingKey) =>
-        new(environment, new Dictionary<string, string?>
+        new(environment, AuthTestConfig.With(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Cali"] = connectionString,
             ["Auth:DevTokens:SigningKey"] = signingKey,
-        });
+        }));
 
     private static async Task ProvisionUserAsync(string connectionString, Guid id, string? displayName = null)
     {

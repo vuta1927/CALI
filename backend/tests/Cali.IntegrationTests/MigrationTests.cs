@@ -113,11 +113,11 @@ public sealed partial class MigrationTests(PostgresFixture postgres)
     public async Task Api_startup_outside_Development_never_migrates()
     {
         var connectionString = await postgres.CreateBlankDatabaseAsync("mig_prod_startup");
-        await using var factory = new CaliApiFactory("Production", new Dictionary<string, string?>
+        await using var factory = new CaliApiFactory("Production", AuthTestConfig.With(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Cali"] = connectionString,
             ["Migrations:ApplyOnStartup"] = "true",
-        });
+        }));
 
         using var client = factory.CreateClient();
         (await client.GetAsync(new Uri("/health/live", UriKind.Relative))).IsSuccessStatusCode.ShouldBeTrue();
