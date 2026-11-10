@@ -35,5 +35,5 @@ docker run --rm -v "${PWD}:/src" -w /src/ios/Packages/CaliCore swift:6.2-noble b
 ## Giới hạn hiện tại (POC)
 
 - App chỉ dùng gói này qua màn **Cá nhân → POC thiết bị** (`ios/CaliApp/POC`), với một DB riêng `Application Support/POC/poc-002.sqlite`. `LocalStore` vẫn là store chính cho tới IOS-001.
-- Khi phiên đã tồn tại được cập nhật, `sync_outbox.base_version` hiện là `nil`, vì POC chưa biết version server đã xác nhận: `TODO(IOS-001)`. Payload trong outbox cũng chưa được ánh xạ sang `contracts/entity-payloads.schema.json`.
+- Outbox (IOS-007, ADR-075): từ migration `v5_sync_client` payload là bản ánh xạ của `contracts/entity-payloads.schema.json` (`payload_version = 2`, `SyncPayloads`), có test đối chiếu schema. Mutation cập nhật của phiên lưu `base_version = nil`; `OutboxSyncEngine` điền version server đã xác nhận (`sync_versions`) ngay trước lần gửi đầu tiên và không đổi sau đó. Dòng outbox cũ (payload là giá trị domain, chưa từng gửi được) được chuyển sang `legacy` và bị bỏ qua; dữ liệu vẫn nằm trong bảng cục bộ.
 - `handle` không tự gọi `reconcile`. App tự gọi `reconcile` ở tick foreground, tức là trong một callback thực thi được.

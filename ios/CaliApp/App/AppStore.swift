@@ -42,6 +42,12 @@ final class AppStore {
     /// Counts and states for the dev-only Diagnostics screen (IOS-012).
     func databaseDiagnostics() throws -> DatabaseDiagnostics { try DatabaseDiagnostics.read(database.coordinator.writer) }
     #endif
+    /// IOS-007: outbox sync and its status (Profile "Đồng bộ").
+    @ObservationIgnored private(set) lazy var sync: SyncService = {
+        let service = SyncService(coordinator: database.coordinator)
+        service.onContentChanged = { [weak self] in self?.reloadContent() }
+        return service
+    }()
     @ObservationIgnored private let notifications = NotificationService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
 
@@ -183,7 +189,10 @@ final class AppStore {
     /// Returns `nil` and shows an alert when the database write failed; nothing changed then.
     func execute(_ command: Command, sessionTitle: String? = nil) -> HandleResult? {
         do {
-            return try database.coordinator.handle(command, sessionTitle: sessionTitle)
+            let result = try database.coordinator.handle(command, sessionTitle: sessionTitle)
+            // Not while a workout runs: the network stays out of the player; rows go out after the session or on foreground.
+            if !result.replayed, result.state?.isActive != true { sync.syncSoon() }
+            return result
         } catch {
             alertMessage = "Không lưu được thao tác trên máy. Hãy thử lại. (\(error.localizedDescription))"
             return nil

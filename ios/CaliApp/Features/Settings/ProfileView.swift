@@ -32,6 +32,13 @@ struct ProfileView: View {
                             Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
                         }
                     }
+                    CardDivider()
+                    NavigationLink { SyncStatusView() } label: {
+                        CardRow(systemImage: "arrow.triangle.2.circlepath", title: "Đồng bộ") {
+                            Text(SyncStatusView.summary(store.sync)).font(.subheadline).foregroundStyle(Color.caliSecondary)
+                            Image(systemName: "chevron.right").foregroundStyle(Color.caliSecondary)
+                        }
+                    }
                     #if DEBUG
                     CardDivider()
                     NavigationLink { DiagnosticsView() } label: {

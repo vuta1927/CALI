@@ -14,10 +14,10 @@ final class CoordinatorTests: XCTestCase {
         defer { dir.remove() }
         do {
             let pool = try CaliDatabase.openPool(at: dir.dbURL)
-            XCTAssertEqual(try pool.read { try CaliDatabase.migrator.appliedIdentifiers($0) }.sorted(), ["v1", "v2_content", "v3_goals", "v4_body_measurements"])
+            XCTAssertEqual(try pool.read { try CaliDatabase.migrator.appliedIdentifiers($0) }.sorted(), ["v1", "v2_content", "v3_goals", "v4_body_measurements", "v5_sync_client", "v6_sync_inbox"])
         }
         let reopened = try CaliDatabase.openPool(at: dir.dbURL)
-        XCTAssertEqual(try reopened.read { try CaliDatabase.migrator.appliedIdentifiers($0) }.sorted(), ["v1", "v2_content", "v3_goals", "v4_body_measurements"])
+        XCTAssertEqual(try reopened.read { try CaliDatabase.migrator.appliedIdentifiers($0) }.sorted(), ["v1", "v2_content", "v3_goals", "v4_body_measurements", "v5_sync_client", "v6_sync_inbox"])
         let mode = try reopened.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }
         XCTAssertEqual(mode?.lowercased(), "wal")
     }
@@ -68,7 +68,7 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertTrue(again.replayed)
         XCTAssertEqual(again.outcome, first.outcome)
         let counts = try f.coordinator.counts()
-        XCTAssertEqual(counts.outbox, 1, "only the create_session outbox row")
+        XCTAssertEqual(counts.outbox, 2, "only the create_session rows: the session and its one execution")
         XCTAssertEqual(counts.processedCommands, 2)
 
         let recent = try f.coordinator.recentOutcomes(limit: 5)

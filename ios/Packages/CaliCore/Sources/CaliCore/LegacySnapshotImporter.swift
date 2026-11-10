@@ -14,8 +14,7 @@ import GRDB
 ///   first recorded session, or the snapshot creation day; a soft-deleted plan stays deleted with no
 ///   activation. The in-flight session (if any) is restored into `local_session_state` + `set_results`.
 ///
-/// TODO(IOS-007): imported rows are not enqueued in `sync_outbox`; they are `dirty` and sync push sends them
-/// first. Expires when IOS-007 implements push.
+/// Imported rows are `dirty` and are not enqueued here; the sync run queues them (`ContentOutbox`) once there is an account.
 public enum LegacySnapshotImporter {
     public static let source = "cali-poc.json"
 

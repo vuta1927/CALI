@@ -96,6 +96,12 @@ public enum CaliDatabase {
         migrator.registerMigration("v4_body_measurements") { db in
             try db.execute(sql: bodyMeasurementsSchemaV4)
         }
+        migrator.registerMigration("v5_sync_client") { db in
+            try db.execute(sql: syncClientSchemaV5)
+        }
+        migrator.registerMigration("v6_sync_inbox") { db in
+            try db.execute(sql: syncInboxSchemaV6)
+        }
         return migrator
     }
 
@@ -106,8 +112,8 @@ public enum CaliDatabase {
     ///
     /// Synced entities carry `server_version` (NULL until the server acknowledges a version) and `dirty`
     /// (1 = changed locally since the last acknowledged version).
-    /// TODO(IOS-007): content edits do not enqueue `sync_outbox` mutations yet; sync push sends every dirty
-    /// row first. Expires when IOS-007 implements push.
+    /// IOS-007 slice 3: `ContentOutbox` turns dirty rows into outbox mutations in the same transaction as the edit (and at the
+    /// start of each sync run); `dirty` is cleared when the server acknowledges the row as it still is.
     /// IOS-015: CON-005 phases (per revision) and goals (per lineage). Goals keep the full payload in `json`;
     /// `current` is computed on the device and never stored. Same sync columns as v2.
     static let goalsSchemaV3 = """
@@ -138,6 +144,51 @@ public enum CaliDatabase {
             dirty INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX plan_goals_lineage ON plan_goals(plan_lineage_id);
+        """
+
+    /// IOS-007: the sync client's bookkeeping. Outbox rows written before this version hold domain values, not
+    /// contract payloads (they were never uploadable, `TODO(IOS-001)`), so they are parked as `legacy` and never sent;
+    /// their data is still in the local tables. New rows carry `payload_version = 2` (entity-payloads.schema.json).
+    static let syncClientSchemaV5 = """
+        ALTER TABLE sync_outbox ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE sync_outbox ADD COLUMN next_attempt_at TEXT;
+        ALTER TABLE sync_outbox ADD COLUMN last_attempt_at TEXT;
+        ALTER TABLE sync_outbox ADD COLUMN error_code TEXT;
+        ALTER TABLE sync_outbox ADD COLUMN server_version INTEGER;
+        ALTER TABLE sync_outbox ADD COLUMN server_entity_json TEXT;
+        UPDATE sync_outbox SET state = 'legacy' WHERE state IN ('pending', 'sending');
+        CREATE INDEX sync_outbox_state_seq ON sync_outbox(state, seq);
+
+        ALTER TABLE local_session_state ADD COLUMN local_date TEXT;
+        ALTER TABLE local_session_state ADD COLUMN timezone TEXT;
+
+        -- Last server version known for each entity: the next mutation's baseVersion (docs/08 §3).
+        CREATE TABLE sync_versions (
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            server_version INTEGER NOT NULL CHECK (server_version >= 0),
+            PRIMARY KEY (entity_type, entity_id)
+        );
+
+        CREATE TABLE sync_state (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        """
+
+    /// IOS-007 slice 2: changes pulled from the server that have no local applier yet. The cursor moves past a page
+    /// in the same transaction that stores it here, so nothing is lost; the content slice reads and clears these rows.
+    static let syncInboxSchemaV6 = """
+        CREATE TABLE sync_inbox (
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            server_version INTEGER NOT NULL CHECK (server_version >= 1),
+            change_id TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            received_at TEXT NOT NULL,
+            PRIMARY KEY (entity_type, entity_id)
+        );
         """
 
     /// IOS-018: CON-007 `body_measurements` (db/007). `value` is exact decimal text in kilograms (no float round

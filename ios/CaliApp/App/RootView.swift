@@ -25,6 +25,7 @@ enum AppTab: String, Hashable {
 /// Five-tab shell (docs/02 §2). The workout player is a full-screen modal on top of any tab.
 struct RootView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = AppTab.launchTab
     @State private var debugRacePlan: UUID?
 
@@ -49,6 +50,9 @@ struct RootView: View {
             .badge(store.pendingRecommendationCount)
         }
         .tint(.caliAccentInk)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { store.sync.syncSoon() }
+        }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {
