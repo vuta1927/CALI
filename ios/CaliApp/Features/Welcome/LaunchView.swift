@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Dark brand backdrop shared by the launch and welcome screens.
+/// Dark brand backdrop used by the welcome screen.
 struct BrandBackdrop: View {
     var body: some View {
         ZStack {
@@ -14,21 +14,19 @@ struct BrandBackdrop: View {
 }
 
 /// Shown on every launch while the app restores its stored session and cached settings.
+/// Same artwork and background as the system launch screen (`UILaunchScreen`), so the hand-off does not jump.
 /// It never waits on the network: the catalog refresh starts after it is gone.
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            BrandBackdrop()
-            VStack(spacing: Spacing.m) {
-                COAMISymbol()
-                    .frame(width: 96, height: 96)
-                Text("COAMI")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .tracking(4)
-                    .foregroundStyle(Color.coamiCream)
-            }
-            .accessibilityElement(children: .combine)
+            Color("COAMIBackground")
+                .ignoresSafeArea()
+            Image("COAMILaunchLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 280)
+                .padding(.horizontal, Spacing.xl)
+                .accessibilityLabel("COAMI")
         }
-        .preferredColorScheme(.dark)
     }
 }
