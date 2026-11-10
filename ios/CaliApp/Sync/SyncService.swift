@@ -23,10 +23,15 @@ final class SyncService {
     /// Called with the cached or newly downloaded criteria and indicators (CON-008).
     @ObservationIgnored var onConfigChanged: ((PublishedConfig) -> Void)?
 
-    init(coordinator: WorkoutCoordinator, auth: AuthService? = nil) {
+    /// DEBUG only: the pasted dev credentials in the Keychain, used while nobody is signed in.
+    @ObservationIgnored private let usesDevCredentials: Bool
+
+    /// `usesDevCredentials: false` keeps a test independent of what an earlier run left in the device Keychain.
+    init(coordinator: WorkoutCoordinator, auth: AuthService? = nil, usesDevCredentials: Bool = true) {
         self.coordinator = coordinator
         self.auth = auth
-        client = SyncClient(coordinator: coordinator, api: Self.makeAPI(auth))
+        self.usesDevCredentials = usesDevCredentials
+        client = SyncClient(coordinator: coordinator, api: Self.makeAPI(auth, devCredentials: usesDevCredentials))
         refresh()
     }
 
@@ -35,7 +40,7 @@ final class SyncService {
 
     /// Re-reads the credentials, e.g. after they were pasted in Diagnostics.
     func reconfigure() {
-        client = SyncClient(coordinator: coordinator, api: Self.makeAPI(auth))
+        client = SyncClient(coordinator: coordinator, api: Self.makeAPI(auth, devCredentials: usesDevCredentials))
         refresh()
     }
 
@@ -128,12 +133,12 @@ final class SyncService {
         }
     }
 
-    private static func makeAPI(_ auth: AuthService?) -> (any SyncAPI)? {
+    private static func makeAPI(_ auth: AuthService?, devCredentials: Bool) -> (any SyncAPI)? {
         if let auth, auth.allowsSync, let base = auth.baseURL {
             return URLSessionSyncAPI(baseURL: base, tokens: auth.manager)
         }
         #if DEBUG
-        guard let base = DevCredentialStore.read(.baseURL), let url = URL(string: base), url.scheme == "https" || url.scheme == "http",
+        guard devCredentials, let base = DevCredentialStore.read(.baseURL), let url = URL(string: base), url.scheme == "https" || url.scheme == "http",
               DevCredentialStore.read(.token) != nil else { return nil }
         return URLSessionSyncAPI(baseURL: url, tokens: DevTokenProvider())
         #else

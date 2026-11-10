@@ -118,7 +118,7 @@ final class AuthServiceTests: XCTestCase {
 
     func testSyncIsConfiguredOnlyOnceTheAccountOwnsTheData() async throws {
         let (auth, api, _, database) = try make()
-        let sync = SyncService(coordinator: database.coordinator, auth: auth)
+        let sync = SyncService(coordinator: database.coordinator, auth: auth, usesDevCredentials: false)
         XCTAssertFalse(sync.isConfigured)
         await signIn(auth, as: userA, api)
         sync.reconfigure()
