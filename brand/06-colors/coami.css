@@ -1,0 +1,11 @@
+:root {
+  --coami-primary: #FE4B01;
+  --coami-accent: #FE6601;
+  --coami-deep: #CA4802;
+  --coami-highlight: #FF9800;
+  --coami-ink: #0A1826;
+  --coami-light: #FAFBFD;
+  --coami-white: #FFFFFF;
+  --coami-secondary: #4B6382;
+  --coami-gradient: linear-gradient(145deg, #FF9800 0%, #FE4B01 58%, #A93001 100%);
+}

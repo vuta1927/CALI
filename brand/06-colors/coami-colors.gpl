@@ -1,0 +1,12 @@
+GIMP Palette
+Name: COAMI Orange
+Columns: 4
+# sRGB swatch samples / production colors
+254  75   1	COAMI primary
+254 102   1	COAMI accent
+202  72   2	COAMI deep
+255 152   0	COAMI highlight
+ 10  24  38	COAMI ink
+250 251 253	COAMI light
+255 255 255	COAMI white
+ 75  99 130	COAMI secondary

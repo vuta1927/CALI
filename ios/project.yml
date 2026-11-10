@@ -54,7 +54,9 @@ targets:
         # Release API base URL (https). Empty = no server: the app stays local-only. Set it per build, never commit a real host.
         CaliAPIBaseURL: $(CALI_API_BASE_URL)
         NSSupportsLiveActivities: true
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: COAMIBackground
+          UIImageName: COAMILaunchLogo
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

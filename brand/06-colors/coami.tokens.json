@@ -1,0 +1,40 @@
+{
+  "name": "COAMI",
+  "version": "1.0.0",
+  "colorSpace": "sRGB",
+  "source": "Approved orange PNG brand board; swatch-center samples, normalized gradient highlights.",
+  "colors": {
+    "primary": "#FE4B01",
+    "accent": "#FE6601",
+    "deep": "#CA4802",
+    "highlight": "#FF9800",
+    "ink": "#0A1826",
+    "light": "#FAFBFD",
+    "white": "#FFFFFF",
+    "secondary": "#4B6382"
+  },
+  "gradients": {
+    "brandOrange": {
+      "from": "#A93001",
+      "middle": "#FE4B01",
+      "to": "#FF9800"
+    },
+    "appOrange": {
+      "from": "#FF9B00",
+      "middle": "#FE4B01",
+      "to": "#FFA400"
+    }
+  },
+  "geometry": {
+    "preserveAspectRatio": true,
+    "minimumClearSpace": "0.25 × mark width",
+    "recommendedMinimumLogoWidthPx": 160,
+    "recommendedMinimumTaglineLogoWidthPx": 480,
+    "appIconCanvasPx": 1024
+  },
+  "notes": [
+    "Gradient is reconstructed; source raster texture is not retained.",
+    "Clear-space and minimum sizes are production recommendations, not pre-existing brand rules.",
+    "Source logo and app symbol use separate silhouettes exactly as depicted on the board."
+  ]
+}

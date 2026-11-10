@@ -15,7 +15,7 @@ enum AppTab: String, Hashable {
     /// DEBUG only: `-uiSkipWelcome YES` hides the first-launch sheet without changing stored settings.
     static var skipsWelcome: Bool {
         #if DEBUG
-        UserDefaults.standard.bool(forKey: "uiSkipWelcome")
+        UserDefaults.standard.bool(forKey: "uiSkipWelcome") || DebugScenario.launch != nil
         #else
         false
         #endif
@@ -28,6 +28,20 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = AppTab.launchTab
     @State private var debugRacePlan: UUID?
+    /// True until the stored session and cached settings are restored. Covers the app on every launch.
+    @State private var isLaunching = !AppTab.skipsWelcome
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The welcome screen is for the first launch after install, while no account is set up.
+    private var showsWelcome: Bool {
+        guard !isLaunching, !AppTab.skipsWelcome, !store.settings.hasSeenWelcome else { return false }
+        if case .signedOut = store.auth.state { return true }
+        return false
+    }
+
+    private func finishWelcome() {
+        store.updateSettings { $0.hasSeenWelcome = true }
+    }
 
     var body: some View {
         @Bindable var store = store
@@ -57,10 +71,22 @@ struct RootView: View {
             }
         }
         .task {
+            let started = ContinuousClock.now
             await store.sync.loadCachedConfig()
             await store.auth.restore()
+            // Keep the launch screen up long enough to read as a screen, not a flash.
+            let minimum = Duration.milliseconds(700)
+            let elapsed = ContinuousClock.now - started
+            if isLaunching, elapsed < minimum { try? await Task.sleep(for: minimum - elapsed) }
+            isLaunching = false
             await store.sync.refreshCatalog()
         }
+        .overlay {
+            if isLaunching {
+                LaunchView().transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: isLaunching)
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .fullScreenCover(isPresented: $store.isPlayerPresented) {
@@ -87,9 +113,14 @@ struct RootView: View {
             }
         }
         #endif
-        .sheet(isPresented: welcomeBinding) {
-            WelcomeView { store.updateSettings { $0.hasSeenWelcome = true } }
-                .interactiveDismissDisabled()
+        .fullScreenCover(isPresented: Binding(get: { showsWelcome }, set: { _ in })) {
+            WelcomeView(showsSignIn: store.auth.isAvailable) {
+                finishWelcome()
+            } onSignIn: {
+                finishWelcome()
+                tab = .profile
+            }
+            .interactiveDismissDisabled()
         }
         .alert("Không thể thực hiện", isPresented: alertBinding) {
             Button("Đóng", role: .cancel) { store.alertMessage = nil }
@@ -104,78 +135,7 @@ struct RootView: View {
         }
     }
 
-    private var welcomeBinding: Binding<Bool> {
-        Binding(get: { !store.settings.hasSeenWelcome && !AppTab.skipsWelcome }, set: { _ in })
-    }
-
     private var alertBinding: Binding<Bool> {
         Binding(get: { store.alertMessage != nil }, set: { if !$0 { store.alertMessage = nil } })
-    }
-}
-
-/// First-launch explainer: what the POC is, what is sample data, and the safety disclaimer.
-struct WelcomeView: View {
-    let onContinue: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.xl) {
-                HStack(spacing: Spacing.m) {
-                    COAMISymbol()
-                        .frame(width: 56, height: 56)
-                    COAMIWordmark(includesTagline: true)
-                }
-                .padding(.top, Spacing.xl)
-                VStack(alignment: .leading, spacing: Spacing.m) {
-                    Text("Tập rõ ràng. Tiến bộ bền vững.")
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(Color.caliText)
-                    Text("COAMI đồng hành cùng bạn từ giáo án, hướng dẫn trực quan đến từng set và khoảng nghỉ — kể cả khi offline.")
-                        .font(.title3)
-                        .foregroundStyle(Color.caliSecondary)
-                }
-                VStack(alignment: .leading, spacing: Spacing.l) {
-                    WelcomeRow(systemImage: "wifi.slash", title: "Tập được cả khi offline",
-                               text: "Mọi buổi tập lưu trên iPhone trước. Khi đã đăng nhập và có mạng, dữ liệu được đồng bộ với máy chủ.")
-                    WelcomeRow(systemImage: "square.grid.2x2", title: "Bắt đầu từ trống",
-                               text: "Bài tập lấy từ máy chủ. Giáo án, lịch sử và mục tiêu là của bạn. Bài nào chưa có ảnh sẽ hiện ảnh tạm (PLACEHOLDER).")
-                    WelcomeRow(systemImage: "cross.case", title: "An toàn là trên hết",
-                               text: "COAMI không đưa ra lời khuyên y tế. Dừng tập nếu thấy đau và hỏi chuyên gia khi cần.")
-                }
-            }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.xl)
-        }
-        .safeAreaInset(edge: .bottom) {
-            Button("Bắt đầu", action: onContinue)
-                .buttonStyle(.caliPrimary)
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
-                .background(LinearGradient(colors: [Color.caliCanvas.opacity(0), Color.caliCanvas], startPoint: .top, endPoint: .center))
-        }
-        .background(COAMIScreenBackground())
-    }
-}
-
-private struct WelcomeRow: View {
-    let systemImage: String
-    let title: String
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(Color.caliAccentInk)
-                .frame(width: 32)
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(Color.caliText)
-                Text(text)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.caliSecondary)
-            }
-        }
     }
 }

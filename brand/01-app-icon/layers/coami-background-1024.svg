@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 308 308" role="img" aria-label="COAMI app icon"><title>COAMI app icon</title><defs>
+<linearGradient id="brandOrange" gradientUnits="userSpaceOnUse" x1="245" y1="395" x2="442" y2="80"><stop offset="0" stop-color="#A93001"/><stop offset="0.43" stop-color="#FE4B01"/><stop offset="0.76" stop-color="#FF7500"/><stop offset="1" stop-color="#FF9800"/></linearGradient>
+<linearGradient id="accentOrange" gradientUnits="userSpaceOnUse" x1="915" y1="287" x2="952" y2="235"><stop offset="0" stop-color="#FE4B01"/><stop offset="1" stop-color="#FF8700"/></linearGradient>
+<linearGradient id="appOrange" gradientUnits="userSpaceOnUse" x1="231" y1="753" x2="375" y2="547"><stop offset="0" stop-color="#FF9B00"/><stop offset="0.22" stop-color="#FE4B01"/><stop offset="0.6" stop-color="#FF6B00"/><stop offset="1" stop-color="#FFA400"/></linearGradient>
+<linearGradient id="iconBG" x1="0" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#263044"/><stop offset="0.45" stop-color="#0B1A2C"/><stop offset="1" stop-color="#03101F"/></linearGradient>
+<radialGradient id="warmGlow" cx="0" cy="0" r="0.8"><stop offset="0" stop-color="#FF6600" stop-opacity="0.42"/><stop offset="0.53" stop-color="#C84B14" stop-opacity="0.07"/><stop offset="1" stop-color="#C84B14" stop-opacity="0"/></radialGradient>
+</defs><rect width="308" height="308" fill="url(#iconBG)"/><rect width="308" height="308" fill="url(#warmGlow)"/></svg>
