@@ -150,7 +150,7 @@ public sealed partial class S3PresignedUrlSigner : IMediaUrlSigner
         return new Uri($"{origin.Scheme}://{authority}{canonicalPath}?{query}&X-Amz-Signature={signature}", UriKind.Absolute);
     }
 
-    private static string EncodePath(string key) => string.Join('/', key.Split('/').Select(EncodeComponent));
+    internal static string EncodePath(string key) => string.Join('/', key.Split('/').Select(EncodeComponent));
 
     /// <summary>RFC 3986 unreserved characters stay; every other UTF-8 byte becomes <c>%XX</c> (upper case).</summary>
     private static string EncodeComponent(string value)
