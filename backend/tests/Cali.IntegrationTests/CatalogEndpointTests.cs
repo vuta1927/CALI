@@ -55,7 +55,7 @@ public sealed class CatalogEndpointTests(PostgresFixture postgres)
         return document.RootElement.Clone();
     }
 
-    private static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    internal static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code)
     {
         response.StatusCode.ShouldBe(status);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");

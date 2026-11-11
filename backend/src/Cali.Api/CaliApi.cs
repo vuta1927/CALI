@@ -44,6 +44,7 @@ internal static class CaliApi
         services.AddScoped<ListExercises>();
         services.AddScoped<GetExercise>();
         services.AddScoped<GetCriteriaConfig>();
+        services.AddScoped<GetVoicePack>();
         services.AddCaliMedia();
         services.AddScoped<ListPlans>();
         services.AddScoped<CreatePlan>();

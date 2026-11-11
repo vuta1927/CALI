@@ -62,6 +62,26 @@ public sealed record CriteriaConfigResponse(
     }
 }
 
+/// <summary>OpenAPI <c>VoiceCueAudio</c>; <see cref="VoiceCue.StorageKey"/> is never sent (ADR-072).</summary>
+public sealed record VoiceCueAudioResponse(Uri? Url, DateTimeOffset? ExpiresAt, string Format, string Sha256, int ByteSize, int DurationMs);
+
+/// <summary>OpenAPI <c>VoiceCue</c>.</summary>
+public sealed record VoiceCueResponse(string Key, string Text, VoiceCueAudioResponse Audio);
+
+/// <summary>OpenAPI <c>VoicePack</c> (CON-010).</summary>
+public sealed record VoicePackResponse(string Locale, int Version, DateTimeOffset PublishedAt, string Voice, IReadOnlyList<VoiceCueResponse> Cues)
+{
+    /// <summary>One <paramref name="issuedAt"/> for every cue, so all URLs of a response expire together.</summary>
+    public static VoicePackResponse From(VoicePack pack, IMediaUrlSigner signer, DateTimeOffset issuedAt) => new(
+        pack.Locale, pack.Version, pack.PublishedAt, pack.Voice,
+        pack.Cues.Select(c =>
+        {
+            var signed = signer.Sign(c.StorageKey, issuedAt);
+            return new VoiceCueResponse(c.Key, c.Text,
+                new VoiceCueAudioResponse(signed?.Url, signed?.ExpiresAt, c.Format, c.Sha256, c.ByteSize, c.DurationMs));
+        }).ToArray());
+}
+
 public static class CatalogEndpoints
 {
     internal const string PublicCacheControl = "public, max-age=300";
@@ -69,6 +89,10 @@ public static class CatalogEndpoints
     // The exercise bodies carry signed media URLs that stop working after Media:UrlLifetimeSeconds (ADR-072).
     // A cached copy, shared or private, would serve dead links, so these responses are never stored.
     internal const string UncacheableMediaUrls = "no-store";
+
+    // CON-010: the voice pack body carries signed URLs too, but its ETag lets the client revalidate cheaply; only the
+    // client may keep it, briefly, well inside the URL lifetime (Media:UrlLifetimeSeconds >= 60).
+    internal const string PrivateShortCacheControl = "private, max-age=60";
     private const int MaxQueryLength = 100;
     private const int MaxEquipmentLength = 50;
     private const int MaxIfNoneMatchLength = 200;
@@ -81,6 +105,7 @@ public static class CatalogEndpoints
         catalog.MapGet("/exercises", ListExercisesAsync).WithName("listExercises");
         catalog.MapGet("/exercises/{id:guid}", GetExerciseAsync).WithName("getExercise");
         catalog.MapGet("/criteria-config", GetCriteriaConfigAsync).WithName("getCriteriaConfig");
+        catalog.MapGet("/voice-pack", GetVoicePackAsync).WithName("getVoicePack");
         return app;
     }
 
@@ -175,6 +200,68 @@ public static class CatalogEndpoints
         return Matches(ifNoneMatch, snapshot.ETag)
             ? Results.StatusCode(StatusCodes.Status304NotModified)
             : Results.Ok(CriteriaConfigResponse.From(snapshot));
+    }
+
+    private static async Task<IResult> GetVoicePackAsync(
+        HttpContext http, GetVoicePack query, IMediaUrlSigner signer, TimeProvider time, CancellationToken cancellationToken)
+    {
+        if (!QueryParameters.TrySingle(http.Request.Query, "locale", out var locale) || locale is null || !GetVoicePack.IsLocale(locale))
+        {
+            return BadRequest("Parameter 'locale' is required and must be a language-region tag such as vi-VN.");
+        }
+
+        if (!TryVersion(http.Request.Query, out var version))
+        {
+            return BadRequest("Parameter 'version' must be a positive integer.");
+        }
+
+        var ifNoneMatch = http.Request.Headers.IfNoneMatch.ToString();
+        if (ifNoneMatch.Length > MaxIfNoneMatchLength)
+        {
+            return BadRequest("Header 'If-None-Match' must be at most 200 characters.");
+        }
+
+        var pack = await query.ExecuteAsync(locale, version, cancellationToken).ConfigureAwait(false);
+        if (pack is null || pack.Cues.Count == 0)
+        {
+            // A version without cues cannot be published (db/011 guard); treat it as missing rather than serve an
+            // empty pack that VoicePack.cues (minItems 1) forbids.
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Voice pack is not published.",
+                extensions: new Dictionary<string, object?> { [ProblemDetailsEnricher.CodeKey] = ProblemCodes.VoicePackNotFound });
+        }
+
+        var etag = GetVoicePack.ETag(pack);
+        var headers = http.Response.Headers;
+        headers.ETag = etag;
+        headers.CacheControl = PrivateShortCacheControl;
+
+        return Matches(ifNoneMatch, etag)
+            ? Results.StatusCode(StatusCodes.Status304NotModified)
+            : Results.Ok(VoicePackResponse.From(pack, signer, time.GetUtcNow()));
+    }
+
+    private static bool TryVersion(IQueryCollection query, out int? version)
+    {
+        version = null;
+        if (!QueryParameters.TrySingle(query, "version", out var raw))
+        {
+            return false;
+        }
+
+        if (raw is null)
+        {
+            return true;
+        }
+
+        if (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) || parsed < 1)
+        {
+            return false;
+        }
+
+        version = parsed;
+        return true;
     }
 
     /// <summary>
