@@ -16,7 +16,7 @@ import UserNotifications
 /// A cue is advisory only: nothing here changes workout state, and nothing runs in a notification callback (AGENTS).
 /// Missing pack or file: the default sound. Voice off in Settings: no sound at all from cues.
 @MainActor
-final class VoiceCueService: NSObject, AVAudioPlayerDelegate {
+final class VoiceCueService {
     static let requestPrefix = "cali.voice."
     /// A due cue found this late (the app was suspended) is not played: an old prompt is worse than none.
     static let lateTolerance: TimeInterval = 2
@@ -27,6 +27,7 @@ final class VoiceCueService: NSObject, AVAudioPlayerDelegate {
     private var timers: [Task<Void, Never>] = []
     private var played: Set<String> = []
     private var player: AVAudioPlayer?
+    private lazy var finish = PlaybackFinish { [weak self] in self?.didFinishPlaying() }
 
     init(soundsDirectory: URL = VoicePackStore.defaultSoundsDirectory) {
         self.soundsDirectory = soundsDirectory
@@ -101,7 +102,7 @@ final class VoiceCueService: NSObject, AVAudioPlayerDelegate {
             try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
             try session.setActive(true)
             let player = try AVAudioPlayer(contentsOf: url)
-            player.delegate = self
+            player.delegate = finish
             player.play()
             self.player = player
         } catch {
@@ -109,12 +110,22 @@ final class VoiceCueService: NSObject, AVAudioPlayerDelegate {
         }
     }
 
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in
-            guard self.player === player else { return }
-            self.player = nil
-            // Give the music its volume back.
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        }
+    private func didFinishPlaying() {
+        guard player?.isPlaying != true else { return }
+        player = nil
+        // Give the music its volume back.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+}
+
+/// `AVAudioPlayerDelegate` kept apart from the service, so the service stays a plain main-actor class.
+private final class PlaybackFinish: NSObject, AVAudioPlayerDelegate, @unchecked Sendable {
+    private let done: @MainActor () -> Void
+
+    init(_ done: @escaping @MainActor () -> Void) { self.done = done }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        let done = self.done
+        Task { @MainActor in done() }
     }
 }

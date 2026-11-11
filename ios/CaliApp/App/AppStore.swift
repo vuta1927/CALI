@@ -59,7 +59,7 @@ final class AppStore {
         return service
     }()
     @ObservationIgnored private let notifications = NotificationService()
-    @ObservationIgnored let voiceCues = VoiceCueService()
+    @ObservationIgnored private let voiceCues = VoiceCueService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
 
     /// - Parameters:
