@@ -21,7 +21,7 @@ public sealed class VbeeOptions
 
     public required string Token { get; init; }
 
-    /// <summary>Must be a voice the Realtime (sync) API supports; list them with <c>Cali.VoicePack list-voices</c>.</summary>
+    /// <summary>vbee voice code; list them with <c>Cali.VoicePack list-voices</c>.</summary>
     public required string VoiceCode { get; init; }
 
     /// <summary>Hz; supported values depend on the voice (vbee docs). 22050 keeps cues small.</summary>
@@ -31,6 +31,20 @@ public sealed class VbeeOptions
     public double Speed { get; init; } = 1.0;
 
     public Uri TtsEndpoint { get; init; } = new("https://api.vbee.vn/v1/tts");
+
+    /// <summary>
+    /// vbee requires a webhook for async requests, but the client polls <c>{TtsEndpoint}/requests/{id}</c> instead, so
+    /// the default is an RFC 2606 <c>.invalid</c> host that can never receive anything. Env <c>Tts__Vbee__WebhookUrl</c>.
+    /// </summary>
+    public Uri WebhookUrl { get; init; } = DefaultWebhookUrl;
+
+    public static readonly Uri DefaultWebhookUrl = new("https://callback.invalid/vbee");
+
+    /// <summary>Wait between status polls; a short cue is usually ready within a few seconds.</summary>
+    public TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Give up on a request still PROCESSING after this many polls.</summary>
+    public int MaxPolls { get; init; } = 120;
 
     public Uri VoicesEndpoint { get; init; } = new("https://vbee.vn/api/public/v1/voices");
 }
@@ -47,9 +61,11 @@ public sealed class VbeeException(HttpStatusCode status, string code, string mes
 public sealed record VbeeVoice(string Code, string Name, string Gender, string LanguageCode);
 
 /// <summary>
-/// vbee Realtime API (<c>POST /v1/tts</c>, <c>mode: sync</c>; https://api-docs.vbee.vn/vbee-api/text-to-speech/realtime-api):
-/// text of at most 300 characters in, audio bytes out, errors as <c>{"error":{"code","message"}}</c>. Retries
-/// TTS_CCR_MAX_LIMIT_REACHED (429) and 5xx a few times with backoff; every other error is final.
+/// vbee TTS API in async mode (https://api-docs.vbee.vn/vbee-api/text-to-speech/realtime-api): <c>POST /v1/tts</c> with
+/// <c>mode: async</c> returns a request id, <c>GET /v1/tts/requests/{id}</c> is polled until COMPLETED, then the WAV is
+/// downloaded from <c>audioLink</c> without our credentials. Sync mode is not used: not every vbee package allows it
+/// ("This feature is not supported in user package"). Errors arrive as <c>{"error":{"code","message"}}</c>;
+/// TTS_CCR_MAX_LIMIT_REACHED (429) and 5xx are retried a few times with backoff, every other error is final.
 /// </summary>
 public sealed class VbeeTtsClient(HttpClient http, VbeeOptions options, Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
@@ -68,17 +84,73 @@ public sealed class VbeeTtsClient(HttpClient http, VbeeOptions options, Func<Tim
             throw new ArgumentException($"vbee accepts at most {MaxTextLength} characters.", nameof(text));
         }
 
-        var body = new SynthesizeRequest(text, "sync", options.VoiceCode, "wav", options.SampleRate, options.Speed);
+        var body = new SynthesizeRequest(text, "async", options.VoiceCode, "wav", options.SampleRate, options.Speed, options.WebhookUrl);
+        var submitted = await SendJsonAsync(
+            () => new HttpRequestMessage(HttpMethod.Post, options.TtsEndpoint) { Content = JsonContent.Create(body, options: Json) },
+            cancellationToken).ConfigureAwait(false);
+        var requestId = submitted.RequestId is { Length: > 0 } id && id.All(c => char.IsAsciiLetterOrDigit(c) || c == '-')
+            ? id
+            : throw new VbeeException(HttpStatusCode.OK, "INVALID_RESPONSE", "no request id");
+
+        var statusUri = new Uri(options.TtsEndpoint.AbsoluteUri.TrimEnd('/') + "/requests/" + requestId);
+        var status = submitted;
+        for (var poll = 0; IsProcessing(status); poll++)
+        {
+            if (poll == options.MaxPolls)
+            {
+                throw new VbeeException(HttpStatusCode.RequestTimeout, "TTS_TIMEOUT", $"request {requestId} still {status.Status} after {poll} polls");
+            }
+
+            await _delay(options.PollInterval, cancellationToken).ConfigureAwait(false);
+            status = await SendJsonAsync(() => new HttpRequestMessage(HttpMethod.Get, statusUri), cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!string.Equals(status.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase)
+            || !Uri.TryCreate(status.AudioLink, UriKind.Absolute, out var audioLink) || audioLink.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new VbeeException(HttpStatusCode.OK, "TTS_FAILED", $"request {requestId} ended {status.Status ?? "without status"}");
+        }
+
+        // No Authorization/App-Id: the link is a capability URL and our credentials stay with the API host.
+        using var response = await http.GetAsync(audioLink, cancellationToken).ConfigureAwait(false);
+        var wav = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode || wav.Length < 12 || !wav.AsSpan(0, 4).SequenceEqual("RIFF"u8))
+        {
+            throw new VbeeException(response.StatusCode, "INVALID_AUDIO", $"request {requestId} audio is not a WAV file");
+        }
+
+        return wav;
+    }
+
+    private static bool IsProcessing(RequestStatus status) =>
+        status.Status is null
+        || string.Equals(status.Status, "PROCESSING", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status.Status, "PENDING", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<RequestStatus> SendJsonAsync(Func<HttpRequestMessage> create, CancellationToken cancellationToken)
+    {
         for (var attempt = 1; ; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, options.TtsEndpoint) { Content = JsonContent.Create(body, options: Json) };
+            using var request = create();
             Authorize(request);
             using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-            var isJson = response.Content.Headers.ContentType?.MediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true;
-            if (response.IsSuccessStatusCode && !isJson)
+            if (response.IsSuccessStatusCode)
             {
-                return bytes;
+                RequestStatus? value;
+                try
+                {
+                    value = JsonSerializer.Deserialize<RequestStatus>(bytes, Json);
+                }
+                catch (JsonException)
+                {
+                    throw new VbeeException(response.StatusCode, "INVALID_RESPONSE", "response is not JSON");
+                }
+
+                if (value is { Error: null })
+                {
+                    return value;
+                }
             }
 
             var error = ParseError(response.StatusCode, bytes);
@@ -141,10 +213,12 @@ public sealed class VbeeTtsClient(HttpClient http, VbeeOptions options, Func<Tim
             // Not the documented error shape; fall through.
         }
 
-        return new VbeeException(status, "UNEXPECTED_RESPONSE", status == HttpStatusCode.OK ? "JSON body instead of audio" : "no error body");
+        return new VbeeException(status, "UNEXPECTED_RESPONSE", status == HttpStatusCode.OK ? "error-shaped body" : "no error body");
     }
 
-    private sealed record SynthesizeRequest(string Text, string Mode, string VoiceCode, string OutputFormat, int SampleRate, double Speed);
+    private sealed record SynthesizeRequest(string Text, string Mode, string VoiceCode, string OutputFormat, int SampleRate, double Speed, Uri WebhookUrl);
+
+    private sealed record RequestStatus(string? RequestId, string? Status, string? AudioLink, ErrorBody? Error);
 
     private sealed record ErrorResponse(ErrorBody? Error);
 

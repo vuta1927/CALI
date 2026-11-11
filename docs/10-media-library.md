@@ -45,7 +45,7 @@ See [local data and QA rules](17-content-editing.md).
 
 ## 5.1 Voice pack (CON-010, ADR-077)
 - Spoken workout cues are pre-rendered TTS audio (vbee.vn) published as an immutable voice pack per `(locale, version)` (db/011). The sentence script is `fixtures/voice_cues.vi-VN.json`; the publisher job (BE-007) renders, converts to CAF IMA4 mono (≤ 30 s, ≤ 1 MB), stores under an opaque key such as `voice/{locale}/v{version}/{key}.caf` and publishes all cues in one transaction.
-- Publisher: `backend/tools/Cali.VoicePack` (BE-007) calls the vbee Realtime API (`mode: sync`, WAV 22050 Hz), converts to CAF IMA4 in process (no `afconvert`/`ffmpeg`, so it runs on Linux), uploads with a presigned PUT and publishes. `render` writes the files locally to listen first; `publish` skips when nothing changed.
+- Publisher: `backend/tools/Cali.VoicePack` (BE-007) calls the vbee TTS API in async mode (submit, poll, download the WAV 22050 Hz), converts to CAF IMA4 in process (no `afconvert`/`ffmpeg`, so it runs on Linux), uploads with a presigned PUT and publishes. `render` writes the files locally to listen first; `publish` skips when nothing changed.
 - `GET /v1/voice-pack?locale=vi-VN` returns the pack with signed URLs (ADR-072) and sha256; the client keeps only the verified files, never the URLs. Without object storage (Development) `url` is null and the client uses the default sound.
 
 ## 6. Media acquisition acceptance
