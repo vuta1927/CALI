@@ -55,7 +55,6 @@ final class AppStore {
         let service = SyncService(coordinator: database.coordinator, auth: auth)
         service.onContentChanged = { [weak self] in self?.reloadContent() }
         service.onConfigChanged = { [weak self] in self?.published = $0 }
-        service.onVoiceLibraryChanged = { [weak self] library in self?.voiceLibraryDidChange(library) }
         return service
     }()
     @ObservationIgnored private let notifications = NotificationService()
@@ -258,12 +257,6 @@ final class AppStore {
         }
     }
 
-    /// A newly downloaded voice pack (IOS-019); scheduled cues are rebuilt so they name the new files.
-    private func voiceLibraryDidChange(_ library: VoiceCueLibrary) {
-        voiceCues.library = library
-        syncSideEffects()
-    }
-
     private func syncSideEffects() {
         guard let player, player.state.isActive || player.state.phase.isTerminal else {
             notifications.cancelAll()
@@ -272,6 +265,7 @@ final class AppStore {
             return
         }
         let name = player.currentExercise?.name ?? player.title
+        voiceCues.library = sync.voiceLibrary
         let deadlineCue = VoiceCuePlan.cues(for: player.state).first(where: \.isPhaseDeadline)?.key
         let voice = deadlineCue.map { (sound: voiceCues.notificationSound(for: $0, enabled: settings.voiceCuesEnabled), text: voiceCues.text(for: $0)) }
         notifications.sync(state: player.state, exerciseName: name, enabled: settings.notificationsEnabled,
