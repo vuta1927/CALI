@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IUserProfileReader, UserProfileReader>();
         services.AddScoped<IExerciseCatalogReader, ExerciseCatalogReader>();
         services.AddScoped<ICriteriaConfigReader, CriteriaConfigReader>();
+        services.AddScoped<IVoicePackReader, VoicePackReader>();
         services.AddScoped<IPlanReader, PlanReader>();
         services.AddScoped<IPlanWriter, PlanWriter>();
         services.AddScoped<ISyncWriter, SyncWriter>();

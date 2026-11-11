@@ -81,6 +81,30 @@ public sealed class CatalogContractTests : IClassFixture<OpenApiContractTests.Sp
     }
 
     [Fact]
+    public void Voice_pack_response_matches_the_VoicePack_schema_signed_or_not()
+    {
+        // BE-007 (CON-010): both the signed and the no-storage shapes are valid wire documents.
+        var signer = new S3PresignedUrlSigner(new S3StorageOptions
+        {
+            Endpoint = new Uri("https://store.example.com"),
+            Bucket = "cali-media",
+            Region = "auto",
+            AccessKeyId = "AKIATESTKEY",
+            SecretAccessKey = "contract-test-secret-value",
+            Lifetime = TimeSpan.FromMinutes(15),
+        });
+        var pack = new VoicePack("vi-VN", 1, new DateTimeOffset(2026, 11, 11, 0, 0, 0, TimeSpan.Zero), "Giọng thử",
+            [new VoiceCue("rest.done", "Hết giờ nghỉ. Vào set tiếp theo.", "voice/vi-VN/v1/rest.done.caf", "caf_ima4", new string('a', 64), 12000, 1800)]);
+
+        foreach (IMediaUrlSigner s in new IMediaUrlSigner[] { signer, new NoMediaUrlSigner() })
+        {
+            var json = JsonSerializer.SerializeToElement(VoicePackResponse.From(pack, s, new DateTimeOffset(2026, 11, 11, 1, 0, 0, TimeSpan.Zero)), Web);
+            SchemaValidator.ShouldMatch(json, Schema("VoicePack"), "VoicePack");
+            json.GetRawText().ShouldNotContain("contract-test-secret-value");
+        }
+    }
+
+    [Fact]
     public void The_spec_documents_signed_urls_with_an_expiry_and_no_storage_key()
     {
         var media = Schema("ExerciseMedia");
