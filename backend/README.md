@@ -131,6 +131,7 @@ Lifetimes are capped at 30 days. The user id comes only from the token's `sub` c
 | `GET /v1/me` | bearer | `UserProfile` from `users`; 404 `user_not_found` if the row is missing. |
 | `POST /v1/auth/apple` | anonymous, `auth` rate limit per IP | Apple identity token + raw nonce -> access token + refresh token. Every refusal is the same 401. 503 when Apple's keys cannot be fetched. |
 | `POST /v1/auth/refresh` | anonymous, `auth` rate limit per IP | Single-use refresh token -> new pair. A spent token revokes the whole session. |
+| `GET /v1/voice-pack?locale=vi-VN` | anonymous, public rate limit per IP | Latest (or `version=`) voice pack with signed audio URLs; ETag/304; 404 `voice_pack_not_found` until a pack is published. |
 
 `TODO(BE-004-APPLE)`: verify against a real Apple identity token when a paid Apple Developer account is
 available (it is needed for IOS-008 anyway). Expiry: remove this line when that check has been run and its result
@@ -145,6 +146,29 @@ Every other route requires authentication by default (fallback policy). Errors a
 Rate-limit policies `auth`, `sync` and `ai` are configured under `RateLimiting:*`. Endpoints attach them
 with `.RequireRateLimiting(RateLimitPolicies.Sync)` and similar calls. Telemetry: `Telemetry:Exporter` = `none` |
 `console` | `otlp`.
+
+## Voice pack publisher (BE-007)
+
+`tools/Cali.VoicePack` renders `fixtures/voice_cues.vi-VN.json` with the vbee.vn Realtime API
+(`POST https://api.vbee.vn/v1/tts`, `mode: sync`), converts each WAV to CAF IMA4 mono, uploads it with a
+presigned PUT and publishes a new immutable voice pack (db/011) in one transaction (ADR-077). Create the vbee
+app and token at https://studio.vbee.vn/apps.
+
+```bash
+cd backend
+dotnet user-secrets --project src/Cali.Api set "Tts:Vbee:AppId" "<app id>"
+dotnet user-secrets --project src/Cali.Api set "Tts:Vbee:Token" "<token>"        # secret
+dotnet run --project tools/Cali.VoicePack -- list-voices                            # find the voice code
+dotnet user-secrets --project src/Cali.Api set "Tts:Vbee:VoiceCode" "<code>"
+dotnet run --project tools/Cali.VoicePack -- render --out /tmp/cali-voice           # listen: afplay /tmp/cali-voice/rest.done.caf
+dotnet run --project tools/Cali.VoicePack -- publish                                # needs ConnectionStrings:Cali + Media:Storage:*
+```
+
+Only five vbee voices work with the Realtime API (HN - Ngọc Huyền, SG - Tường Vy, HN - Mai Phương, SG - Lan Trinh,
+SG - Thảo Trinh). `publish` does nothing when the latest pack already has the same voice and sentences
+(`--force` overrides); `render` and `publish` spend vbee credit. The storage credential used by `publish` must be
+allowed to write the bucket; the API's credential should stay read-only, so set the writing one only where the
+tool runs. The tool shares the user-secrets id `cali-backend-dev` with the API.
 
 ## Tests
 
