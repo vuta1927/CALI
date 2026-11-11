@@ -149,8 +149,9 @@ with `.RequireRateLimiting(RateLimitPolicies.Sync)` and similar calls. Telemetry
 
 ## Voice pack publisher (BE-007)
 
-`tools/Cali.VoicePack` renders `fixtures/voice_cues.vi-VN.json` with the vbee.vn Realtime API
-(`POST https://api.vbee.vn/v1/tts`, `mode: sync`), converts each WAV to CAF IMA4 mono, uploads it with a
+`tools/Cali.VoicePack` renders `fixtures/voice_cues.vi-VN.json` with the vbee.vn TTS API in async mode
+(`POST https://api.vbee.vn/v1/tts` with `mode: async`, poll `GET /v1/tts/requests/{id}` until `COMPLETED`, download
+`audioLink`; sync mode is not available on every vbee package), converts each WAV to CAF IMA4 mono, uploads it with a
 presigned PUT and publishes a new immutable voice pack (db/011) in one transaction (ADR-077). Create the vbee
 app and token at https://studio.vbee.vn/apps.
 
@@ -164,8 +165,8 @@ dotnet run --project tools/Cali.VoicePack -- render --out /tmp/cali-voice       
 dotnet run --project tools/Cali.VoicePack -- publish                                # needs ConnectionStrings:Cali + Media:Storage:*
 ```
 
-Only five vbee voices work with the Realtime API (HN - Ngọc Huyền, SG - Tường Vy, HN - Mai Phương, SG - Lan Trinh,
-SG - Thảo Trinh). `publish` does nothing when the latest pack already has the same voice and sentences
+vbee requires a `webhookUrl` for async requests; the tool polls instead and sends the never-resolving default
+`https://callback.invalid/vbee` (override with `Tts__Vbee__WebhookUrl`). `publish` does nothing when the latest pack already has the same voice and sentences
 (`--force` overrides); `render` and `publish` spend vbee credit. The storage credential used by `publish` must be
 allowed to write the bucket; the API's credential should stay read-only, so set the writing one only where the
 tool runs. The tool shares the user-secrets id `cali-backend-dev` with the API.

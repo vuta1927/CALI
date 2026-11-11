@@ -26,7 +26,7 @@ const string Usage = """
     Default script: fixtures/voice_cues.vi-VN.json (searched upward from the current directory).
 
     Configuration (user-secrets id cali-backend-dev, or environment variables):
-      Tts__Vbee__AppId, Tts__Vbee__Token (secret), Tts__Vbee__VoiceCode, optional Tts__Vbee__SampleRate (22050)
+      Tts__Vbee__AppId, Tts__Vbee__Token (secret), Tts__Vbee__VoiceCode, optional Tts__Vbee__SampleRate (22050), Tts__Vbee__WebhookUrl
       publish also: ConnectionStrings__Cali and Media__Storage__Endpoint/Bucket/AccessKeyId/SecretAccessKey
       (+ optional Media__Storage__Region, default auto) with write access to the bucket.
     """;
@@ -186,6 +186,7 @@ static VbeeOptions Vbee(IConfiguration configuration, bool requireVoice)
         Token = Required("Token"),
         VoiceCode = requireVoice ? Required("VoiceCode") : section["VoiceCode"] ?? string.Empty,
         SampleRate = sampleRate,
+        WebhookUrl = section["WebhookUrl"] is { Length: > 0 } hook ? new Uri(hook, UriKind.Absolute) : VbeeOptions.DefaultWebhookUrl,
     };
 }
 

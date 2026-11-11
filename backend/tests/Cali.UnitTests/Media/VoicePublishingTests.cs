@@ -22,39 +22,64 @@ public sealed class VoicePublishingTests
 
     // ---- vbee client ----
 
-    [Fact]
-    public async Task Synthesize_sends_the_documented_realtime_request_and_returns_the_audio()
+    private const string RequestId = "1b7b6cfb-8b46-404f-aaeb-527344c4b39d";
+    private static readonly Uri AudioLink = new("https://vbee.vn/s/1b7b6cfb/386803aa");
+    private static readonly Uri StatusUri = new($"https://api.vbee.vn/v1/tts/requests/{RequestId}");
+
+    /// <summary>vbee async: submit, two polls (PROCESSING then COMPLETED), then the audio download.</summary>
+    private static Func<HttpRequestMessage, HttpResponseMessage> AsyncVbee(byte[] wav, params HttpResponseMessage[] beforeSubmit)
     {
-        var handler = new StubHandler(_ => Audio(SpeechWav()));
-        var client = new VbeeTtsClient(new HttpClient(handler), Options);
+        var queue = new Queue<HttpResponseMessage>(beforeSubmit);
+        var polls = 0;
+        return request => request switch
+        {
+            { Method.Method: "POST" } when queue.Count > 0 => queue.Dequeue(),
+            { Method.Method: "POST" } => Status(HttpStatusCode.Created, "PROCESSING"),
+            _ when request.RequestUri == StatusUri => ++polls < 2 ? Status(HttpStatusCode.OK, "PROCESSING") : Status(HttpStatusCode.OK, "COMPLETED", AudioLink),
+            _ when request.RequestUri == AudioLink => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(wav) },
+            _ => throw new InvalidOperationException($"unexpected {request.Method} {request.RequestUri}"),
+        };
+    }
+
+    [Fact]
+    public async Task Synthesize_submits_an_async_request_polls_it_and_downloads_the_audio_without_credentials()
+    {
+        var handler = new StubHandler(AsyncVbee(SpeechWav()));
+        var waits = new List<TimeSpan>();
+        var client = new VbeeTtsClient(new HttpClient(handler), Options, (d, _) => { waits.Add(d); return Task.CompletedTask; });
 
         var wav = await client.SynthesizeWavAsync("Hết giờ nghỉ.", CancellationToken.None);
 
         wav.ShouldBe(SpeechWav());
-        var request = handler.Requests.Single();
-        request.Method.ShouldBe(HttpMethod.Post);
-        request.Uri.ShouldBe(new Uri("https://api.vbee.vn/v1/tts"));
-        request.Authorization.ShouldBe($"Bearer {Token}");
-        request.AppId.ShouldBe("app-1");
-        using var body = JsonDocument.Parse(request.Body!);
+        handler.Requests.Select(r => (r.Method.Method, r.Uri)).ShouldBe([
+            ("POST", new Uri("https://api.vbee.vn/v1/tts")), ("GET", StatusUri), ("GET", StatusUri), ("GET", AudioLink)]);
+        handler.Requests.Take(3).ShouldAllBe(r => r.Authorization == $"Bearer {Token}" && r.AppId == "app-1");
+        handler.Requests[3].Authorization.ShouldBeNull();
+        handler.Requests[3].AppId.ShouldBeNull();
+        waits.ShouldBe([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)]);
+
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
         var root = body.RootElement;
         root.GetProperty("text").GetString().ShouldBe("Hết giờ nghỉ.");
-        root.GetProperty("mode").GetString().ShouldBe("sync");
+        root.GetProperty("mode").GetString().ShouldBe("async");
         root.GetProperty("voiceCode").GetString().ShouldBe("sg_female_tuongvy_test");
         root.GetProperty("outputFormat").GetString().ShouldBe("wav");
         root.GetProperty("sampleRate").GetInt32().ShouldBe(22050);
+        root.GetProperty("webhookUrl").GetString().ShouldBe("https://callback.invalid/vbee");
     }
 
     [Fact]
     public async Task Concurrency_limit_and_server_errors_are_retried_with_backoff()
     {
-        var responses = new Queue<HttpResponseMessage>([Error(HttpStatusCode.TooManyRequests, "TTS_CCR_MAX_LIMIT_REACHED"), Error(HttpStatusCode.InternalServerError, "INTERNAL_SERVER_ERROR"), Audio(SpeechWav())]);
+        var handler = new StubHandler(AsyncVbee(SpeechWav(),
+            Error(HttpStatusCode.TooManyRequests, "TTS_CCR_MAX_LIMIT_REACHED"), Error(HttpStatusCode.InternalServerError, "INTERNAL_SERVER_ERROR")));
         var waits = new List<TimeSpan>();
-        var client = new VbeeTtsClient(new HttpClient(new StubHandler(_ => responses.Dequeue())), Options, (d, _) => { waits.Add(d); return Task.CompletedTask; });
+        var client = new VbeeTtsClient(new HttpClient(handler), Options, (d, _) => { waits.Add(d); return Task.CompletedTask; });
 
         (await client.SynthesizeWavAsync("Câu.", CancellationToken.None)).ShouldNotBeEmpty();
 
-        waits.ShouldBe([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)]);
+        waits.Take(2).ShouldBe([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)]);
+        handler.Requests.Count(r => r.Method == HttpMethod.Post).ShouldBe(3);
     }
 
     [Theory]
@@ -74,7 +99,7 @@ public sealed class VoicePublishingTests
     }
 
     [Fact]
-    public async Task A_json_body_with_status_200_is_an_error_not_audio()
+    public async Task An_error_body_with_status_200_is_an_error()
     {
         var client = new VbeeTtsClient(new HttpClient(new StubHandler(_ => Error(HttpStatusCode.OK, "BAD_REQUEST"))), Options);
 
@@ -82,9 +107,32 @@ public sealed class VoicePublishingTests
     }
 
     [Fact]
+    public async Task A_failed_request_or_a_non_wav_download_is_an_error()
+    {
+        var failed = new StubHandler(r => r.Method == HttpMethod.Post ? Status(HttpStatusCode.Created, "PROCESSING") : Status(HttpStatusCode.OK, "FAILED"));
+        (await Should.ThrowAsync<VbeeException>(() =>
+            new VbeeTtsClient(new HttpClient(failed), Options, (_, _) => Task.CompletedTask).SynthesizeWavAsync("Câu.", CancellationToken.None))).Code.ShouldBe("TTS_FAILED");
+
+        var notWav = new StubHandler(AsyncVbee(Encoding.UTF8.GetBytes("<html>expired</html>")));
+        (await Should.ThrowAsync<VbeeException>(() =>
+            new VbeeTtsClient(new HttpClient(notWav), Options, (_, _) => Task.CompletedTask).SynthesizeWavAsync("Câu.", CancellationToken.None))).Code.ShouldBe("INVALID_AUDIO");
+    }
+
+    [Fact]
+    public async Task A_request_that_never_completes_times_out()
+    {
+        var handler = new StubHandler(r => Status(r.Method == HttpMethod.Post ? HttpStatusCode.Created : HttpStatusCode.OK, "PROCESSING"));
+        var options = new VbeeOptions { AppId = "app-1", Token = Token, VoiceCode = "v", MaxPolls = 3 };
+
+        (await Should.ThrowAsync<VbeeException>(() =>
+            new VbeeTtsClient(new HttpClient(handler), options, (_, _) => Task.CompletedTask).SynthesizeWavAsync("Câu.", CancellationToken.None))).Code.ShouldBe("TTS_TIMEOUT");
+        handler.Requests.Count.ShouldBe(4);
+    }
+
+    [Fact]
     public async Task Text_over_the_vbee_limit_is_refused_before_any_call()
     {
-        var handler = new StubHandler(_ => Audio(SpeechWav()));
+        var handler = new StubHandler(AsyncVbee(SpeechWav()));
 
         await Should.ThrowAsync<ArgumentException>(() =>
             new VbeeTtsClient(new HttpClient(handler), Options).SynthesizeWavAsync(new string('a', 301), CancellationToken.None));
@@ -111,7 +159,7 @@ public sealed class VoicePublishingTests
     [Fact]
     public async Task Renderer_turns_vbee_wav_into_caf_with_its_duration()
     {
-        var renderer = new VbeeCueRenderer(new VbeeTtsClient(new HttpClient(new StubHandler(_ => Audio(SpeechWav(1.5)))), Options), Options);
+        var renderer = new VbeeCueRenderer(new VbeeTtsClient(new HttpClient(new StubHandler(AsyncVbee(SpeechWav(1.5)))), Options, (_, _) => Task.CompletedTask), Options);
 
         var cue = await renderer.RenderAsync("Câu.", CancellationToken.None);
 
@@ -198,8 +246,12 @@ public sealed class VoicePublishingTests
 
     // ---- fakes ----
 
-    private static HttpResponseMessage Audio(byte[] wav) =>
-        new(HttpStatusCode.OK) { Content = new ByteArrayContent(wav) { Headers = { ContentType = new("audio/wav") } } };
+    private static HttpResponseMessage Status(HttpStatusCode code, string status, Uri? audioLink = null) =>
+        new(code)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { requestId = RequestId, status, audioLink = audioLink?.AbsoluteUri }), Encoding.UTF8, "application/json"),
+        };
 
     private static HttpResponseMessage Error(HttpStatusCode status, string code) =>
         new(status) { Content = new StringContent($$$"""{"error":{"code":"{{{code}}}","message":"m"}}""", Encoding.UTF8, "application/json") };
