@@ -26,6 +26,8 @@ final class SyncService {
     @ObservationIgnored var onContentChanged: (() -> Void)?
     /// Called with the cached or newly downloaded criteria and indicators (CON-008).
     @ObservationIgnored var onConfigChanged: ((PublishedConfig) -> Void)?
+    /// Called with the cached or newly downloaded voice cues (CON-010, IOS-019).
+    @ObservationIgnored var onVoiceLibraryChanged: ((VoiceCueLibrary) -> Void)?
 
     /// A test replaces this to answer without a network.
     @ObservationIgnored var makeCatalogAPI: (URL) -> any ExerciseCatalogAPI = { URLSessionExerciseCatalogAPI(baseURL: $0) }
@@ -83,6 +85,7 @@ final class SyncService {
         isRefreshingCatalog = true
         defer { isRefreshingCatalog = false }
         await refreshConfig(base)
+        await refreshVoicePack(base)
         let refresher = ExerciseCatalogRefresher(api: makeCatalogAPI(base), coordinator: coordinator,
                                                 media: ExerciseMediaCache(directory: LocalMedia.directory))
         do {
@@ -101,6 +104,18 @@ final class SyncService {
     /// At launch, before any network: the last downloaded config, or the bundled one.
     func loadCachedConfig() async {
         onConfigChanged?(await CriteriaConfigStore(coordinator: coordinator).load())
+        onVoiceLibraryChanged?(await voicePackStore.load())
+    }
+
+    private var voicePackStore: VoicePackStore {
+        VoicePackStore(coordinator: coordinator, soundsDirectory: VoicePackStore.defaultSoundsDirectory)
+    }
+
+    /// `GET /v1/voice-pack` with the cached ETag; the files go to `Library/Sounds`. Failing, the pack in use stays.
+    private func refreshVoicePack(_ base: URL) async {
+        let store = voicePackStore
+        guard (try? await VoicePackRefresher(api: URLSessionVoicePackAPI(baseURL: base), store: store).refresh()) == true else { return }
+        onVoiceLibraryChanged?(await store.load())
     }
 
     /// `GET /v1/criteria-config` with the cached ETag. Offline, 304 or a body this build cannot read keep the copy in use.

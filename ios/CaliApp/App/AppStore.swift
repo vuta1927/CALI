@@ -55,9 +55,11 @@ final class AppStore {
         let service = SyncService(coordinator: database.coordinator, auth: auth)
         service.onContentChanged = { [weak self] in self?.reloadContent() }
         service.onConfigChanged = { [weak self] in self?.published = $0 }
+        service.onVoiceLibraryChanged = { [weak self] in self?.voiceCues.library = $0 }
         return service
     }()
     @ObservationIgnored private let notifications = NotificationService()
+    @ObservationIgnored let voiceCues = VoiceCueService()
     @ObservationIgnored private let liveActivity = LiveActivityController()
 
     /// - Parameters:
@@ -259,11 +261,16 @@ final class AppStore {
     private func syncSideEffects() {
         guard let player, player.state.isActive || player.state.phase.isTerminal else {
             notifications.cancelAll()
+            voiceCues.cancelAll()
             liveActivity.sync(nil, enabled: false)
             return
         }
         let name = player.currentExercise?.name ?? player.title
-        notifications.sync(state: player.state, exerciseName: name, enabled: settings.notificationsEnabled)
+        let deadlineCue = VoiceCuePlan.cues(for: player.state).first(where: \.isPhaseDeadline)?.key
+        let voice = deadlineCue.map { (sound: voiceCues.notificationSound(for: $0, enabled: settings.voiceCuesEnabled), text: voiceCues.text(for: $0)) }
+        notifications.sync(state: player.state, exerciseName: name, enabled: settings.notificationsEnabled,
+                           voice: settings.voiceCuesEnabled ? voice : nil)
+        voiceCues.sync(state: player.state, enabled: settings.voiceCuesEnabled, notificationsAllowed: settings.notificationsEnabled)
         let content = LiveActivityController.contentState(for: player.state, exerciseName: name)
         liveActivity.sync(content, enabled: settings.liveActivityEnabled)
     }
@@ -409,6 +416,7 @@ final class AppStore {
             isPlayerPresented = false
             player = nil
             notifications.cancelAll()
+            voiceCues.cancelAll()
             liveActivity.sync(nil, enabled: false)
             var fresh = AppSettings()
             fresh.hasSeenWelcome = settings.hasSeenWelcome
@@ -428,6 +436,7 @@ final class AppStore {
         isPlayerPresented = false
         player = nil
         notifications.cancelAll()
+        voiceCues.cancelAll()
         liveActivity.sync(nil, enabled: false)
         var fresh = AppSettings()
         fresh.hasSeenWelcome = settings.hasSeenWelcome
@@ -449,6 +458,7 @@ final class AppStore {
         isPlayerPresented = false
         player = nil
         notifications.cancelAll()
+        voiceCues.cancelAll()
         liveActivity.sync(nil, enabled: false)
         var fresh = AppSettings()
         fresh.hasSeenWelcome = settings.hasSeenWelcome

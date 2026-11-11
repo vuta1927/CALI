@@ -99,6 +99,8 @@ struct ProfileView: View {
                     CardDivider()
                     Toggle("Thông báo nhắc hết giờ", isOn: setting(\.notificationsEnabled)).frame(minHeight: 52)
                     CardDivider()
+                    Toggle("Âm thanh nhắc (giọng nói)", isOn: setting(\.voiceCuesEnabled)).frame(minHeight: 52)
+                    CardDivider()
                     Toggle("Live Activity trên màn khoá", isOn: setting(\.liveActivityEnabled)).frame(minHeight: 52)
                 }
 
