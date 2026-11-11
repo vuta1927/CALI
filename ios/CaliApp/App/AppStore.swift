@@ -55,7 +55,7 @@ final class AppStore {
         let service = SyncService(coordinator: database.coordinator, auth: auth)
         service.onContentChanged = { [weak self] in self?.reloadContent() }
         service.onConfigChanged = { [weak self] in self?.published = $0 }
-        service.onVoiceLibraryChanged = { [weak self] in self?.voiceCues.library = $0 }
+        service.onVoiceLibraryChanged = { [weak self] library in self?.voiceLibraryDidChange(library) }
         return service
     }()
     @ObservationIgnored private let notifications = NotificationService()
@@ -256,6 +256,12 @@ final class AppStore {
         if let player, !player.state.isActive {
             self.player = nil
         }
+    }
+
+    /// A newly downloaded voice pack (IOS-019); scheduled cues are rebuilt so they name the new files.
+    private func voiceLibraryDidChange(_ library: VoiceCueLibrary) {
+        voiceCues.library = library
+        syncSideEffects()
     }
 
     private func syncSideEffects() {
