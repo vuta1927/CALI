@@ -35,7 +35,9 @@ final class NotificationService {
     }
 
     /// Replaces any pending reminder with one for the current deadline (if any).
-    func sync(state: SessionState?, exerciseName: String, enabled: Bool) {
+    /// - Parameter voice: the spoken cue of this deadline (IOS-019): its sound replaces the default one and its sentence
+    ///   leads the body; `sound == nil` (voice off) leaves the default sound.
+    func sync(state: SessionState?, exerciseName: String, enabled: Bool, voice: (sound: UNNotificationSound?, text: String)? = nil) {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [Self.requestId])
         guard enabled, let state, state.isActive, let deadline = state.phaseDeadlineAt else { return }
@@ -43,7 +45,7 @@ final class NotificationService {
         guard interval > 1 else { return }
 
         let content = UNMutableNotificationContent()
-        content.sound = .default
+        content.sound = voice?.sound ?? .default
         switch state.phase {
         case .exercising:
             content.title = "Hết thời gian mục tiêu"
@@ -54,6 +56,7 @@ final class NotificationService {
         default:
             return // pre-countdown is too short to be worth a reminder
         }
+        if let text = voice?.text { content.body = "\(text) \(content.body)" }
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
         center.add(UNNotificationRequest(identifier: Self.requestId, content: content, trigger: trigger))
     }

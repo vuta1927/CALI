@@ -470,13 +470,15 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var hapticsEnabled = true
     public var notificationsEnabled = true
     public var liveActivityEnabled = true
+    /// IOS-019 (ADR-078): spoken cues; independent of haptics.
+    public var voiceCuesEnabled = true
     public var hasSeenWelcome = false
     /// ADR-046: load is stored in kg; this only changes how it is shown and typed.
     public var weightUnit: WeightUnit = .kg
     public var appearance: AppearanceMode = .system
 
     private enum CodingKeys: String, CodingKey {
-        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, hasSeenWelcome, weightUnit, appearance
+        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, voiceCuesEnabled, hasSeenWelcome, weightUnit, appearance
     }
 
     /// Settings saved by an older build have no `weightUnit` or `appearance`.
@@ -486,6 +488,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         hapticsEnabled = try c.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? true
         notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
         liveActivityEnabled = try c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
+        voiceCuesEnabled = try c.decodeIfPresent(Bool.self, forKey: .voiceCuesEnabled) ?? true
         hasSeenWelcome = try c.decodeIfPresent(Bool.self, forKey: .hasSeenWelcome) ?? false
         weightUnit = try c.decodeIfPresent(WeightUnit.self, forKey: .weightUnit) ?? .kg
         // An unknown value from a newer build falls back to the system setting instead of failing the whole settings row.
@@ -495,8 +498,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public init(
         countdownSeconds: Int = 3, hapticsEnabled: Bool = true, notificationsEnabled: Bool = true,
         liveActivityEnabled: Bool = true, hasSeenWelcome: Bool = false, weightUnit: WeightUnit = .kg,
-        appearance: AppearanceMode = .system
+        appearance: AppearanceMode = .system, voiceCuesEnabled: Bool = true
     ) {
+        self.voiceCuesEnabled = voiceCuesEnabled
         self.weightUnit = weightUnit
         self.appearance = appearance
         self.countdownSeconds = countdownSeconds
