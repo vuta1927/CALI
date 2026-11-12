@@ -19,6 +19,9 @@ public enum DomainError: Error, Equatable, Sendable {
     /// `FinishSession` with `now < startedAt` (wall clock went backwards): would violate
     /// `finished_at >= started_at`; coordinator must run clock reconciliation first.
     case timestampBeforeSessionStart
+    /// IOS-023: `ReopenSkipped` for an execution that has no skipped set (already reopened, double tap). The
+    /// coordinator records it as an idempotent `already_resolved` no-op, like a duplicate set resolution.
+    case nothingToReopen(executionId: UUID)
 
     /// Stable code used in CON-002 fixtures.
     public var code: String {
@@ -31,6 +34,7 @@ public enum DomainError: Error, Equatable, Sendable {
         case .setMismatch: "set_mismatch"
         case .validationFailed: "validation_failed"
         case .timestampBeforeSessionStart: "timestamp_before_session_start"
+        case .nothingToReopen: "nothing_to_reopen"
         }
     }
 }

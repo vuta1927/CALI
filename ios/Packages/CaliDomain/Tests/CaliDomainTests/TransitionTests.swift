@@ -117,14 +117,17 @@ final class TransitionTests: XCTestCase {
         XCTAssertEqual(t.events.codes, ["set_confirmed", "phase_changed", "deadline_changed"])
     }
 
-    func testConfirmLastSetOfExerciseMovesToNextExerciseReady() {
+    /// IOS-022: the last set of an exercise leads into the transition rest (default 60 s), then READY.
+    func testConfirmLastSetOfExerciseMovesToNextExerciseTransitionRest() {
         let h = Harness()
         h.send(h.create([Specs.hold(sets: 1), Specs.reps()]))
         h.send(h.startSet(countdown: 0))
         h.clock.advance(by: 5)
         h.send(h.stopSet())
         h.send(h.confirm())
-        XCTAssertEqual(h.s.phase, .ready)
+        XCTAssertEqual(h.s.phase, .resting)
+        XCTAssertEqual(h.s.phaseDeadlineAt, h.now.addingTimeInterval(60))
+        XCTAssertTrue(h.s.isTransitionRest)
         XCTAssertEqual(h.s.currentExecutionIndex, 1)
         XCTAssertEqual(h.s.currentSetIndex, 1)
     }
@@ -232,7 +235,9 @@ final class TransitionTests: XCTestCase {
         .paused: [.resume, .abandonSession],
         .awaitingResult: [.confirmSet, .skipSet, .abandonSession],
         .resting: [.extendRest, .readyNext, .abandonSession],
-        .reviewingSummary: [.finishSession, .abandonSession],
+        // IOS-023: reopenSkipped is phase-legal in READY/RESTING too; there the matrix state has no skipped set, so
+        // it is refused as `nothing_to_reopen` (accepted below as a non-phase rejection).
+        .reviewingSummary: [.finishSession, .abandonSession, .reopenSkipped],
         .completed: [.createSession],
         .abandoned: [.createSession],
     ]
@@ -254,7 +259,9 @@ final class TransitionTests: XCTestCase {
                     } else if kind == .createSession {
                         XCTAssertEqual(e, .activeSessionExists(sessionId: before.sessionId))
                     } else {
-                        XCTAssertTrue(["invalid_transition", "duplicate_set_resolution"].contains(e.code), "\(phase) \(kind): \(e)")
+                        let codes = kind == .reopenSkipped && [.ready, .resting].contains(phase)
+                            ? ["nothing_to_reopen"] : ["invalid_transition", "duplicate_set_resolution"]
+                        XCTAssertTrue(codes.contains(e.code), "\(phase) \(kind): \(e)")
                     }
                 case (.success(let t), false):
                     XCTFail("\(kind) must be rejected in \(phase); got \(t.state.phase)")

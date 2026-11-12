@@ -45,6 +45,8 @@ public enum WorkoutReducer {
             return finishSession(state, now: now)
         case .abandonSession(let c):
             return abandonSession(state, c, now: now)
+        case .reopenSkipped(let c):
+            return reopenSkipped(state, c, now: now)
         }
     }
 
@@ -69,6 +71,9 @@ public enum WorkoutReducer {
                 ValidationIssue(field: "executions[\(i)].\($0.field)", reason: $0.reason, detail: $0.detail)
             })
         }
+        if let v = c.transitionRestSeconds, let issue = ValidationIssue.range("transitionRestSeconds", v, DomainLimits.restSeconds) {
+            issues.append(issue)
+        }
         guard issues.isEmpty else { return .failure(.validationFailed(issues)) }
 
         let state = SessionState(
@@ -82,7 +87,8 @@ public enum WorkoutReducer {
             currentSetIndex: 1,
             startedAt: now,
             updatedAt: now,
-            phaseStartedAt: now
+            phaseStartedAt: now,
+            transitionRestSeconds: c.transitionRestSeconds ?? DomainLimits.defaultTransitionRestSeconds
         )
         return .success(Transition(state: state, events: [.sessionCreated(sessionId: c.sessionId, startedAt: now)]))
     }
@@ -259,6 +265,37 @@ public enum WorkoutReducer {
         return .success(b.commit(now: now))
     }
 
+    /// IOS-023 (PO D4/D5): "tập lại ngay". Allowed while the session is active in READY, RESTING or
+    /// REVIEWING_SUMMARY. Rejected while a set runs (PRE_COUNTDOWN, EXERCISING, PAUSED) and in AWAITING_RESULT, where
+    /// moving the cursor would throw away the unsaved result of the current set (interpretation, docs/03 §4).
+    /// Retracts the skipped results of the execution (all of them, or only `setIndex` for the snackbar undo, QA D2),
+    /// remembers where the user was (`resumePoint`, the current set) and moves to the first reopened set in READY.
+    static func reopenSkipped(_ s: SessionState, _ c: ReopenSkipped, now: Date) -> Result<Transition, DomainError> {
+        guard [.ready, .resting, .reviewingSummary].contains(s.phase) else {
+            return .failure(.invalidTransition(from: s.phase, command: .reopenSkipped))
+        }
+        guard let index = s.executions.firstIndex(where: { $0.id == c.executionId }) else {
+            return .failure(.validationFailed([ValidationIssue(field: "executionId", reason: .missing, detail: "not in this session")]))
+        }
+        let skipped = s.skippedSets(in: c.executionId).filter { c.setIndex == nil || $0.key.setIndex == c.setIndex }
+        guard let first = skipped.first else { return .failure(.nothingToReopen(executionId: c.executionId)) }
+
+        var b = Builder(s)
+        let retracted = Set(skipped.map(\.key))
+        b.next.resolvedSets.removeAll { retracted.contains($0.key) }
+        b.events.append(.setResultsRetracted(skipped.map(\.setResultId)))
+        // QA D3: a nested reopen remembers the *current* set (e.g. the unfinished reopened exercise B); an earlier resume
+        // point is not lost, because after B the next-unresolved order reaches it again (plan order from B).
+        if s.phase != .reviewingSummary, let here = s.currentSetKey, !retracted.contains(here), s.resolution(for: here) == nil {
+            b.next.resumePoint = here
+        }
+        b.next.currentExecutionIndex = index
+        b.next.currentSetIndex = first.key.setIndex
+        if b.next.resumePoint == b.next.currentSetKey { b.next.resumePoint = nil }
+        b.enterReady(now: now)
+        return .success(b.commit(now: now))
+    }
+
     static func abandonSession(_ s: SessionState, _ c: AbandonSession, now: Date) -> Result<Transition, DomainError> {
         // Interpretation (CON-002 Q1): table precondition "active session" — allowed from every
         // non-terminal phase, including preCountdown/exercising which the diagram omits.
@@ -273,6 +310,7 @@ public enum WorkoutReducer {
         // finished_at >= started_at); abandonedAt keeps the raw device time.
         b.next.finishedAt = max(now, s.startedAt)
         b.next.abandonReason = c.reason
+        b.next.resumePoint = nil
         b.next.phaseStartedAt = now
         b.next.phaseDeadlineAt = nil
         b.events.append(.sessionAbandoned(at: now, reason: c.reason))
@@ -399,25 +437,87 @@ struct Builder {
         next.phaseDeadlineAt = nil
     }
 
-    /// After a set is confirmed or skipped: next set (rest or ready), next exercise (ready), or summary.
+    // MARK: IOS-023 cursor helpers
+
+    private func isResolved(_ executionId: UUID, _ setIndex: Int) -> Bool {
+        next.resolution(for: SetKey(executionId: executionId, setIndex: setIndex)) != nil
+    }
+
+    /// First unresolved set after `index` in `spec`, else the first unresolved one before it.
+    private func nextUnresolvedSet(in spec: ExecutionSpec, after index: Int) -> Int? {
+        let later = index < spec.setCount ? Array((index + 1)...spec.setCount) : []
+        let earlier = index > 1 ? Array(1..<index) : []
+        return (later + earlier).first { !isResolved(spec.id, $0) }
+    }
+
+    /// The pending resume point, cleared; nil when there is none (or it got resolved meanwhile).
+    private mutating func takeResumePoint() -> (executionIndex: Int, setIndex: Int)? {
+        guard let rp = next.resumePoint else { return nil }
+        next.resumePoint = nil
+        guard !isResolved(rp.executionId, rp.setIndex), let index = next.executions.firstIndex(where: { $0.id == rp.executionId }) else {
+            return nil
+        }
+        return (index, rp.setIndex)
+    }
+
+    /// Next execution (in plan order after the current one, then from the start) with an unresolved set.
+    private func nextExecutionTarget() -> (executionIndex: Int, setIndex: Int)? {
+        let count = next.executions.count
+        for offset in 1..<max(count, 1) {
+            let index = (next.currentExecutionIndex + offset) % count
+            let spec = next.executions[index]
+            if let set = (1...spec.setCount).first(where: { !isResolved(spec.id, $0) }) { return (index, set) }
+        }
+        return nil
+    }
+
+    private mutating func clearResumePointIfReached() {
+        if next.resumePoint == next.currentSetKey { next.resumePoint = nil }
+    }
+
+    /// IOS-022: rest before the first set of another exercise (cursor already moved).
+    mutating func enterTransition(now: Date) {
+        if next.transitionRestSeconds > 0 {
+            enterResting(seconds: next.transitionRestSeconds, now: now)
+        } else {
+            enterReady(now: now)
+        }
+    }
+
+    mutating func enterResting(seconds: Int, now: Date) {
+        next.phase = .resting
+        next.phaseStartedAt = now
+        // seconds == 0 ⇒ deadline == now; the next reconcile marks it ready (CON-002 Q5).
+        next.phaseDeadlineAt = TimeMath.date(now, plusSeconds: seconds)
+    }
+
+    /// After a set is confirmed or skipped: next set (rest or ready), next exercise (transition rest), or summary.
+    ///
+    /// IOS-022 interpretation (docs/03 §4): `restBeforeNextSet` only governs the rest *within* an exercise ("a skipped
+    /// set earns no rest"). Changing exercise always gets the session's transition rest, however the last set was
+    /// resolved, because it is preparation time for the new exercise, not recovery from the last set.
+    /// `transitionRestSeconds == 0` goes straight to READY.
     mutating func advanceAfterResolution(restBeforeNextSet: Bool, now: Date) {
         clearSetScratch()
         guard let spec = next.currentExecution else { return }
-        if next.currentSetIndex < spec.setCount {
-            next.currentSetIndex += 1
+        // IOS-023: pick the next *unresolved* set (identical to the linear order while nothing was reopened):
+        // 1. within the current execution, 2. the resume point of a reopen detour, 3. the next execution with an
+        // unresolved set (then wrapping to earlier ones), else the summary.
+        if let setIndex = nextUnresolvedSet(in: spec, after: next.currentSetIndex) {
+            next.currentSetIndex = setIndex
+            clearResumePointIfReached()
             if restBeforeNextSet {
-                next.phase = .resting
-                next.phaseStartedAt = now
-                // restSeconds == 0 ⇒ deadline == now; the next reconcile marks it ready (CON-002 Q5).
-                next.phaseDeadlineAt = TimeMath.date(now, plusSeconds: spec.restSeconds)
+                enterResting(seconds: spec.restSeconds, now: now)
             } else {
                 enterReady(now: now)
             }
-        } else if next.currentExecutionIndex + 1 < next.executions.count {
-            next.currentExecutionIndex += 1
-            next.currentSetIndex = 1
-            enterReady(now: now)
+        } else if let target = takeResumePoint() ?? nextExecutionTarget() {
+            next.currentExecutionIndex = target.executionIndex
+            next.currentSetIndex = target.setIndex
+            clearResumePointIfReached()
+            enterTransition(now: now)
         } else {
+            next.resumePoint = nil
             // Final set: summary while status stays active; only FinishSession completes.
             next.phase = .reviewingSummary
             next.phaseStartedAt = now

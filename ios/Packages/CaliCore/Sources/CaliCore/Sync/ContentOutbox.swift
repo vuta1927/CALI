@@ -135,6 +135,8 @@ enum ContentOutbox {
             put(&o, "description", row["description"])
         case "planned_workout":
             o["planId"] = .string(row["plan_id"]); o["weekday"] = int("weekday"); o["title"] = .string(row["title"]); o["orderIndex"] = int("order_index")
+            // CON-011: the push carries the value it was pulled with (absent = null = client default, like other optionals).
+            if let rest = row["rest_between_exercises_seconds"] as Int? { o["restBetweenExercisesSeconds"] = .number(Decimal(rest)) }
         case "planned_exercise":
             o["plannedWorkoutId"] = .string(row["planned_workout_id"]); o["exerciseId"] = .string(row["exercise_id"]); o["orderIndex"] = int("order_index")
             o["setCount"] = int("set_count"); o["restSeconds"] = int("rest_seconds")

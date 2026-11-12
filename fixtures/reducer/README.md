@@ -29,7 +29,11 @@ disagreement between the vectors, the reducer and docs/03 was found, so no reduc
 | `illegal_transitions.json` | Representative rejections; a rejected command never changes state or revision. |
 | `clock_jump_during_rest.json` | Edge #4: wall clock changed during rest; transitions withheld with `clock_jump_detected` until acknowledged. |
 | `stale_session_recovery.json` | Edge #7: app killed mid-set, reopened 7 h later; recovery prompt, nothing auto-completed. |
+| `transition_rest_auto_advance.json` | IOS-022 (PO): the transition rest auto-advances like a set rest — on time with `autoAdvance: true` → set 1 of the next exercise exercising at the deadline, no set result. |
+| `rest_auto_advance.json` | IOS-021: `reconcile.autoAdvance: true` — rest on time → exercising at the rest deadline (no set result), timed set still → awaiting_result, rest found late → ready + `rest_lapsed`; `autoAdvance: false` (or absent) keeps rest → ready. |
 | `load_reps.json` | CON-006 / ADR-062: load target 5 x 60 kg, no deadline, confirm requires `actualReps` + `actualLoadKg` (max 2 decimals, rejected not rounded), lighter set recorded as given. |
+
+**IOS-022 change (deliberate):** the last set of an exercise now leads to the transition rest (default 60 s, `create_session.transitionRestSeconds`), not READY. `skip_set.json` (skip of the last hold set → `resting` + `ready_next` step) and `pause_resume_edge_cases.json` (confirm of the last set → `resting` + reconcile step) gained one step each; later revisions shifted by one. No other vector changed.
 
 ## Format
 

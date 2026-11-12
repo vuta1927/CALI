@@ -143,6 +143,10 @@ final class Harness {
         return .skipSet(SkipSet(commandId: freshId(), setResultId: freshId(), executionId: k.executionId, setIndex: k.setIndex, reason: reason))
     }
 
+    func reopen(_ executionId: UUID, setIndex: Int? = nil) -> Command {
+        .reopenSkipped(ReopenSkipped(commandId: freshId(), executionId: executionId, setIndex: setIndex))
+    }
+
     /// A syntactically valid command of `kind` targeting the current set.
     func command(_ kind: CommandKind) -> Command {
         switch kind {
@@ -157,6 +161,7 @@ final class Harness {
         case .skipSet: skip()
         case .finishSession: finish()
         case .abandonSession: abandon()
+        case .reopenSkipped: reopen(s.currentExecution!.id)
         }
     }
 
@@ -185,6 +190,7 @@ final class Harness {
         while s.phase != .reviewingSummary {
             switch s.phase {
             case .ready: send(skip())
+            case .resting: send(readyNext()) // IOS-022 transition rest between exercises
             default: XCTFail("unexpected phase \(s.phase)", file: file, line: line); return
             }
         }

@@ -30,6 +30,8 @@ final class ReducerFixtureTests: XCTestCase {
         var previousNow: Date?
         var monotonicElapsed: TimeInterval?
         var acknowledgeClockJump: Bool?
+        /// IOS-021: the app setting "Tự động chuyển set"; absent ⇒ false (the frozen CON-002 behavior).
+        var autoAdvance: Bool?
     }
 
     /// Absent keys are not checked. `phaseDeadlineAt` / `pendingSuggestedActualMs` distinguish
@@ -146,7 +148,8 @@ final class ReducerFixtureTests: XCTestCase {
                 guard let current = state else { XCTFail("\(ctx): reconcile without session"); return }
                 let result = WorkoutReducer.reconcile(
                     current, now: step.now, previousNow: r.previousNow,
-                    monotonicElapsed: r.monotonicElapsed, acknowledgeClockJump: r.acknowledgeClockJump ?? false
+                    monotonicElapsed: r.monotonicElapsed, acknowledgeClockJump: r.acknowledgeClockJump ?? false,
+                    policy: ReconcilePolicy(autoAdvance: r.autoAdvance ?? false)
                 )
                 state = result.state
                 events = result.events

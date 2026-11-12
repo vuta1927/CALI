@@ -102,8 +102,45 @@ public enum CaliDatabase {
         migrator.registerMigration("v6_sync_inbox") { db in
             try db.execute(sql: syncInboxSchemaV6)
         }
+        migrator.registerMigration("v7_rest_between_exercises") { db in
+            try db.execute(sql: restBetweenExercisesV7)
+        }
+        migrator.registerMigration("v8_set_result_tombstones") { db in
+            try db.execute(sql: setResultTombstonesV8)
+        }
         return migrator
     }
+
+    /// CON-011: `planned_workouts.rest_between_exercises_seconds` (nullable; NULL = client default 60 s). Kept so an
+    /// iOS upsert never wipes the server value.
+    static let restBetweenExercisesV7 = """
+        ALTER TABLE planned_workouts ADD COLUMN rest_between_exercises_seconds INTEGER
+            CHECK (rest_between_exercises_seconds IS NULL OR rest_between_exercises_seconds BETWEEN 0 AND 3600);
+        """
+
+    /// IOS-023: a reopened skipped set is tombstoned (`deleted_at`, docs/08 §7: never hard-delete while unsynced)
+    /// and done again under a new id, so "one result per set" holds for live rows only (like the server's partial
+    /// unique index on `set_results(execution_id, set_index) WHERE deleted_at IS NULL`). SQLite cannot alter a
+    /// table constraint: the table is rebuilt with the same columns plus `deleted_at`.
+    static let setResultTombstonesV8 = """
+        CREATE TABLE set_results_v7 (
+            id TEXT PRIMARY KEY NOT NULL,
+            session_id TEXT NOT NULL REFERENCES local_session_state(session_id),
+            execution_id TEXT NOT NULL,
+            set_index INTEGER NOT NULL CHECK (set_index >= 1),
+            status TEXT NOT NULL,
+            record_json TEXT NOT NULL,
+            confirmed_at TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            deleted_at TEXT
+        );
+        INSERT INTO set_results_v7 (id, session_id, execution_id, set_index, status, record_json, confirmed_at, revision)
+            SELECT id, session_id, execution_id, set_index, status, record_json, confirmed_at, revision FROM set_results;
+        DROP TABLE set_results;
+        ALTER TABLE set_results_v7 RENAME TO set_results;
+        CREATE UNIQUE INDEX set_results_one_live_per_set
+            ON set_results(session_id, execution_id, set_index) WHERE deleted_at IS NULL;
+        """
 
     /// IOS-001: local mirror of the content entities after CON-003/004 (docs/04 "main tables mirror server
     /// business entities"), plus history, AI review, audit, settings, sync cursor, media cache and the record

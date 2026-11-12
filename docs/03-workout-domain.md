@@ -104,14 +104,21 @@ stateDiagram-v2
     exercising --> paused: pause
     paused --> exercising: resume
     awaiting_result --> resting: confirmSet (if more sets)
-    awaiting_result --> ready: confirmSet (next exercise)
+    awaiting_result --> resting: confirmSet (next exercise, transition rest IOS-022)
     awaiting_result --> reviewing_summary: confirmSet (final set)
     reviewing_summary --> completed: finishSession
     reviewing_summary --> abandoned: abandonSession
-    resting --> ready: restExpired / userReady
-    ready --> ready: skipSet (next set or exercise, no rest)
-    exercising --> ready: skipSet (next set or exercise, no rest)
-    awaiting_result --> ready: skipSet (next set or exercise, no rest)
+    resting --> ready: restExpired / userReady / restLapsed
+    resting --> exercising: restExpired while foreground + autoAdvance (IOS-021)
+    ready --> ready: reopenSkipped (IOS-023)
+    resting --> ready: reopenSkipped (IOS-023)
+    reviewing_summary --> ready: reopenSkipped (IOS-023)
+    ready --> ready: skipSet (next set, no rest)
+    exercising --> ready: skipSet (next set, no rest)
+    awaiting_result --> ready: skipSet (next set, no rest)
+    ready --> resting: skipSet (last set of exercise, transition rest)
+    exercising --> resting: skipSet (last set of exercise, transition rest)
+    awaiting_result --> resting: skipSet (last set of exercise, transition rest)
     ready --> reviewing_summary: skipSet (final set)
     exercising --> reviewing_summary: skipSet (final set)
     awaiting_result --> reviewing_summary: skipSet (final set)
@@ -124,9 +131,15 @@ stateDiagram-v2
     completed --> [*]
     abandoned --> [*]
 ```
-The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest.
+The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest within its exercise.
 
-**Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. `restExpired → ready` only updates readiness, never starts exercising.
+**Transition rest (IOS-022, PO D2).** Moving to the first set of the next exercise enters RESTING with deadline `now + transitionRestSeconds` (no new phase: the SQL `phase` CHECK is unchanged). The value is fixed at `CreateSession` (`transitionRestSeconds`, 0..3600); without one it is 60 s. Plans do not carry the field yet (separate contract PR); the app always sends none for now. `0` goes straight to READY. *Interpretation:* "a skipped set earns no rest" applies within an exercise; changing exercise always gets the transition rest, however the last set was resolved (confirmed or skipped), because it is preparation for the new exercise, not recovery. A transition rest is recognised by the last resolved set belonging to another execution (`SessionState.isTransitionRest`); **PO decision:** it follows the same auto-advance rule as a rest between sets (setting on + reconciled within tolerance while the app executes → set 1 of the next exercise EXERCISING at the deadline; late → READY + `rest_lapsed`; setting off → READY), also when returning to a resume point after a reopen; no set result is ever created (vector `transition_rest_auto_advance.json`). It is local session state only and not on the wire; states saved by older builds decode with 60 s. The final set still goes straight to REVIEWING_SUMMARY. Vectors `skip_set.json` and `pause_resume_edge_cases.json` were updated for this on purpose (an extra transition-rest step, revisions shifted).
+
+**Reopen skipped (IOS-023, PO D4/D5).** "Tập lại ngay": only while the session is active (incl. REVIEWING_SUMMARY). The skipped results are retracted (soft-deleted locally and on the server, never hard-deleted) and the sets are done again under new `setResultId`s. Next-set selection always picks the next *unresolved* set: same exercise first, then the pending `resumePoint`, then the next exercise with an unresolved set (wrapping), else the summary. Rejected in AWAITING_RESULT because moving the cursor would drop the unsaved result. A nested reopen remembers the current set, so an unfinished reopened exercise is finished before the plan order continues. Nothing is inferred as completed.
+
+**Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. Without auto-advance `restExpired → ready` only updates readiness, never starts exercising.
+
+**Auto-advance (IOS-021, PO D1/D3).** The app setting "Tự động chuyển set" (default ON) reaches the pure reducer only as `ReconcilePolicy.autoAdvance` (domain default `false`, so the frozen CON-002 vectors keep "rest → ready"). With it on, a rest deadline reconciled within `autoAdvanceLateTolerance` (2 s, like `countdownLateTolerance`) enters EXERCISING starting **at the rest deadline**: a timed set gets its target deadline and still ends in AWAITING_RESULT; a reps set has no deadline and ends only with "Xong set" (`StopSet`). Reconciled later (the app was suspended or locked) → READY + `restLapsed(lateMs)`, the user starts the set. Auto-advance never creates a set result, and clock anomalies withhold it like every other timing transition. Vector: `fixtures/reducer/rest_auto_advance.json`.
 
 ### Transition table
 | Command/event | Precondition | Transactional write | Side effect after commit |
@@ -137,10 +150,11 @@ The diagram matches the transition table below (ADR-029). AbandonSession is acce
 | `Pause(cmdId)` | EXERCISING | pausedAt, accumulatedExerciseMs; phase PAUSED | update Activity, cancel/rebuild notifications |
 | `Resume(cmdId)` | PAUSED | recompute deadline; EXERCISING | update Activity/notification |
 | `StopSet(cmdId)` | EXERCISING or elapsed deadline reconciled | AWAITING_RESULT draft | prompt actual values |
-| `ConfirmSet(cmdId, payload)` | AWAITING_RESULT; unique set not confirmed | insert `set_result` + advance phase REST/READY/REVIEWING_SUMMARY + outbox | Activity and next notification |
+| `ConfirmSet(cmdId, payload)` | AWAITING_RESULT; unique set not confirmed | insert `set_result` + advance phase REST (set rest, or transition rest before the next exercise) / REVIEWING_SUMMARY + outbox | Activity and next notification |
 | `ExtendRest(cmdId, +30s)` | RESTING | recompute deadline, revision | cancel previous reminder, schedule new one |
 | `ReadyNext(cmdId)` | RESTING, manual request or deadline reached | READY | Activity refresh |
-| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED + skipReason, revision, phase next READY (no rest) or REVIEWING_SUMMARY | Activity |
+| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED + skipReason, revision, phase next READY (no rest), transition REST (last set of an exercise, IOS-022) or REVIEWING_SUMMARY | Activity |
+| `ReopenSkipped(cmdId, executionId, setIndex?)` | READY/RESTING/REVIEWING_SUMMARY, execution has SKIPPED sets (IOS-023) | skipped set_results (all, or only `setIndex` for the "Hoàn tác" undo) tombstoned (`deleted_at`, sync `delete`), cursor on first reopened set in READY, `resumePoint` = previous position (none from summary), returned to with a transition rest; repeat ⇒ `nothing_to_reopen` | Activity |
 | `FinishSession(cmdId)` | REVIEWING_SUMMARY, no active set pending confirmation | COMPLETED + finishedAt + outbox | end Activity; AI after sync |
 | `AbandonSession(cmdId)` | active session (any non-terminal phase) | ABANDONED, abandonReason, finishedAt | end Activity |
 
@@ -152,7 +166,7 @@ The diagram matches the transition table below (ADR-029). AbandonSession is acce
 - `phaseDeadlineUtc` persisted in same transaction as state revision; iOS may render countdown without per-second writes.
 - `status=completed ⇔ phase=completed` and `status=abandoned ⇔ phase=abandoned`; `pausedAt` is non-null only in PAUSED. This is ADR-023, also enforced by SQL CHECK and JSON Schema.
 - `PAUSED` has no active moving deadline. Recompute remaining duration on resume, rather than adding timers.
-- `RESTING` never auto-triggers a new exercising set without user Start action.
+- `RESTING` never auto-triggers a new exercising set without user Start action, except auto-advance (IOS-021) while the app is executing and the deadline is within tolerance; even then no set result is created.
 - On edit set result, increment revision and write a mutation; downstream analysis of old revision is superseded.
 - User initiated explicit skip/abandon always takes precedence over notifications.
 

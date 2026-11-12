@@ -62,6 +62,12 @@ enum SyncPayloads {
         }
     }
 
+    /// `delete` payload for any entity (docs/08 §4 `{id, deletedAt}`); IOS-023 uses it for a reopened skipped set.
+    struct Tombstone: Encodable {
+        var id: UUID
+        var deletedAt: Date
+    }
+
     struct SetResult: Encodable {
         var id: UUID
         var executionId: UUID

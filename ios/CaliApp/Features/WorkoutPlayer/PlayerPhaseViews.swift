@@ -166,6 +166,14 @@ struct RestPhaseView: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
+        if model.state.isTransitionRest {
+            TransitionRestView(model: model)
+        } else {
+            setRest
+        }
+    }
+
+    private var setRest: some View {
         PlayerScaffold {
             Text("Nghỉ")
                 .font(.title2.bold())
@@ -201,12 +209,69 @@ struct RestPhaseView: View {
                 .caliCard(padding: Spacing.m)
                 .accessibilityElement(children: .combine)
             }
-            Text("Hết giờ nghỉ chỉ nhắc (rung / thông báo), không tự bắt đầu set.")
+            Text(model.autoAdvanceEnabled && model.state.restAutoAdvances
+                 ? "Hết giờ nghỉ khi app đang mở, set tiếp tự bắt đầu. Set chỉ được ghi khi bạn bấm Xong set / Lưu."
+                 : "Hết giờ nghỉ chỉ nhắc (rung / thông báo), không tự bắt đầu set.")
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)
                 .multilineTextAlignment(.center)
         } actions: {
             Button("Bắt đầu set tiếp", systemImage: "play.fill") { model.startNextSet() }
+                .buttonStyle(.caliPrimary)
+        }
+    }
+}
+
+// MARK: - Transition rest (IOS-022)
+
+/// Rest before a new exercise: the next exercise's poster leads (visual-first), the countdown is secondary.
+/// Ends like any rest: with "Tự động chuyển set" on and the app executing on time, set 1 starts at the deadline;
+/// otherwise READY (PO decision after IOS-022).
+struct TransitionRestView: View {
+    let model: WorkoutPlayerModel
+
+    var body: some View {
+        PlayerScaffold {
+            Text("Chuẩn bị bài mới")
+                .font(.title2.bold())
+                .foregroundStyle(Color.caliText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            PosterView(exercise: model.currentExercise, height: 220)
+            if let execution = model.currentExecution {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.currentExercise?.name ?? "Bài tập")
+                        .font(.title3.bold())
+                        .foregroundStyle(Color.caliText)
+                    Text("\(execution.setCount) set · \(Fmt.target(execution.target))")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(Color.caliAccentInk)
+                    HStack(spacing: 6) {
+                        TagChip(text: execution.target.type.label)
+                        TagChip(text: "Nghỉ giữa set \(Fmt.seconds(execution.restSeconds))", systemImage: "clock")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+            HStack(spacing: Spacing.m) {
+                TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0), size: 56)
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    Button("+30 giây", systemImage: "plus") { model.extendRest(30) }
+                        .buttonStyle(.caliSecondary)
+                    Button("Bỏ nghỉ") { model.skipRest() }
+                        .buttonStyle(.caliSecondary)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Chuẩn bị còn \(Fmt.countdown(ms: model.remainingMs ?? 0))")
+            Text(model.autoAdvanceEnabled
+                 ? "Hết giờ khi app đang mở, set 1 bài mới tự bắt đầu. Set chỉ được ghi khi bạn bấm Xong set / Lưu."
+                 : "Hết giờ chỉ nhắc, không tự bắt đầu bài mới. Bấm Bắt đầu khi bạn đã sẵn sàng.")
+                .font(.caption)
+                .foregroundStyle(Color.caliSecondary)
+                .multilineTextAlignment(.center)
+        } actions: {
+            Button("Bắt đầu bài mới", systemImage: "play.fill") { model.startNextSet() }
                 .buttonStyle(.caliPrimary)
         }
     }
@@ -224,6 +289,13 @@ struct SummaryPhaseView: View {
                 .foregroundStyle(Color.caliText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             SessionStatsRow(model: model)
+            let skippedExercises = model.state.executionsWithSkippedSets.count
+            if skippedExercises > 0 {
+                Text("Còn \(skippedExercises) bài bỏ qua, tập luôn không?")
+                    .font(.callout)
+                    .foregroundStyle(Color.caliText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             SessionSetList(model: model)
         } actions: {
             Button("Lưu buổi tập", systemImage: "checkmark.circle") { model.finish() }
@@ -302,6 +374,14 @@ struct SessionSetList: View {
                 ExerciseResultCard(exercise: model.exercise(for: execution),
                                    sets: model.records(for: execution).map(LoggedSet.init(record:)),
                                    plannedSetCount: execution.setCount)
+                let skipped = model.skippedCount(for: execution)
+                if skipped > 0, model.canReopenSkipped {
+                    // IOS-023: "Đã bỏ qua" sets of this exercise can be done now.
+                    Button("Tập lại \(skipped) set đã bỏ qua", systemImage: "arrow.uturn.backward") {
+                        model.reopenSkipped(executionId: execution.id)
+                    }
+                    .buttonStyle(.caliSecondary)
+                }
             }
         }
     }

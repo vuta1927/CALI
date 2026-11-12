@@ -47,22 +47,25 @@ final class VoiceCueService {
     /// - Parameters:
     ///   - enabled: the voice setting.
     ///   - notificationsAllowed: the reminder setting; without it background cues are not scheduled.
-    func sync(state: SessionState?, enabled: Bool, notificationsAllowed: Bool, now: Date = Date()) {
+    func sync(state: SessionState?, enabled: Bool, notificationsAllowed: Bool, autoAdvance: Bool = false, now: Date = Date()) {
         cancelScheduled()
         guard enabled, let state, state.isActive || state.phase == .completed else { return }
-        let plan = VoiceCuePlan.cues(for: state)
+        let plan = VoiceCuePlan.cues(for: state, autoAdvance: autoAdvance)
         for cue in plan {
             let id = "\(state.sessionId.uuidString)|\(cue.key.rawValue)|\(cue.at.timeIntervalSince1970)"
             guard !played.contains(id) else { continue }
             let delay = cue.at.timeIntervalSince(now)
             if delay < -Self.lateTolerance { continue }
-            timers.append(Task { [weak self] in
-                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
-                guard !Task.isCancelled else { return }
-                self?.playIfForeground(cue.key, id: id)
-            })
+            if cue.delivery != .backgroundOnly {
+                timers.append(Task { [weak self] in
+                    if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+                    guard !Task.isCancelled else { return }
+                    self?.playIfForeground(cue.key, id: id)
+                })
+            }
             // The deadline cue is the deadline reminder's sound (NotificationService); the others get their own request.
-            if notificationsAllowed, !cue.isPhaseDeadline, delay > 1, cue.key != .sessionDone {
+            // A foreground-only cue (IOS-021 auto-start count) never becomes a notification.
+            if notificationsAllowed, cue.delivery == .everywhere, !cue.isPhaseDeadline, delay > 1, cue.key != .sessionDone {
                 schedule(cue, after: delay)
             }
         }

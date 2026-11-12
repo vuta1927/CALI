@@ -114,13 +114,22 @@ public struct PlannedWorkout: Identifiable, Codable, Hashable, Sendable {
     /// Local-only subtitle.
     public var focus: String
     public var exercises: [PlannedExercise]
+    /// CON-011: rest before the next exercise (0...3600); nil ⇒ the domain default 60 s.
+    public var restBetweenExercisesSeconds: Int?
 
-    public init(id: UUID, weekday: Int, title: String, focus: String, exercises: [PlannedExercise]) {
+    public init(id: UUID, weekday: Int, title: String, focus: String, exercises: [PlannedExercise], restBetweenExercisesSeconds: Int? = nil) {
         self.id = id
         self.weekday = weekday
         self.title = title
         self.focus = focus
         self.exercises = exercises
+        self.restBetweenExercisesSeconds = restBetweenExercisesSeconds
+    }
+
+    /// IOS-022/CON-011: the `CreateSession` for this workout; the plan's transition rest feeds the session (nil ⇒ 60 s).
+    public func createSession(commandId: UUID, sessionId: UUID, executions: [ExecutionSpec]) -> CreateSession {
+        CreateSession(commandId: commandId, sessionId: sessionId, plannedWorkoutId: id, executions: executions,
+                      transitionRestSeconds: restBetweenExercisesSeconds)
     }
 
     public var totalSets: Int { exercises.reduce(0) { $0 + $1.setCount } }
@@ -472,13 +481,15 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var liveActivityEnabled = true
     /// IOS-019 (ADR-078): spoken cues; independent of haptics.
     public var voiceCuesEnabled = true
+    /// IOS-021 (PO D3): "Tự động chuyển set" — a rest that ends while the app is open starts the next set. Default ON.
+    public var autoAdvanceSets = true
     public var hasSeenWelcome = false
     /// ADR-046: load is stored in kg; this only changes how it is shown and typed.
     public var weightUnit: WeightUnit = .kg
     public var appearance: AppearanceMode = .system
 
     private enum CodingKeys: String, CodingKey {
-        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, voiceCuesEnabled, hasSeenWelcome, weightUnit, appearance
+        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, voiceCuesEnabled, autoAdvanceSets, hasSeenWelcome, weightUnit, appearance
     }
 
     /// Settings saved by an older build have no `weightUnit` or `appearance`.
@@ -489,6 +500,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
         liveActivityEnabled = try c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
         voiceCuesEnabled = try c.decodeIfPresent(Bool.self, forKey: .voiceCuesEnabled) ?? true
+        autoAdvanceSets = try c.decodeIfPresent(Bool.self, forKey: .autoAdvanceSets) ?? true
         hasSeenWelcome = try c.decodeIfPresent(Bool.self, forKey: .hasSeenWelcome) ?? false
         weightUnit = try c.decodeIfPresent(WeightUnit.self, forKey: .weightUnit) ?? .kg
         // An unknown value from a newer build falls back to the system setting instead of failing the whole settings row.

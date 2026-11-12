@@ -187,6 +187,17 @@ final class VoiceCueTests: XCTestCase {
                        [PlannedVoiceCue(key: .restDone, at: t0.addingTimeInterval(15), isPhaseDeadline: true)])
     }
 
+    func testAutoAdvanceRestCountsDownInForegroundOnly() {
+        XCTAssertEqual(VoiceCuePlan.cues(for: state(.resting, deadline: 60), autoAdvance: true), [
+            PlannedVoiceCue(key: .restEnding10s, at: t0.addingTimeInterval(50)),
+            PlannedVoiceCue(key: .countdownStart, at: t0.addingTimeInterval(57), delivery: .foregroundOnly),
+            PlannedVoiceCue(key: .restDone, at: t0.addingTimeInterval(60), isPhaseDeadline: true, delivery: .backgroundOnly),
+        ])
+        // Too short a rest for a 3-second count: unchanged plan.
+        XCTAssertEqual(VoiceCuePlan.cues(for: state(.resting, rest: 3, deadline: 3), autoAdvance: true),
+                       [PlannedVoiceCue(key: .restDone, at: t0.addingTimeInterval(3), isPhaseDeadline: true)])
+    }
+
     func testRestBeforeTheFirstSetOfANewExerciseSaysSo() {
         XCTAssertEqual(VoiceCuePlan.cues(for: state(.resting, rest: 10, executionIndex: 1, setIndex: 1, deadline: 10)).map(\.key),
                        [.restDoneNextExercise])

@@ -225,7 +225,7 @@ public final class WorkoutCoordinator: Sendable {
         try writer.read { db in
             StoreCounts(
                 sessions: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM local_session_state") ?? 0,
-                setResults: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM set_results") ?? 0,
+                setResults: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM set_results WHERE deleted_at IS NULL") ?? 0,
                 outbox: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM sync_outbox") ?? 0,
                 processedCommands: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM processed_commands") ?? 0
             )
@@ -235,7 +235,7 @@ public final class WorkoutCoordinator: Sendable {
     public func setResults(sessionId: UUID) throws -> [SetRecord] {
         try writer.read { db in
             let rows = try String.fetchAll(
-                db, sql: "SELECT record_json FROM set_results WHERE session_id = ? ORDER BY revision, rowid",
+                db, sql: "SELECT record_json FROM set_results WHERE session_id = ? AND deleted_at IS NULL ORDER BY revision, rowid",
                 arguments: [DBText.id(sessionId)]
             )
             return try rows.map { try Self.decode(SetRecord.self, $0) }
@@ -277,6 +277,10 @@ public final class WorkoutCoordinator: Sendable {
                 outcome.status = .alreadyResolved
                 outcome.setResultIds = [existing.setResultId]
             }
+            if case .nothingToReopen = error {
+                // IOS-023: the skipped sets were already reopened (double tap / second "Hoàn tác"): idempotent no-op.
+                outcome.status = .alreadyResolved
+            }
             try Self.record(db, outcome)
             return HandleResult(outcome: outcome, replayed: false, state: state, events: [], error: error)
         case .success(let t):
@@ -300,6 +304,19 @@ public final class WorkoutCoordinator: Sendable {
             }
         } else if let state {
             try Self.update(db, from: state, to: next)
+        }
+
+        // IOS-023: tombstone retracted results BEFORE inserting new ones (a reopened set may be redone later in another
+        // transaction; the partial unique index only covers live rows). The delete mutation uses this command's id,
+        // so its mutationId differs from the original skip's upsert (no `mutation_id_reused`); baseVersion nil lets
+        // the sync engine rebase it on the acknowledged server version, and per-entity ordering sends it after the
+        // upsert if that is still queued (docs/08 §7, ADR-025).
+        for id in transition.retractedSetResultIds {
+            try db.execute(sql: "UPDATE set_results SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+                           arguments: [DBText.time(now), DBText.id(id)])
+            guard db.changesCount == 1 else { throw CoordinatorError.invariantViolation(["retracted set result \(id) not live"]) }
+            try Self.appendOutbox(db, commandId: command.commandId, entityType: "set_result", entityId: id, action: "delete",
+                                  baseVersion: nil, changedAt: now, payload: SyncPayloads.Tombstone(id: id, deletedAt: now))
         }
 
         for record in transition.setRecords {
@@ -403,7 +420,7 @@ public final class WorkoutCoordinator: Sendable {
     private static func insertHistory(_ db: Database, finished s: SessionState) throws {
         let title = try String.fetchOne(db, sql: "SELECT title FROM local_session_state WHERE session_id = ?", arguments: [DBText.id(s.sessionId)]) ?? ""
         let records = try String.fetchAll(
-            db, sql: "SELECT record_json FROM set_results WHERE session_id = ? ORDER BY revision, rowid", arguments: [DBText.id(s.sessionId)]
+            db, sql: "SELECT record_json FROM set_results WHERE session_id = ? AND deleted_at IS NULL ORDER BY revision, rowid", arguments: [DBText.id(s.sessionId)]
         ).map { try decode(SetRecord.self, $0) }
         let session = CompletedSession(
             id: s.sessionId, title: title, plannedWorkoutId: s.plannedWorkoutId, startedAt: s.startedAt,
@@ -440,17 +457,17 @@ public final class WorkoutCoordinator: Sendable {
     }
 
     private static func appendOutbox<P: Encodable>(
-        _ db: Database, commandId: UUID, entityType: String, entityId: UUID, baseVersion: Int?, changedAt: Date, payload: P
+        _ db: Database, commandId: UUID, entityType: String, entityId: UUID, action: String = "upsert", baseVersion: Int?, changedAt: Date, payload: P
     ) throws {
         let mutationId = CommandIdentity.mutationId(commandId: commandId, entityType: entityType, entityId: entityId)
-        let envelope = OutboxEnvelope(mutationId: mutationId, entityType: entityType, entityId: entityId, action: "upsert",
+        let envelope = OutboxEnvelope(mutationId: mutationId, entityType: entityType, entityId: entityId, action: action,
                                       baseVersion: baseVersion, clientChangedAt: changedAt, payload: payload)
         try db.execute(
             sql: """
                 INSERT INTO sync_outbox (mutation_id, entity_type, entity_id, action, base_version, json, created_at, payload_version)
-                VALUES (?, ?, ?, 'upsert', ?, ?, ?, 2)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 2)
                 """,
-            arguments: [DBText.id(mutationId), entityType, DBText.id(entityId), baseVersion, try encode(envelope), DBText.time(changedAt)]
+            arguments: [DBText.id(mutationId), entityType, DBText.id(entityId), action, baseVersion, try encode(envelope), DBText.time(changedAt)]
         )
     }
 

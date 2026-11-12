@@ -1,6 +1,6 @@
 {
   "name": "skip_set",
-  "description": "SkipSet from READY, EXERCISING and AWAITING_RESULT records a skipped result and goes to the next set or exercise READY with no rest (docs/03 §4: a skipped set earns no rest), or to REVIEWING_SUMMARY on the final set; rejected while PAUSED or RESTING; duplicate, wrong-set and over-long reason are rejected without changing state; skipped sets count towards FinishSession.",
+  "description": "SkipSet from READY, EXERCISING and AWAITING_RESULT records a skipped result and goes to the next set READY with no rest (docs/03 §4: a skipped set earns no rest within an exercise) or, when it was the exercise's last set, to the 60 s transition rest before the next exercise (IOS-022: changing exercise always gets the transition rest), or to REVIEWING_SUMMARY on the final set; rejected while PAUSED or RESTING; duplicate, wrong-set and over-long reason are rejected without changing state; skipped sets count towards FinishSession.",
   "steps": [
     {
       "now": "2026-11-07T08:00:00Z",
@@ -182,17 +182,33 @@
         "reason": "form broke down"
       },
       "expect": {
-        "phase": "ready",
+        "phase": "resting",
         "revision": 7,
         "currentExecutionIndex": 1,
         "currentSetIndex": 1,
         "skippedSetCount": 3,
         "confirmedSetCount": 0,
         "pendingMeasuredElapsedMs": null,
+        "phaseDeadlineAt": "2026-11-07T08:01:35Z",
         "events": [
           "set_skipped",
-          "phase_changed"
+          "phase_changed",
+          "deadline_changed"
         ]
+      }
+    },
+    {
+      "now": "2026-11-07T08:00:38Z",
+      "command": {
+        "type": "ready_next",
+        "commandId": "00000000-0000-4000-8000-000000000022"
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 8,
+        "currentExecutionIndex": 1,
+        "currentSetIndex": 1,
+        "phaseDeadlineAt": null
       }
     },
     {
@@ -204,7 +220,7 @@
       },
       "expect": {
         "phase": "pre_countdown",
-        "revision": 8
+        "revision": 9
       }
     },
     {
@@ -215,7 +231,7 @@
       },
       "expect": {
         "phase": "exercising",
-        "revision": 9,
+        "revision": 10,
         "phaseDeadlineAt": null
       }
     },
@@ -227,7 +243,7 @@
       },
       "expect": {
         "phase": "paused",
-        "revision": 10
+        "revision": 11
       }
     },
     {
@@ -242,7 +258,7 @@
       "expect": {
         "error": "invalid_transition",
         "phase": "paused",
-        "revision": 10
+        "revision": 11
       }
     },
     {
@@ -253,7 +269,7 @@
       },
       "expect": {
         "phase": "exercising",
-        "revision": 11
+        "revision": 12
       }
     },
     {
@@ -264,7 +280,7 @@
       },
       "expect": {
         "phase": "awaiting_result",
-        "revision": 12
+        "revision": 13
       }
     },
     {
@@ -280,7 +296,7 @@
       },
       "expect": {
         "phase": "resting",
-        "revision": 13,
+        "revision": 14,
         "currentSetIndex": 2,
         "confirmedSetCount": 1,
         "phaseDeadlineAt": "2026-11-07T08:02:45Z"
@@ -298,7 +314,7 @@
       "expect": {
         "error": "invalid_transition",
         "phase": "resting",
-        "revision": 13,
+        "revision": 14,
         "phaseDeadlineAt": "2026-11-07T08:02:45Z"
       }
     },
@@ -310,7 +326,7 @@
       },
       "expect": {
         "phase": "ready",
-        "revision": 14
+        "revision": 15
       }
     },
     {
@@ -325,7 +341,7 @@
       "expect": {
         "phase": "reviewing_summary",
         "status": "active",
-        "revision": 15,
+        "revision": 16,
         "confirmedSetCount": 1,
         "skippedSetCount": 4,
         "phaseDeadlineAt": null,
@@ -347,7 +363,7 @@
       "expect": {
         "error": "duplicate_set_resolution",
         "phase": "reviewing_summary",
-        "revision": 15,
+        "revision": 16,
         "skippedSetCount": 4
       }
     },
@@ -360,7 +376,7 @@
       "expect": {
         "phase": "completed",
         "status": "completed",
-        "revision": 16,
+        "revision": 17,
         "confirmedSetCount": 1,
         "skippedSetCount": 4
       }

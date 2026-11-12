@@ -17,6 +17,14 @@ public struct ReconcilePolicy: Equatable, Sendable {
     public var forwardGapThreshold: TimeInterval?
     /// Session untouched for this long ⇒ ask the user to resume/finish/abandon (docs/03 §7 #7).
     public var staleSessionThreshold: TimeInterval
+    /// IOS-021 (setting "Tự động chuyển set", app default ON): a rest found over within
+    /// `autoAdvanceLateTolerance` starts the next set's exercising phase at the rest deadline. The domain default is
+    /// `false` (CON-002 vectors keep "rest → ready"); the app passes the user's setting through `reconcile`.
+    /// Never creates a set result: reps sets still end with "Xong set", timed sets with the result form (D1).
+    public var autoAdvance: Bool
+    /// A rest deadline found later than this (the app was not executing) never auto-starts: back to READY +
+    /// `restLapsed`, mirroring `countdownLateTolerance` (UX §5 "do not auto-start if app is inactive").
+    public var autoAdvanceLateTolerance: TimeInterval
 
     public init(
         countdownLateTolerance: TimeInterval = 2,
@@ -24,8 +32,12 @@ public struct ReconcilePolicy: Equatable, Sendable {
         backwardJumpTolerance: TimeInterval = 2,
         monotonicDriftTolerance: TimeInterval = 5,
         forwardGapThreshold: TimeInterval? = 12 * 3600,
-        staleSessionThreshold: TimeInterval = 6 * 3600
+        staleSessionThreshold: TimeInterval = 6 * 3600,
+        autoAdvance: Bool = false,
+        autoAdvanceLateTolerance: TimeInterval = 2
     ) {
+        self.autoAdvance = autoAdvance
+        self.autoAdvanceLateTolerance = autoAdvanceLateTolerance
         self.countdownLateTolerance = countdownLateTolerance
         self.promptDeadlineTolerance = promptDeadlineTolerance
         self.backwardJumpTolerance = backwardJumpTolerance
@@ -85,7 +97,9 @@ extension WorkoutReducer {
     ///   a set without the app executing (UX §5).
     /// - timed `exercising`, deadline reached → `awaitingResult` (`targetDeadlineReached`). A draft is created
     ///   but **no set result**; the suggested actual is only pre-filled when reconciled promptly (ADR-009).
-    /// - `resting`, deadline reached → `ready` (`restExpired`). Never starts exercising.
+    /// - `resting`, deadline reached → `ready` (`restExpired`). With `policy.autoAdvance` (IOS-021) and the deadline
+    ///   reached within `autoAdvanceLateTolerance` → `exercising` starting at the rest deadline; reached later (the app
+    ///   was not executing) → `ready` + `restLapsed`. Auto-advance never produces a set result.
     /// - `paused`, `ready`, `awaitingResult`, `reviewingSummary`: no time-based transition.
     ///
     /// Clock anomalies (backward jump, monotonic mismatch, oversized forward gap) withhold all timing
@@ -184,7 +198,17 @@ extension WorkoutReducer {
         case .resting:
             guard let deadline = s.phaseDeadlineAt, now >= deadline else { return nil }
             var b = Builder(s)
-            b.enterReady(now: now) // restExpired → ready; never exercising
+            guard policy.autoAdvance, s.restAutoAdvances else {
+                b.enterReady(now: now) // restExpired → ready
+                return b.commit(now: now)
+            }
+            let lateMs = TimeMath.ms(from: deadline, to: now)
+            if lateMs <= Int64(policy.autoAdvanceLateTolerance * 1000) {
+                b.beginExercising(at: deadline) // IOS-021: rest over while executing → next set starts
+            } else {
+                b.events.append(.restLapsed(lateMs: lateMs))
+                b.enterReady(now: now)
+            }
             return b.commit(now: now)
 
         case .ready, .paused, .awaitingResult, .reviewingSummary, .completed, .abandoned:

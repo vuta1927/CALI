@@ -25,6 +25,9 @@ final class WorkoutPlayerModel {
     /// Wall-clock instant the UI renders against; refreshed by `tick()`.
     private(set) var now = Date()
     var banner: Banner?
+    /// IOS-023: "Đã bỏ qua · Hoàn tác" snackbar — the execution whose skip can be undone, until `until`.
+    struct UndoSkip: Equatable { let executionId: UUID; let setIndex: Int; let until: Date }
+    var undoSkip: UndoSkip?
     /// Increments on every phase change; drives `.sensoryFeedback`.
     private(set) var feedbackTick = 0
     /// Non-nil while a clock change is waiting for the user's confirmation.
@@ -152,14 +155,32 @@ final class WorkoutPlayerModel {
 
     func skipCurrentSet(reason: String?) {
         guard let key = state.pendingResult?.key ?? state.currentSetKey else { return }
-        send(.skipSet(SkipSet(
+        if send(.skipSet(SkipSet(
             commandId: UUID(),
             setResultId: resultId(for: key),
             executionId: key.executionId,
             setIndex: key.setIndex,
             reason: reason
-        )))
+        ))) {
+            undoSkip = UndoSkip(executionId: key.executionId, setIndex: key.setIndex, until: Date().addingTimeInterval(10))
+        }
     }
+
+    /// IOS-023 (PO D5): "tập lại ngay" — retract the skipped sets of `executionId`, do them now, then return.
+    func reopenSkipped(executionId: UUID, setIndex: Int? = nil) {
+        undoSkip = nil
+        send(.reopenSkipped(ReopenSkipped(commandId: UUID(), executionId: executionId, setIndex: setIndex)))
+    }
+
+    var showsUndoSkip: Bool {
+        guard let undoSkip, now < undoSkip.until, canReopenSkipped else { return false }
+        return state.skippedSets(in: undoSkip.executionId).contains { $0.key.setIndex == undoSkip.setIndex }
+    }
+
+    func skippedCount(for execution: ExecutionSpec) -> Int { state.skippedSets(in: execution.id).count }
+
+    /// Reopen is phase-legal only between sets or on the summary (the reducer enforces it as well).
+    var canReopenSkipped: Bool { state.isActive && [.ready, .resting, .reviewingSummary].contains(state.phase) }
 
     private func resultId(for key: SetKey) -> UUID {
         if let id = setResultIds[key] { return id }
@@ -189,6 +210,10 @@ final class WorkoutPlayerModel {
 
     // MARK: Time reconciliation
 
+    /// IOS-021: the domain stays pure; the user's "Tự động chuyển set" setting only reaches it through the policy.
+    var autoAdvanceEnabled: Bool { store?.settings.autoAdvanceSets ?? true }
+    private var reconcilePolicy: ReconcilePolicy { ReconcilePolicy(autoAdvance: autoAdvanceEnabled) }
+
     /// Called ~4×/s while the player is visible and on every scene-phase change.
     func tick() {
         let wall = Date()
@@ -198,16 +223,19 @@ final class WorkoutPlayerModel {
 
         let monoElapsed = lastTickMono.map { MonotonicClock.seconds(from: $0, to: mono) }
         // Pure check first so the 4 Hz tick only opens a write transaction when something is due.
+        let policy = reconcilePolicy
         var result = WorkoutReducer.reconcile(
             state,
             now: wall,
             previousNow: lastTickWall,
             monotonicElapsed: monoElapsed,
-            acknowledgeClockJump: clockAcknowledged
+            acknowledgeClockJump: clockAcknowledged,
+            policy: policy
         )
         if result.changed, !result.requiresUserReconciliation {
             guard let store,
-                  let persisted = store.reconcile(previousNow: lastTickWall, monotonicElapsed: monoElapsed, acknowledgeClockJump: clockAcknowledged)
+                  let persisted = store.reconcile(previousNow: lastTickWall, monotonicElapsed: monoElapsed,
+                                                  acknowledgeClockJump: clockAcknowledged, policy: policy)
             else { return }
             result = persisted
         }
@@ -255,8 +283,15 @@ final class WorkoutPlayerModel {
                 if !records.contains(where: { $0.setResultId == record.setResultId }) {
                     records.append(record)
                 }
+            case .setResultsRetracted(let ids):
+                let retracted = Set(ids)
+                records.removeAll { retracted.contains($0.setResultId) }
+                // The redo gets a fresh id (the old one is tombstoned on the server).
+                setResultIds = setResultIds.filter { !retracted.contains($0.value) }
             case .countdownLapsed:
                 banner = .info("Đếm ngược đã hết khi app không mở. Set chưa bắt đầu — bấm Bắt đầu khi sẵn sàng.")
+            case .restLapsed:
+                banner = .info("Hết giờ nghỉ khi app không mở nên set chưa tự bắt đầu — bấm Bắt đầu khi sẵn sàng.")
             default:
                 break
             }
@@ -290,6 +325,8 @@ final class WorkoutPlayerModel {
             "Dữ liệu chưa hợp lệ: " + issues.map(Self.describe).joined(separator: "; ")
         case .timestampBeforeSessionStart:
             "Giờ thiết bị sớm hơn lúc bắt đầu buổi tập. Hãy kiểm tra lại giờ hệ thống."
+        case .nothingToReopen:
+            "Không còn set bỏ qua nào của bài này."
         }
     }
 

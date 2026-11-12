@@ -95,6 +95,14 @@ public struct SessionState: Codable, Equatable, Sendable {
     public var pendingResult: ResultDraft?
     /// Sets that already have a canonical result.
     public var resolvedSets: [ResolvedSet]
+    /// IOS-022 (PO D2): rest before the first set of the next exercise. Fixed at `CreateSession` (from the plan when
+    /// the plan carries one — separate contract PR — else `DomainLimits.defaultTransitionRestSeconds`). Local state
+    /// only; states persisted before IOS-022 decode with the default.
+    public var transitionRestSeconds: Int
+    /// IOS-023 (PO D5): where the user was when they reopened skipped sets ("tập lại ngay"). After the reopened
+    /// execution has no unresolved set left, the cursor returns here (with the transition rest) and it is cleared.
+    /// Local state only, never on the wire.
+    public var resumePoint: SetKey?
 
     public init(
         sessionId: UUID,
@@ -117,8 +125,12 @@ public struct SessionState: Codable, Equatable, Sendable {
         pausedAt: Date? = nil,
         pausedRemainingMs: Int64? = nil,
         pendingResult: ResultDraft? = nil,
-        resolvedSets: [ResolvedSet] = []
+        resolvedSets: [ResolvedSet] = [],
+        transitionRestSeconds: Int = DomainLimits.defaultTransitionRestSeconds,
+        resumePoint: SetKey? = nil
     ) {
+        self.transitionRestSeconds = transitionRestSeconds
+        self.resumePoint = resumePoint
         self.sessionId = sessionId
         self.plannedWorkoutId = plannedWorkoutId
         self.status = status
@@ -156,6 +168,27 @@ public struct SessionState: Codable, Equatable, Sendable {
 
     public func resolution(for key: SetKey) -> ResolvedSet? {
         resolvedSets.first { $0.key == key }
+    }
+
+    /// IOS-022: the current rest leads into a different exercise than the last resolved set (the transition rest).
+    public var isTransitionRest: Bool {
+        guard phase == .resting, let current = currentExecution else { return false }
+        guard let last = resolvedSets.last else { return currentSetIndex == 1 && currentExecutionIndex > 0 }
+        return last.key.executionId != current.id
+    }
+
+    /// Whether a rest ending now may auto-start the next set (IOS-021). PO decision: a transition rest follows the same
+    /// rule as a rest between sets (set 1 of the next exercise starts at the deadline when the policy allows it).
+    public var restAutoAdvances: Bool { phase == .resting }
+
+    /// IOS-023: skipped set keys of one execution, ascending.
+    public func skippedSets(in executionId: UUID) -> [ResolvedSet] {
+        resolvedSets.filter { $0.key.executionId == executionId && $0.status == .skipped }.sorted { $0.key.setIndex < $1.key.setIndex }
+    }
+
+    /// IOS-023: executions that still have skipped sets, in plan order.
+    public var executionsWithSkippedSets: [ExecutionSpec] {
+        executions.filter { !skippedSets(in: $0.id).isEmpty }
     }
 
     public var totalPlannedSets: Int { executions.reduce(0) { $0 + $1.setCount } }
@@ -225,6 +258,10 @@ public struct SessionState: Codable, Equatable, Sendable {
         if phase != .paused, pausedAt != nil || pausedRemainingMs != nil { v.append("pause fields outside paused") }
         if phase != .awaitingResult, pendingResult != nil { v.append("draft outside awaitingResult") }
         if phase == .reviewingSummary, !allSetsResolved { v.append("reviewingSummary with unresolved sets") }
+        if let rp = resumePoint {
+            if status != .active { v.append("resumePoint on a terminal session") }
+            if resolution(for: rp) != nil { v.append("resumePoint \(rp) is already resolved") }
+        }
         if status == .active, phase != .reviewingSummary, let key = currentSetKey, resolution(for: key) != nil {
             v.append("current set \(key) is already resolved")
         }
