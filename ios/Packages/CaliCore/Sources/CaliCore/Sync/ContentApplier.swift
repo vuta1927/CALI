@@ -121,12 +121,16 @@ enum ContentApplier {
         case "planned_workout":
             guard let planId = payload["planId"]?.stringValue, try planExists(db, planId), let weekday = payload["weekday"]?.intValue,
                   let order = payload["orderIndex"]?.intValue else { return false }
+            // CON-011: absent or null ⇒ NULL (client default 60 s); out of range ⇒ row not applied.
+            let restBetween = payload["restBetweenExercisesSeconds"]?.intValue
+            if let restBetween, !(0...3600).contains(restBetween) { return false }
             try db.execute(sql: """
-                INSERT INTO planned_workouts (id, plan_id, weekday, title, focus, order_index, server_version, dirty)
-                VALUES (?, ?, ?, ?, '', ?, ?, 0)
+                INSERT INTO planned_workouts (id, plan_id, weekday, title, focus, order_index, rest_between_exercises_seconds, server_version, dirty)
+                VALUES (?, ?, ?, ?, '', ?, ?, ?, 0)
                 ON CONFLICT(id) DO UPDATE SET plan_id = excluded.plan_id, weekday = excluded.weekday, title = excluded.title,
-                    order_index = excluded.order_index, server_version = excluded.server_version, dirty = 0
-                """, arguments: [key, planId, weekday, payload["title"]?.stringValue ?? "", order, version])
+                    order_index = excluded.order_index, rest_between_exercises_seconds = excluded.rest_between_exercises_seconds,
+                    server_version = excluded.server_version, dirty = 0
+                """, arguments: [key, planId, weekday, payload["title"]?.stringValue ?? "", order, restBetween, version])
         case "planned_exercise":
             guard let workoutId = payload["plannedWorkoutId"]?.stringValue,
                   try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM planned_workouts WHERE id = ?)", arguments: [workoutId]) == true,

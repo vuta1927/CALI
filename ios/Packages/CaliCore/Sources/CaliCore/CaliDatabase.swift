@@ -102,8 +102,18 @@ public enum CaliDatabase {
         migrator.registerMigration("v6_sync_inbox") { db in
             try db.execute(sql: syncInboxSchemaV6)
         }
+        migrator.registerMigration("v7_rest_between_exercises") { db in
+            try db.execute(sql: restBetweenExercisesV7)
+        }
         return migrator
     }
+
+    /// CON-011: `planned_workouts.rest_between_exercises_seconds` (nullable; NULL = client default 60 s). Kept so an
+    /// iOS upsert never wipes the server value.
+    static let restBetweenExercisesV7 = """
+        ALTER TABLE planned_workouts ADD COLUMN rest_between_exercises_seconds INTEGER
+            CHECK (rest_between_exercises_seconds IS NULL OR rest_between_exercises_seconds BETWEEN 0 AND 3600);
+        """
 
     /// IOS-001: local mirror of the content entities after CON-003/004 (docs/04 "main tables mirror server
     /// business entities"), plus history, AI review, audit, settings, sync cursor, media cache and the record

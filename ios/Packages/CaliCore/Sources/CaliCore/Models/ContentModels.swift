@@ -114,13 +114,22 @@ public struct PlannedWorkout: Identifiable, Codable, Hashable, Sendable {
     /// Local-only subtitle.
     public var focus: String
     public var exercises: [PlannedExercise]
+    /// CON-011: rest before the next exercise (0...3600); nil ⇒ the domain default 60 s.
+    public var restBetweenExercisesSeconds: Int?
 
-    public init(id: UUID, weekday: Int, title: String, focus: String, exercises: [PlannedExercise]) {
+    public init(id: UUID, weekday: Int, title: String, focus: String, exercises: [PlannedExercise], restBetweenExercisesSeconds: Int? = nil) {
         self.id = id
         self.weekday = weekday
         self.title = title
         self.focus = focus
         self.exercises = exercises
+        self.restBetweenExercisesSeconds = restBetweenExercisesSeconds
+    }
+
+    /// IOS-022/CON-011: the `CreateSession` for this workout; the plan's transition rest feeds the session (nil ⇒ 60 s).
+    public func createSession(commandId: UUID, sessionId: UUID, executions: [ExecutionSpec]) -> CreateSession {
+        CreateSession(commandId: commandId, sessionId: sessionId, plannedWorkoutId: id, executions: executions,
+                      transitionRestSeconds: restBetweenExercisesSeconds)
     }
 
     public var totalSets: Int { exercises.reduce(0) { $0 + $1.setCount } }

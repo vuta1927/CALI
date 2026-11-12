@@ -320,12 +320,13 @@ public final class ContentStore: Sendable {
             let workoutId = DBText.id(workout.id)
             try db.execute(
                 sql: """
-                    INSERT INTO planned_workouts (id, plan_id, weekday, title, focus, order_index)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO planned_workouts (id, plan_id, weekday, title, focus, order_index, rest_between_exercises_seconds)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET plan_id = excluded.plan_id, weekday = excluded.weekday, title = excluded.title,
-                        focus = excluded.focus, order_index = excluded.order_index, dirty = 1
+                        focus = excluded.focus, order_index = excluded.order_index,
+                        rest_between_exercises_seconds = excluded.rest_between_exercises_seconds, dirty = 1
                     """,
-                arguments: [workoutId, planId, workout.weekday, workout.title, workout.focus, workoutIndex]
+                arguments: [workoutId, planId, workout.weekday, workout.title, workout.focus, workoutIndex, workout.restBetweenExercisesSeconds]
             )
             let keepExercises = workout.exercises.map { DBText.id($0.id) }
             let removedExercises = try String.fetchAll(db, sql: "SELECT id FROM planned_exercises WHERE planned_workout_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
@@ -514,7 +515,8 @@ public final class ContentStore: Sendable {
                         )
                     }
                     return PlannedWorkout(id: DBText.uuid(workoutId) ?? UUID(), weekday: workout["weekday"], title: workout["title"],
-                                          focus: workout["focus"], exercises: exercises)
+                                          focus: workout["focus"], exercises: exercises,
+                                          restBetweenExercisesSeconds: workout["rest_between_exercises_seconds"])
                 }
             let activations = try Row.fetchAll(db, sql: """
                 SELECT id, from_date, to_date, timezone FROM plan_activations
