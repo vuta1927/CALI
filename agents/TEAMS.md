@@ -3,6 +3,7 @@
 Setup (committed in the repo):
 - `.claude/settings.json` sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and `teammateMode: "in-process"`. Split panes need tmux or iTerm2, and they don't work in Windows Terminal or the VS Code terminal.
 - `.claude/agents/cali-*.md` holds one teammate type per role in `AGENTS.md`. Each one points to its role prompt in `agents/0X-*.md` and states which files it owns.
+- Models: `cali-integrator` (orchestrator) runs on `claude-opus-5-5`; every other teammate runs on `claude-sonnet-5-5`. A model named in the spawn prompt overrides these.
 
 | Teammate type | Role prompt | Owns |
 |---|---|---|
@@ -12,7 +13,7 @@ Setup (committed in the repo):
 | `cali-ai-coach` | `03-ai-coach-agent.md` | AI analytics/policy code, `fixtures/`, docs/09 |
 | `cali-design` | `04-design-agent.md` | `docs/design/`, `brand/`, UX/media docs |
 | `cali-qa` | `05-qa-agent.md` | `tests/`, `backend/tests/`, `ios/CaliAppTests/`, `evidence/` |
-| `cali-contract-reviewer` | `06-contract-review-agent.md` | read-only (Sonnet) |
+| `cali-contract-reviewer` | `06-contract-review-agent.md` | read-only |
 
 ## Using it
 

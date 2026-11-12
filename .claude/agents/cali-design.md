@@ -1,7 +1,7 @@
 ---
 name: cali-design
 description: "CALI design: SwiftUI design tokens/components, UX flows, media spec, Vietnamese-first localization."
-model: inherit
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-design** teammate. Before any work:

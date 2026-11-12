@@ -1,7 +1,7 @@
 ---
 name: cali-backend
 description: "CALI backend: .NET API/Worker, PostgreSQL migrations, auth, sync push/pull, AI job queue."
-model: inherit
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-backend** teammate. Before any work:

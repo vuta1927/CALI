@@ -1,7 +1,7 @@
 ---
 name: cali-qa
 description: "CALI QA: acceptance tests, sync/offline/timer evidence, device matrix, release recommendation."
-model: inherit
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-qa** teammate. Before any work:
