@@ -171,9 +171,9 @@ public struct SessionState: Codable, Equatable, Sendable {
         return last.key.executionId != current.id
     }
 
-    /// Whether a rest ending now may auto-start the next set (IOS-021). A transition rest never does (IOS-022): a new
-    /// exercise needs the user to look at it and set up, so it ends in READY.
-    public var restAutoAdvances: Bool { phase == .resting && !isTransitionRest }
+    /// Whether a rest ending now may auto-start the next set (IOS-021). PO decision: a transition rest follows the same
+    /// rule as a rest between sets (set 1 of the next exercise starts at the deadline when the policy allows it).
+    public var restAutoAdvances: Bool { phase == .resting }
 
     public var totalPlannedSets: Int { executions.reduce(0) { $0 + $1.setCount } }
     public var confirmedSetCount: Int { resolvedSets.filter { $0.status != .skipped }.count }

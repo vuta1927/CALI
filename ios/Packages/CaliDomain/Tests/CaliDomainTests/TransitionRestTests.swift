@@ -58,14 +58,41 @@ final class TransitionRestTests: XCTestCase {
         XCTAssertTrue(h.s.restAutoAdvances)
     }
 
-    func testTransitionRestNeverAutoAdvances() {
+    /// AC3: after the last set of A, the transition rest ends on time → set 1 of B exercising, no SetRecord.
+    func testTransitionRestAutoAdvancesToFirstSetOfNextExercise() {
+        let h = Harness()
+        h.send(h.create([Specs.hold(sets: 1), Specs.hold(sets: 2, id: uuid(9105))]))
+        h.send(h.startSet(countdown: 0)); h.clock.advance(by: 12)
+        h.send(h.stopSet()); h.send(h.confirm())
+        XCTAssertTrue(h.s.isTransitionRest)
+        XCTAssertTrue(h.s.restAutoAdvances)
+        let deadline = h.s.phaseDeadlineAt!
+        h.clock.advance(by: 61)
+        let r = h.reconcile(previousNow: h.now.addingTimeInterval(-1), monotonicElapsed: 1, policy: ReconcilePolicy(autoAdvance: true))
+        XCTAssertEqual(r.state.phase, .exercising)
+        XCTAssertEqual(r.state.currentSetKey, SetKey(executionId: uuid(9105), setIndex: 1))
+        XCTAssertEqual(r.state.phaseStartedAt, deadline)
+        XCTAssertTrue(r.state.resolvedSets.count == 1, "no SetRecord created by auto-advance")
+        XCTAssertFalse(r.events.contains { $0.code == "set_confirmed" || $0.code == "set_skipped" })
+    }
+
+    func testLateTransitionRestGoesToReadyWithRestLapsed() {
         let h = Harness()
         create(h, transition: nil)
         h.send(h.skip())
-        XCTAssertFalse(h.s.restAutoAdvances)
+        h.clock.advance(by: 120)
+        let r = h.reconcile(previousNow: h.now.addingTimeInterval(-60), monotonicElapsed: 60, policy: ReconcilePolicy(autoAdvance: true))
+        XCTAssertEqual(r.state.phase, .ready)
+        XCTAssertTrue(r.events.contains { $0.code == "rest_lapsed" })
+    }
+
+    func testTransitionRestWithSettingOffEndsInReady() {
+        let h = Harness()
+        create(h, transition: nil)
+        h.send(h.skip())
         h.clock.advance(by: 60)
-        let r = h.reconcile(previousNow: h.now.addingTimeInterval(-1), monotonicElapsed: 1, policy: ReconcilePolicy(autoAdvance: true))
-        XCTAssertEqual(r.state.phase, .ready, "a new exercise starts only on the user's Start")
+        let r = h.reconcile(previousNow: h.now.addingTimeInterval(-1), monotonicElapsed: 1, policy: ReconcilePolicy(autoAdvance: false))
+        XCTAssertEqual(r.state.phase, .ready)
         XCTAssertFalse(r.events.contains { $0.code == "rest_lapsed" })
     }
 

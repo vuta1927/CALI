@@ -225,7 +225,8 @@ struct RestPhaseView: View {
 // MARK: - Transition rest (IOS-022)
 
 /// Rest before a new exercise: the next exercise's poster leads (visual-first), the countdown is secondary.
-/// Ends in READY; the user starts the first set (never auto-started, even with "Tự động chuyển set").
+/// Ends like any rest: with "Tự động chuyển set" on and the app executing on time, set 1 starts at the deadline;
+/// otherwise READY (PO decision after IOS-022).
 struct TransitionRestView: View {
     let model: WorkoutPlayerModel
 
@@ -263,7 +264,9 @@ struct TransitionRestView: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Chuẩn bị còn \(Fmt.countdown(ms: model.remainingMs ?? 0))")
-            Text("Hết giờ chỉ nhắc, không tự bắt đầu bài mới. Bấm Bắt đầu khi bạn đã sẵn sàng.")
+            Text(model.autoAdvanceEnabled
+                 ? "Hết giờ khi app đang mở, set 1 bài mới tự bắt đầu. Set chỉ được ghi khi bạn bấm Xong set / Lưu."
+                 : "Hết giờ chỉ nhắc, không tự bắt đầu bài mới. Bấm Bắt đầu khi bạn đã sẵn sàng.")
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)
                 .multilineTextAlignment(.center)
