@@ -289,6 +289,13 @@ struct SummaryPhaseView: View {
                 .foregroundStyle(Color.caliText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             SessionStatsRow(model: model)
+            let skippedExercises = model.state.executionsWithSkippedSets.count
+            if skippedExercises > 0 {
+                Text("Còn \(skippedExercises) bài bỏ qua, tập luôn không?")
+                    .font(.callout)
+                    .foregroundStyle(Color.caliText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             SessionSetList(model: model)
         } actions: {
             Button("Lưu buổi tập", systemImage: "checkmark.circle") { model.finish() }
@@ -367,6 +374,14 @@ struct SessionSetList: View {
                 ExerciseResultCard(exercise: model.exercise(for: execution),
                                    sets: model.records(for: execution).map(LoggedSet.init(record:)),
                                    plannedSetCount: execution.setCount)
+                let skipped = model.skippedCount(for: execution)
+                if skipped > 0, model.canReopenSkipped {
+                    // IOS-023: "Đã bỏ qua" sets of this exercise can be done now.
+                    Button("Tập lại \(skipped) set đã bỏ qua", systemImage: "arrow.uturn.backward") {
+                        model.reopenSkipped(executionId: execution.id)
+                    }
+                    .buttonStyle(.caliSecondary)
+                }
             }
         }
     }

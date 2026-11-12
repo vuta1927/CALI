@@ -143,6 +143,8 @@ final class Harness {
         return .skipSet(SkipSet(commandId: freshId(), setResultId: freshId(), executionId: k.executionId, setIndex: k.setIndex, reason: reason))
     }
 
+    func reopen(_ executionId: UUID) -> Command { .reopenSkipped(ReopenSkipped(commandId: freshId(), executionId: executionId)) }
+
     /// A syntactically valid command of `kind` targeting the current set.
     func command(_ kind: CommandKind) -> Command {
         switch kind {
@@ -157,6 +159,7 @@ final class Harness {
         case .skipSet: skip()
         case .finishSession: finish()
         case .abandonSession: abandon()
+        case .reopenSkipped: reopen(s.currentExecution!.id)
         }
     }
 

@@ -6,6 +6,7 @@ extension SessionState {
         case sessionId, plannedWorkoutId, status, phase, revision, executions, currentExecutionIndex, currentSetIndex
         case startedAt, updatedAt, finishedAt, abandonedAt, abandonReason, phaseStartedAt, phaseDeadlineAt, countdownSeconds
         case accumulatedExerciseMs, pausedAt, pausedRemainingMs, pendingResult, resolvedSets, transitionRestSeconds
+        case resumePoint
     }
 
     public init(from decoder: Decoder) throws {
@@ -33,7 +34,8 @@ extension SessionState {
             pendingResult: try c.decodeIfPresent(ResultDraft.self, forKey: .pendingResult),
             resolvedSets: try c.decodeIfPresent([ResolvedSet].self, forKey: .resolvedSets) ?? [],
             // IOS-022: absent in states written before the transition rest existed.
-            transitionRestSeconds: try c.decodeIfPresent(Int.self, forKey: .transitionRestSeconds) ?? DomainLimits.defaultTransitionRestSeconds
+            transitionRestSeconds: try c.decodeIfPresent(Int.self, forKey: .transitionRestSeconds) ?? DomainLimits.defaultTransitionRestSeconds,
+            resumePoint: try c.decodeIfPresent(SetKey.self, forKey: .resumePoint)
         )
     }
 }

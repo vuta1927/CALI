@@ -99,6 +99,10 @@ public struct SessionState: Codable, Equatable, Sendable {
     /// the plan carries one — separate contract PR — else `DomainLimits.defaultTransitionRestSeconds`). Local state
     /// only; states persisted before IOS-022 decode with the default.
     public var transitionRestSeconds: Int
+    /// IOS-023 (PO D5): where the user was when they reopened skipped sets ("tập lại ngay"). After the reopened
+    /// execution has no unresolved set left, the cursor returns here (with the transition rest) and it is cleared.
+    /// Local state only, never on the wire.
+    public var resumePoint: SetKey?
 
     public init(
         sessionId: UUID,
@@ -122,9 +126,11 @@ public struct SessionState: Codable, Equatable, Sendable {
         pausedRemainingMs: Int64? = nil,
         pendingResult: ResultDraft? = nil,
         resolvedSets: [ResolvedSet] = [],
-        transitionRestSeconds: Int = DomainLimits.defaultTransitionRestSeconds
+        transitionRestSeconds: Int = DomainLimits.defaultTransitionRestSeconds,
+        resumePoint: SetKey? = nil
     ) {
         self.transitionRestSeconds = transitionRestSeconds
+        self.resumePoint = resumePoint
         self.sessionId = sessionId
         self.plannedWorkoutId = plannedWorkoutId
         self.status = status
@@ -174,6 +180,16 @@ public struct SessionState: Codable, Equatable, Sendable {
     /// Whether a rest ending now may auto-start the next set (IOS-021). PO decision: a transition rest follows the same
     /// rule as a rest between sets (set 1 of the next exercise starts at the deadline when the policy allows it).
     public var restAutoAdvances: Bool { phase == .resting }
+
+    /// IOS-023: skipped set keys of one execution, ascending.
+    public func skippedSets(in executionId: UUID) -> [ResolvedSet] {
+        resolvedSets.filter { $0.key.executionId == executionId && $0.status == .skipped }.sorted { $0.key.setIndex < $1.key.setIndex }
+    }
+
+    /// IOS-023: executions that still have skipped sets, in plan order.
+    public var executionsWithSkippedSets: [ExecutionSpec] {
+        executions.filter { !skippedSets(in: $0.id).isEmpty }
+    }
 
     public var totalPlannedSets: Int { executions.reduce(0) { $0 + $1.setCount } }
     public var confirmedSetCount: Int { resolvedSets.filter { $0.status != .skipped }.count }
@@ -242,6 +258,10 @@ public struct SessionState: Codable, Equatable, Sendable {
         if phase != .paused, pausedAt != nil || pausedRemainingMs != nil { v.append("pause fields outside paused") }
         if phase != .awaitingResult, pendingResult != nil { v.append("draft outside awaitingResult") }
         if phase == .reviewingSummary, !allSetsResolved { v.append("reviewingSummary with unresolved sets") }
+        if let rp = resumePoint {
+            if status != .active { v.append("resumePoint on a terminal session") }
+            if resolution(for: rp) != nil { v.append("resumePoint \(rp) is already resolved") }
+        }
         if status == .active, phase != .reviewingSummary, let key = currentSetKey, resolution(for: key) != nil {
             v.append("current set \(key) is already resolved")
         }

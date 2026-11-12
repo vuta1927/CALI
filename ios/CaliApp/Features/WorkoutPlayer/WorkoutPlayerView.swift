@@ -28,6 +28,25 @@ struct WorkoutPlayerView: View {
             phaseContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .overlay(alignment: .bottom) {
+            // IOS-023: undo a skip for 10 s ("tập lại ngay" for that exercise).
+            if model.showsUndoSkip, let undo = model.undoSkip {
+                HStack {
+                    Text("Đã bỏ qua")
+                        .foregroundStyle(Color.caliText)
+                    Spacer()
+                    Button("Hoàn tác") { model.reopenSkipped(executionId: undo.executionId) }
+                        .font(.body.bold())
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .padding(.horizontal, Spacing.l)
+                .padding(.vertical, Spacing.s)
+                .background(Color.caliSurface, in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, Spacing.l)
+                .padding(.bottom, 96)
+                .accessibilityElement(children: .contain)
+            }
+        }
         .background(Color.caliCanvas.ignoresSafeArea())
         .task {
             while !Task.isCancelled {

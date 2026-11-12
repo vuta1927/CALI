@@ -14,6 +14,7 @@ public enum CommandKind: String, Codable, Sendable, CaseIterable {
     case skipSet = "skip_set"
     case finishSession = "finish_session"
     case abandonSession = "abandon_session"
+    case reopenSkipped = "reopen_skipped"
 }
 
 // MARK: - Payloads (one per row of the docs/03 §4 transition table that is a user command)
@@ -147,6 +148,17 @@ public struct AbandonSession: Codable, Equatable, Sendable {
     }
 }
 
+/// IOS-023 (PO D4/D5): "Tập lại" — retract every skipped result of one execution and do those sets now.
+public struct ReopenSkipped: Codable, Equatable, Sendable {
+    public var commandId: UUID
+    public var executionId: UUID
+
+    public init(commandId: UUID, executionId: UUID) {
+        self.commandId = commandId
+        self.executionId = executionId
+    }
+}
+
 // MARK: - Command
 
 /// Every user command of the docs/03 §4 transition table. `CountdownElapsed` and `restExpired` /
@@ -167,6 +179,7 @@ public enum Command: Equatable, Sendable {
     case skipSet(SkipSet)
     case finishSession(SimpleCommand)
     case abandonSession(AbandonSession)
+    case reopenSkipped(ReopenSkipped)
 
     public var kind: CommandKind {
         switch self {
@@ -181,6 +194,7 @@ public enum Command: Equatable, Sendable {
         case .skipSet: .skipSet
         case .finishSession: .finishSession
         case .abandonSession: .abandonSession
+        case .reopenSkipped: .reopenSkipped
         }
     }
 
@@ -193,6 +207,7 @@ public enum Command: Equatable, Sendable {
         case .extendRest(let c): c.commandId
         case .skipSet(let c): c.commandId
         case .abandonSession(let c): c.commandId
+        case .reopenSkipped(let c): c.commandId
         }
     }
 }
@@ -215,6 +230,7 @@ extension Command: Codable {
         case .skipSet: self = .skipSet(try SkipSet(from: decoder))
         case .finishSession: self = .finishSession(try SimpleCommand(from: decoder))
         case .abandonSession: self = .abandonSession(try AbandonSession(from: decoder))
+        case .reopenSkipped: self = .reopenSkipped(try ReopenSkipped(from: decoder))
         }
     }
 
@@ -227,6 +243,7 @@ extension Command: Codable {
         case .extendRest(let c): try c.encode(to: encoder)
         case .skipSet(let c): try c.encode(to: encoder)
         case .abandonSession(let c): try c.encode(to: encoder)
+        case .reopenSkipped(let c): try c.encode(to: encoder)
         }
         var container = encoder.container(keyedBy: TypeKey.self)
         try container.encode(kind, forKey: .type)

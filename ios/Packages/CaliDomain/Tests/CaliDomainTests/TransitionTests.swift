@@ -235,7 +235,9 @@ final class TransitionTests: XCTestCase {
         .paused: [.resume, .abandonSession],
         .awaitingResult: [.confirmSet, .skipSet, .abandonSession],
         .resting: [.extendRest, .readyNext, .abandonSession],
-        .reviewingSummary: [.finishSession, .abandonSession],
+        // IOS-023: reopenSkipped is phase-legal in READY/RESTING too; there the matrix state has no skipped set, so
+        // it is refused as `nothing_to_reopen` (accepted below as a non-phase rejection).
+        .reviewingSummary: [.finishSession, .abandonSession, .reopenSkipped],
         .completed: [.createSession],
         .abandoned: [.createSession],
     ]
@@ -257,7 +259,9 @@ final class TransitionTests: XCTestCase {
                     } else if kind == .createSession {
                         XCTAssertEqual(e, .activeSessionExists(sessionId: before.sessionId))
                     } else {
-                        XCTAssertTrue(["invalid_transition", "duplicate_set_resolution"].contains(e.code), "\(phase) \(kind): \(e)")
+                        let codes = kind == .reopenSkipped && [.ready, .resting].contains(phase)
+                            ? ["nothing_to_reopen"] : ["invalid_transition", "duplicate_set_resolution"]
+                        XCTAssertTrue(codes.contains(e.code), "\(phase) \(kind): \(e)")
                     }
                 case (.success(let t), false):
                     XCTFail("\(kind) must be rejected in \(phase); got \(t.state.phase)")
