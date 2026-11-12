@@ -3,7 +3,7 @@ import Foundation
 import GRDB
 import XCTest
 
-/// QA (IOS-023): v7_set_result_tombstones upgrades a v6 database holding real rows without loss.
+/// QA (IOS-023): v8_set_result_tombstones upgrades a v6 database (via v7_rest_between_exercises) holding real rows without loss.
 final class QAMigrationV7Tests: XCTestCase {
     func testUpgradeFromV6PreservesRowsAndEnforcesOneLivePerSet() throws {
         let q = try DatabaseQueue(configuration: CaliDatabase.configuration(label: "qa.v6"))
@@ -19,7 +19,7 @@ final class QAMigrationV7Tests: XCTestCase {
         }
         try CaliDatabase.migrator.migrate(q)
         try q.read { db in
-            XCTAssertEqual(try CaliDatabase.migrator.appliedIdentifiers(db).contains("v7_set_result_tombstones"), true)
+            XCTAssertEqual(try CaliDatabase.migrator.appliedIdentifiers(db).contains("v8_set_result_tombstones"), true)
             let rows = try Row.fetchAll(db, sql: "SELECT id, status, record_json, revision, deleted_at FROM set_results ORDER BY id")
             XCTAssertEqual(rows.map { $0["id"] as String }, ["r1", "r2"])
             XCTAssertEqual(rows.map { $0["record_json"] as String }, ["{\"a\":1}", "{\"a\":2}"])
