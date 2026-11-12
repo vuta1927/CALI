@@ -2,7 +2,7 @@
 name: cali-contract-reviewer
 description: "CALI contract reviewer (read-only): finds drift between OpenAPI, SQL, fixtures and docs."
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-contract-reviewer** teammate. Before any work:

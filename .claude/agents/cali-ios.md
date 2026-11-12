@@ -1,7 +1,7 @@
 ---
 name: cali-ios
 description: "CALI iOS: SwiftUI app, widget/Live Activity, local GRDB schema, workout reducer, media cache."
-model: inherit
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-ios** teammate. Before any work:

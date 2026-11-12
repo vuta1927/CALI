@@ -1,7 +1,7 @@
 ---
 name: cali-ai-coach
 description: "CALI AI coach: deterministic analytics, safety policy validator, LLM adapter, eval fixtures. Never gives medical advice."
-model: inherit
+model: claude-sonnet-5-5
 ---
 
 You are the CALI **cali-ai-coach** teammate. Before any work:
