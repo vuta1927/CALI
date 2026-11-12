@@ -222,10 +222,10 @@ final class AppStore {
 
     /// Persists deadline-derived transitions (countdown over, target reached, rest over). Called from the
     /// player's foreground tick only when the pure reducer already sees a change.
-    func reconcile(previousNow: Date?, monotonicElapsed: TimeInterval?, acknowledgeClockJump: Bool) -> ReconcileResult? {
+    func reconcile(previousNow: Date?, monotonicElapsed: TimeInterval?, acknowledgeClockJump: Bool, policy: ReconcilePolicy) -> ReconcileResult? {
         do {
             return try database.coordinator.reconcile(
-                previousNow: previousNow, monotonicElapsed: monotonicElapsed, acknowledgeClockJump: acknowledgeClockJump
+                previousNow: previousNow, monotonicElapsed: monotonicElapsed, acknowledgeClockJump: acknowledgeClockJump, policy: policy
             )
         } catch {
             alertMessage = "Không lưu được trạng thái buổi tập trên máy. (\(error.localizedDescription))"
@@ -270,7 +270,8 @@ final class AppStore {
         let voice = deadlineCue.map { (sound: voiceCues.notificationSound(for: $0, enabled: settings.voiceCuesEnabled), text: voiceCues.text(for: $0)) }
         notifications.sync(state: player.state, exerciseName: name, enabled: settings.notificationsEnabled,
                            voice: settings.voiceCuesEnabled ? voice : nil)
-        voiceCues.sync(state: player.state, enabled: settings.voiceCuesEnabled, notificationsAllowed: settings.notificationsEnabled)
+        voiceCues.sync(state: player.state, enabled: settings.voiceCuesEnabled, notificationsAllowed: settings.notificationsEnabled,
+                       autoAdvance: settings.autoAdvanceSets)
         let content = LiveActivityController.contentState(for: player.state, exerciseName: name)
         liveActivity.sync(content, enabled: settings.liveActivityEnabled)
     }

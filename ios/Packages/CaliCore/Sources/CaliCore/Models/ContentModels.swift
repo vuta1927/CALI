@@ -472,13 +472,15 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var liveActivityEnabled = true
     /// IOS-019 (ADR-078): spoken cues; independent of haptics.
     public var voiceCuesEnabled = true
+    /// IOS-021 (PO D3): "Tự động chuyển set" — a rest that ends while the app is open starts the next set. Default ON.
+    public var autoAdvanceSets = true
     public var hasSeenWelcome = false
     /// ADR-046: load is stored in kg; this only changes how it is shown and typed.
     public var weightUnit: WeightUnit = .kg
     public var appearance: AppearanceMode = .system
 
     private enum CodingKeys: String, CodingKey {
-        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, voiceCuesEnabled, hasSeenWelcome, weightUnit, appearance
+        case countdownSeconds, hapticsEnabled, notificationsEnabled, liveActivityEnabled, voiceCuesEnabled, autoAdvanceSets, hasSeenWelcome, weightUnit, appearance
     }
 
     /// Settings saved by an older build have no `weightUnit` or `appearance`.
@@ -489,6 +491,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
         liveActivityEnabled = try c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
         voiceCuesEnabled = try c.decodeIfPresent(Bool.self, forKey: .voiceCuesEnabled) ?? true
+        autoAdvanceSets = try c.decodeIfPresent(Bool.self, forKey: .autoAdvanceSets) ?? true
         hasSeenWelcome = try c.decodeIfPresent(Bool.self, forKey: .hasSeenWelcome) ?? false
         weightUnit = try c.decodeIfPresent(WeightUnit.self, forKey: .weightUnit) ?? .kg
         // An unknown value from a newer build falls back to the system setting instead of failing the whole settings row.

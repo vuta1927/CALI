@@ -95,6 +95,16 @@ struct ProfileView: View {
                         .frame(maxWidth: 140)
                     }
                     CardDivider()
+                    Toggle(isOn: setting(\.autoAdvanceSets)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Tự động chuyển set")
+                            Text("Hết giờ nghỉ khi app đang mở thì set tiếp tự bắt đầu. Bạn vẫn bấm Xong set và lưu kết quả.")
+                                .font(.caption)
+                                .foregroundStyle(Color.caliSecondary)
+                        }
+                    }
+                    .frame(minHeight: 52)
+                    CardDivider()
                     Toggle("Rung phản hồi", isOn: setting(\.hapticsEnabled)).frame(minHeight: 52)
                     CardDivider()
                     Toggle("Thông báo nhắc hết giờ", isOn: setting(\.notificationsEnabled)).frame(minHeight: 52)

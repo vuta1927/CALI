@@ -158,6 +158,9 @@ public struct SessionState: Codable, Equatable, Sendable {
         resolvedSets.first { $0.key == key }
     }
 
+    /// Whether a rest ending now may auto-start the next set (IOS-021). Only meaningful while `resting`.
+    public var restAutoAdvances: Bool { phase == .resting }
+
     public var totalPlannedSets: Int { executions.reduce(0) { $0 + $1.setCount } }
     public var confirmedSetCount: Int { resolvedSets.filter { $0.status != .skipped }.count }
     public var skippedSetCount: Int { resolvedSets.filter { $0.status == .skipped }.count }

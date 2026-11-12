@@ -108,7 +108,8 @@ stateDiagram-v2
     awaiting_result --> reviewing_summary: confirmSet (final set)
     reviewing_summary --> completed: finishSession
     reviewing_summary --> abandoned: abandonSession
-    resting --> ready: restExpired / userReady
+    resting --> ready: restExpired / userReady / restLapsed
+    resting --> exercising: restExpired while foreground + autoAdvance (IOS-021)
     ready --> ready: skipSet (next set or exercise, no rest)
     exercising --> ready: skipSet (next set or exercise, no rest)
     awaiting_result --> ready: skipSet (next set or exercise, no rest)
@@ -126,7 +127,9 @@ stateDiagram-v2
 ```
 The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest.
 
-**Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. `restExpired → ready` only updates readiness, never starts exercising.
+**Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. Without auto-advance `restExpired → ready` only updates readiness, never starts exercising.
+
+**Auto-advance (IOS-021, PO D1/D3).** The app setting "Tự động chuyển set" (default ON) reaches the pure reducer only as `ReconcilePolicy.autoAdvance` (domain default `false`, so the frozen CON-002 vectors keep "rest → ready"). With it on, a rest deadline reconciled within `autoAdvanceLateTolerance` (2 s, like `countdownLateTolerance`) enters EXERCISING starting **at the rest deadline**: a timed set gets its target deadline and still ends in AWAITING_RESULT; a reps set has no deadline and ends only with "Xong set" (`StopSet`). Reconciled later (the app was suspended or locked) → READY + `restLapsed(lateMs)`, the user starts the set. Auto-advance never creates a set result, and clock anomalies withhold it like every other timing transition. Vector: `fixtures/reducer/rest_auto_advance.json`.
 
 ### Transition table
 | Command/event | Precondition | Transactional write | Side effect after commit |
@@ -152,7 +155,7 @@ The diagram matches the transition table below (ADR-029). AbandonSession is acce
 - `phaseDeadlineUtc` persisted in same transaction as state revision; iOS may render countdown without per-second writes.
 - `status=completed ⇔ phase=completed` and `status=abandoned ⇔ phase=abandoned`; `pausedAt` is non-null only in PAUSED. This is ADR-023, also enforced by SQL CHECK and JSON Schema.
 - `PAUSED` has no active moving deadline. Recompute remaining duration on resume, rather than adding timers.
-- `RESTING` never auto-triggers a new exercising set without user Start action.
+- `RESTING` never auto-triggers a new exercising set without user Start action, except auto-advance (IOS-021) while the app is executing and the deadline is within tolerance; even then no set result is created.
 - On edit set result, increment revision and write a mutation; downstream analysis of old revision is superseded.
 - User initiated explicit skip/abandon always takes precedence over notifications.
 

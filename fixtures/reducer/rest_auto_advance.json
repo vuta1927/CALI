@@ -1,0 +1,122 @@
+{
+  "name": "rest_auto_advance",
+  "description": "IOS-021: with autoAdvance on, a rest reconciled within tolerance starts the next set at the rest deadline (no set result); a timed set still ends in awaiting_result; a rest found over while the app was suspended goes to ready with rest_lapsed; autoAdvance off keeps rest -> ready.",
+  "steps": [
+    {
+      "now": "2026-11-07T08:00:00Z",
+      "command": {
+        "type": "create_session",
+        "commandId": "00000000-0000-4000-8000-000000000001",
+        "sessionId": "00000000-0000-4000-8000-000000005000",
+        "plannedWorkoutId": "00000000-0000-4000-8000-000000006000",
+        "executions": [
+          {
+            "id": "00000000-0000-4000-8000-000000009001",
+            "plannedExerciseId": "00000000-0000-4000-8000-000000008001",
+            "exerciseId": "00000000-0000-4000-8000-000000007001",
+            "catalogVersion": 3,
+            "setCount": 4,
+            "target": { "kind": "static_hold", "holdSeconds": 12 },
+            "restSeconds": 90
+          }
+        ]
+      },
+      "expect": { "phase": "ready", "revision": 1 }
+    },
+    {
+      "now": "2026-11-07T08:00:05Z",
+      "command": { "type": "start_set", "commandId": "00000000-0000-4000-8000-000000000002", "countdownSeconds": 0 },
+      "expect": { "phase": "exercising", "revision": 2, "phaseDeadlineAt": "2026-11-07T08:00:17Z" }
+    },
+    {
+      "now": "2026-11-07T08:00:10Z",
+      "command": { "type": "stop_set", "commandId": "00000000-0000-4000-8000-000000000003" },
+      "expect": { "phase": "awaiting_result", "revision": 3 }
+    },
+    {
+      "now": "2026-11-07T08:00:11Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000004",
+        "setResultId": "00000000-0000-4000-8000-000000000101",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 1,
+        "status": "completed",
+        "actualHoldMs": 5000
+      },
+      "expect": { "phase": "resting", "revision": 4, "currentSetIndex": 2, "phaseDeadlineAt": "2026-11-07T08:01:41Z", "confirmedSetCount": 1 }
+    },
+    {
+      "now": "2026-11-07T08:01:42Z",
+      "reconcile": { "previousNow": "2026-11-07T08:01:41Z", "monotonicElapsed": 1, "autoAdvance": true },
+      "expect": {
+        "phase": "exercising", "revision": 5, "currentSetIndex": 2,
+        "events": ["phase_changed", "deadline_changed"],
+        "phaseDeadlineAt": "2026-11-07T08:01:53Z",
+        "confirmedSetCount": 1, "skippedSetCount": 0
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:53.500Z",
+      "reconcile": { "previousNow": "2026-11-07T08:01:53Z", "monotonicElapsed": 0.5, "autoAdvance": true },
+      "expect": {
+        "phase": "awaiting_result", "revision": 6,
+        "events": ["phase_changed", "deadline_changed"],
+        "phaseDeadlineAt": null,
+        "pendingMeasuredElapsedMs": 12000, "pendingSuggestedActualMs": 12000,
+        "confirmedSetCount": 1
+      }
+    },
+    {
+      "now": "2026-11-07T08:01:56Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000005",
+        "setResultId": "00000000-0000-4000-8000-000000000102",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 2,
+        "status": "completed",
+        "actualHoldMs": 12000
+      },
+      "expect": { "phase": "resting", "revision": 7, "currentSetIndex": 3, "phaseDeadlineAt": "2026-11-07T08:03:26Z", "confirmedSetCount": 2 }
+    },
+    {
+      "now": "2026-11-07T08:10:00Z",
+      "reconcile": { "previousNow": null, "autoAdvance": true },
+      "expect": {
+        "phase": "ready", "revision": 8, "currentSetIndex": 3,
+        "events": ["rest_lapsed", "phase_changed", "deadline_changed"],
+        "phaseDeadlineAt": null,
+        "confirmedSetCount": 2
+      }
+    },
+    {
+      "now": "2026-11-07T08:10:05Z",
+      "command": { "type": "start_set", "commandId": "00000000-0000-4000-8000-000000000006", "countdownSeconds": 0 },
+      "expect": { "phase": "exercising", "revision": 9 }
+    },
+    {
+      "now": "2026-11-07T08:10:10Z",
+      "command": { "type": "stop_set", "commandId": "00000000-0000-4000-8000-000000000007" },
+      "expect": { "phase": "awaiting_result", "revision": 10 }
+    },
+    {
+      "now": "2026-11-07T08:10:11Z",
+      "command": {
+        "type": "confirm_set",
+        "commandId": "00000000-0000-4000-8000-000000000008",
+        "setResultId": "00000000-0000-4000-8000-000000000103",
+        "executionId": "00000000-0000-4000-8000-000000009001",
+        "setIndex": 3,
+        "status": "completed",
+        "actualHoldMs": 5000
+      },
+      "expect": { "phase": "resting", "revision": 11, "currentSetIndex": 4, "phaseDeadlineAt": "2026-11-07T08:11:41Z" }
+    },
+    {
+      "now": "2026-11-07T08:11:41Z",
+      "reconcile": { "previousNow": "2026-11-07T08:11:40Z", "monotonicElapsed": 1, "autoAdvance": false },
+      "expect": { "phase": "ready", "revision": 12, "events": ["phase_changed", "deadline_changed"], "confirmedSetCount": 3 }
+    }
+  ]
+}

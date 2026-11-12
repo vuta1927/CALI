@@ -201,7 +201,9 @@ struct RestPhaseView: View {
                 .caliCard(padding: Spacing.m)
                 .accessibilityElement(children: .combine)
             }
-            Text("Hết giờ nghỉ chỉ nhắc (rung / thông báo), không tự bắt đầu set.")
+            Text(model.autoAdvanceEnabled && model.state.restAutoAdvances
+                 ? "Hết giờ nghỉ khi app đang mở, set tiếp tự bắt đầu. Set chỉ được ghi khi bạn bấm Xong set / Lưu."
+                 : "Hết giờ nghỉ chỉ nhắc (rung / thông báo), không tự bắt đầu set.")
                 .font(.caption)
                 .foregroundStyle(Color.caliSecondary)
                 .multilineTextAlignment(.center)

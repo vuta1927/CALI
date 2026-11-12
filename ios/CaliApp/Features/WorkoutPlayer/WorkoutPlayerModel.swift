@@ -189,6 +189,10 @@ final class WorkoutPlayerModel {
 
     // MARK: Time reconciliation
 
+    /// IOS-021: the domain stays pure; the user's "Tự động chuyển set" setting only reaches it through the policy.
+    var autoAdvanceEnabled: Bool { store?.settings.autoAdvanceSets ?? true }
+    private var reconcilePolicy: ReconcilePolicy { ReconcilePolicy(autoAdvance: autoAdvanceEnabled) }
+
     /// Called ~4×/s while the player is visible and on every scene-phase change.
     func tick() {
         let wall = Date()
@@ -198,16 +202,19 @@ final class WorkoutPlayerModel {
 
         let monoElapsed = lastTickMono.map { MonotonicClock.seconds(from: $0, to: mono) }
         // Pure check first so the 4 Hz tick only opens a write transaction when something is due.
+        let policy = reconcilePolicy
         var result = WorkoutReducer.reconcile(
             state,
             now: wall,
             previousNow: lastTickWall,
             monotonicElapsed: monoElapsed,
-            acknowledgeClockJump: clockAcknowledged
+            acknowledgeClockJump: clockAcknowledged,
+            policy: policy
         )
         if result.changed, !result.requiresUserReconciliation {
             guard let store,
-                  let persisted = store.reconcile(previousNow: lastTickWall, monotonicElapsed: monoElapsed, acknowledgeClockJump: clockAcknowledged)
+                  let persisted = store.reconcile(previousNow: lastTickWall, monotonicElapsed: monoElapsed,
+                                                  acknowledgeClockJump: clockAcknowledged, policy: policy)
             else { return }
             result = persisted
         }
@@ -257,6 +264,8 @@ final class WorkoutPlayerModel {
                 }
             case .countdownLapsed:
                 banner = .info("Đếm ngược đã hết khi app không mở. Set chưa bắt đầu — bấm Bắt đầu khi sẵn sàng.")
+            case .restLapsed:
+                banner = .info("Hết giờ nghỉ khi app không mở nên set chưa tự bắt đầu — bấm Bắt đầu khi sẵn sàng.")
             default:
                 break
             }

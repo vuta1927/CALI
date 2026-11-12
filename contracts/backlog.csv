@@ -57,3 +57,4 @@ IOS-010,M3,iOS,"AI-003, IOS-007",UI duyệt AI nối API: AI review UI pending/c
 QA-003,M3,QA,IOS-010,"T-13..T-15, prompt injection, no silent plan mutation"
 OPS-001,M3,Integrator,BE-004,"CI/CD, metrics, secrets, backup+restore, privacy baseline"
 REL-001,M3,Integrator/QA,"QA-001,QA-002,QA-003,OPS-001","pilot release checklist, testflight, rollback playbook"
+IOS-021,M2,iOS,IOS-019,"auto-advance between sets: ReconcilePolicy.autoAdvance (rest on time → exercising at deadline, late → ready + restLapsed), setting Tự động chuyển set default on, foreground-only 3-2-1 cue; never a set result"

@@ -100,6 +100,9 @@ public enum DomainEvent: Equatable, Sendable {
     /// A pre-countdown was found elapsed (or implausible) without the app executing; back to `ready`,
     /// the user must start again (UX §5 "do not auto-start if app is inactive").
     case countdownLapsed(lateMs: Int64)
+    /// IOS-021: auto-advance was on but the rest was found over too late (app not executing); back to `ready`,
+    /// the user starts the set.
+    case restLapsed(lateMs: Int64)
     case sessionFinished(finishedAt: Date)
     case sessionAbandoned(at: Date, reason: String?)
 
@@ -112,6 +115,7 @@ public enum DomainEvent: Equatable, Sendable {
         case .setConfirmed: "set_confirmed"
         case .setSkipped: "set_skipped"
         case .countdownLapsed: "countdown_lapsed"
+        case .restLapsed: "rest_lapsed"
         case .sessionFinished: "session_finished"
         case .sessionAbandoned: "session_abandoned"
         }
