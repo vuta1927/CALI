@@ -268,8 +268,8 @@ public enum WorkoutReducer {
     /// IOS-023 (PO D4/D5): "tập lại ngay". Allowed while the session is active in READY, RESTING or
     /// REVIEWING_SUMMARY. Rejected while a set runs (PRE_COUNTDOWN, EXERCISING, PAUSED) and in AWAITING_RESULT, where
     /// moving the cursor would throw away the unsaved result of the current set (interpretation, docs/03 §4).
-    /// Retracts every skipped result of the execution, remembers where the user was (`resumePoint`, kept from an
-    /// earlier reopen if one is pending) and moves to the first reopened set in READY.
+    /// Retracts the skipped results of the execution (all of them, or only `setIndex` for the snackbar undo, QA D2),
+    /// remembers where the user was (`resumePoint`, the current set) and moves to the first reopened set in READY.
     static func reopenSkipped(_ s: SessionState, _ c: ReopenSkipped, now: Date) -> Result<Transition, DomainError> {
         guard [.ready, .resting, .reviewingSummary].contains(s.phase) else {
             return .failure(.invalidTransition(from: s.phase, command: .reopenSkipped))
@@ -277,14 +277,16 @@ public enum WorkoutReducer {
         guard let index = s.executions.firstIndex(where: { $0.id == c.executionId }) else {
             return .failure(.validationFailed([ValidationIssue(field: "executionId", reason: .missing, detail: "not in this session")]))
         }
-        let skipped = s.skippedSets(in: c.executionId)
+        let skipped = s.skippedSets(in: c.executionId).filter { c.setIndex == nil || $0.key.setIndex == c.setIndex }
         guard let first = skipped.first else { return .failure(.nothingToReopen(executionId: c.executionId)) }
 
         var b = Builder(s)
         let retracted = Set(skipped.map(\.key))
         b.next.resolvedSets.removeAll { retracted.contains($0.key) }
         b.events.append(.setResultsRetracted(skipped.map(\.setResultId)))
-        if b.next.resumePoint == nil, s.phase != .reviewingSummary, let here = s.currentSetKey, !retracted.contains(here) {
+        // QA D3: a nested reopen remembers the *current* set (e.g. the unfinished reopened exercise B); an earlier resume
+        // point is not lost, because after B the next-unresolved order reaches it again (plan order from B).
+        if s.phase != .reviewingSummary, let here = s.currentSetKey, !retracted.contains(here), s.resolution(for: here) == nil {
             b.next.resumePoint = here
         }
         b.next.currentExecutionIndex = index

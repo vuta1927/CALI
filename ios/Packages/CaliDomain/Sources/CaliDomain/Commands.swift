@@ -152,10 +152,13 @@ public struct AbandonSession: Codable, Equatable, Sendable {
 public struct ReopenSkipped: Codable, Equatable, Sendable {
     public var commandId: UUID
     public var executionId: UUID
+    /// nil ⇒ every skipped set of the execution ("Tập lại"); set ⇒ only that set (snackbar "Hoàn tác", QA D2).
+    public var setIndex: Int?
 
-    public init(commandId: UUID, executionId: UUID) {
+    public init(commandId: UUID, executionId: UUID, setIndex: Int? = nil) {
         self.commandId = commandId
         self.executionId = executionId
+        self.setIndex = setIndex
     }
 }
 

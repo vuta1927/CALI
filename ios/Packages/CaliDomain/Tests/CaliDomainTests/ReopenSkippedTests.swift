@@ -176,7 +176,8 @@ final class ReopenSkippedTests: XCTestCase {
         XCTAssertNil(h.s.resumePoint)
     }
 
-    func testNestedReopenKeepsTheOriginalResumePoint() {
+    /// QA D3: reopen B (from C#1), then A inside the B detour → A, back to unfinished B, then C#1.
+    func testNestedReopenReturnsToTheUnfinishedReopenedExerciseFirst() {
         let h = session()
         h.send(h.skip()); h.send(h.skip())            // A skipped → transition
         h.send(h.readyNext())
@@ -185,16 +186,33 @@ final class ReopenSkippedTests: XCTestCase {
         h.send(h.readyNext())
         h.send(h.reopen(b))                           // resume C#1
         XCTAssertEqual(h.s.resumePoint, SetKey(executionId: c, setIndex: 1))
-        h.send(h.reopen(a))                           // still resume at C#1
-        XCTAssertEqual(h.s.resumePoint, SetKey(executionId: c, setIndex: 1))
+        h.send(h.reopen(a))                           // resume at the unfinished B#1
+        XCTAssertEqual(h.s.resumePoint, SetKey(executionId: b, setIndex: 1))
         XCTAssertEqual(h.s.currentSetKey, SetKey(executionId: a, setIndex: 1))
-        doSet(h); doSet(h)                            // A done → back to C#1 (B#1 still unresolved, picked later)
-        XCTAssertEqual(h.s.currentSetKey, SetKey(executionId: c, setIndex: 1))
-        doSet(h); doSet(h)                            // C done → wraps to B#1
+        doSet(h); doSet(h)                            // A done → back to B#1
         XCTAssertEqual(h.s.currentSetKey, SetKey(executionId: b, setIndex: 1))
-        doSet(h)
+        doSet(h)                                      // B done → C#1 (plan order)
+        XCTAssertEqual(h.s.currentSetKey, SetKey(executionId: c, setIndex: 1))
+        doSet(h); doSet(h)
         XCTAssertEqual(h.s.phase, .reviewingSummary)
         XCTAssertEqual(h.s.confirmedSetCount, 6)
+    }
+
+    /// QA D2: the snackbar undo reopens only the set just skipped.
+    func testSetScopedUndoLeavesEarlierSkipAlone() {
+        let h = Harness()
+        h.send(h.create([Specs.hold(sets: 3, id: a), Specs.reps(sets: 1, id: b)]))
+        let early = h.send(h.skip()).setRecords[0].setResultId   // A#1
+        doSet(h)                                                 // A#2 → rest → A#3
+        h.send(h.readyNext())
+        let late = h.send(h.skip()).setRecords[0].setResultId    // A#3 → transition → B#1
+        let t = h.send(h.reopen(a, setIndex: 3))
+        XCTAssertEqual(t.retractedSetResultIds, [late])
+        XCTAssertEqual(h.s.currentSetKey, SetKey(executionId: a, setIndex: 3))
+        XCTAssertEqual(h.s.skippedSets(in: a).map(\.setResultId), [early])
+        XCTAssertEqual(h.s.resumePoint, SetKey(executionId: b, setIndex: 1))
+        XCTAssertEqual(h.reject(h.reopen(a, setIndex: 3)), .nothingToReopen(executionId: a))
+        XCTAssertEqual(h.reject(h.reopen(a, setIndex: 2)), .nothingToReopen(executionId: a), "confirmed set is not reopened")
     }
 
     func testResumePointRoundTripsAndOldStatesDecodeWithout() throws {

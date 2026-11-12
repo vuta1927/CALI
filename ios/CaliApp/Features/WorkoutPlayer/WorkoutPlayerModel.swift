@@ -26,7 +26,7 @@ final class WorkoutPlayerModel {
     private(set) var now = Date()
     var banner: Banner?
     /// IOS-023: "Đã bỏ qua · Hoàn tác" snackbar — the execution whose skip can be undone, until `until`.
-    struct UndoSkip: Equatable { let executionId: UUID; let until: Date }
+    struct UndoSkip: Equatable { let executionId: UUID; let setIndex: Int; let until: Date }
     var undoSkip: UndoSkip?
     /// Increments on every phase change; drives `.sensoryFeedback`.
     private(set) var feedbackTick = 0
@@ -162,19 +162,19 @@ final class WorkoutPlayerModel {
             setIndex: key.setIndex,
             reason: reason
         ))) {
-            undoSkip = UndoSkip(executionId: key.executionId, until: Date().addingTimeInterval(10))
+            undoSkip = UndoSkip(executionId: key.executionId, setIndex: key.setIndex, until: Date().addingTimeInterval(10))
         }
     }
 
     /// IOS-023 (PO D5): "tập lại ngay" — retract the skipped sets of `executionId`, do them now, then return.
-    func reopenSkipped(executionId: UUID) {
+    func reopenSkipped(executionId: UUID, setIndex: Int? = nil) {
         undoSkip = nil
-        send(.reopenSkipped(ReopenSkipped(commandId: UUID(), executionId: executionId)))
+        send(.reopenSkipped(ReopenSkipped(commandId: UUID(), executionId: executionId, setIndex: setIndex)))
     }
 
     var showsUndoSkip: Bool {
         guard let undoSkip, now < undoSkip.until, canReopenSkipped else { return false }
-        return !state.skippedSets(in: undoSkip.executionId).isEmpty
+        return state.skippedSets(in: undoSkip.executionId).contains { $0.key.setIndex == undoSkip.setIndex }
     }
 
     func skippedCount(for execution: ExecutionSpec) -> Int { state.skippedSets(in: execution.id).count }

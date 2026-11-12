@@ -35,7 +35,7 @@ struct WorkoutPlayerView: View {
                     Text("Đã bỏ qua")
                         .foregroundStyle(Color.caliText)
                     Spacer()
-                    Button("Hoàn tác") { model.reopenSkipped(executionId: undo.executionId) }
+                    Button("Hoàn tác") { model.reopenSkipped(executionId: undo.executionId, setIndex: undo.setIndex) }
                         .font(.body.bold())
                         .frame(minWidth: 44, minHeight: 44)
                 }
