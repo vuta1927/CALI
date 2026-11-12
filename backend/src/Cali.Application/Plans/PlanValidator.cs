@@ -93,6 +93,8 @@ public static class PlanValidator
 
                 RequireId(workout.Id, prefix + "id", ids, errors);
                 var fields = ValidateWorkoutFields(workout.Weekday, workout.Title, workout.OrderIndex, prefix, errors);
+                var restOk = workout.RestBetweenExercisesSeconds is null
+                    || CheckInt(workout.RestBetweenExercisesSeconds, prefix + "restBetweenExercisesSeconds", 0, MaxRestBetweenExercisesSeconds, errors);
                 var exercises = new List<PlannedExercise>();
                 if (workout.Exercises is null)
                 {
@@ -119,9 +121,9 @@ public static class PlanValidator
                     }
                 }
 
-                if (fields is { } f && workout.Id is { } workoutId)
+                if (fields is { } f && restOk && workout.Id is { } workoutId)
                 {
-                    workouts.Add(new PlannedWorkout(workoutId, f.Weekday, f.Title, f.OrderIndex, exercises));
+                    workouts.Add(new PlannedWorkout(workoutId, f.Weekday, f.Title, f.OrderIndex, exercises, workout.RestBetweenExercisesSeconds));
                 }
             }
         }
@@ -167,6 +169,9 @@ public static class PlanValidator
 
         return ok ? (title!, effectiveKind, discipline) : null;
     }
+
+    /// <summary>Upper bound of <c>planned_workouts.rest_between_exercises_seconds</c> (db/012, CON-011).</summary>
+    public const int MaxRestBetweenExercisesSeconds = 3600;
 
     /// <summary><c>planned_workout</c> scalar fields; an omitted title is stored as "" (ADR-027).</summary>
     public static (int Weekday, string Title, int OrderIndex)? ValidateWorkoutFields(

@@ -22,7 +22,8 @@ public sealed record PlannedWorkoutInput(
     int? Weekday,
     string? Title,
     int? OrderIndex,
-    IReadOnlyList<PlannedExerciseInput?>? Exercises);
+    IReadOnlyList<PlannedExerciseInput?>? Exercises,
+    int? RestBetweenExercisesSeconds = null);
 
 /// <summary>
 /// OpenAPI <c>PlannedExercise</c> (and the <c>planned_exercise_payload</c> fields shared with sync push)

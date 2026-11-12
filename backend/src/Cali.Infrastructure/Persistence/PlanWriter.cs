@@ -43,9 +43,10 @@ public sealed class PlanWriter(NpgsqlDataSource dataSource) : IPlanWriter
         """;
 
     private const string InsertWorkoutsSql = """
-        INSERT INTO planned_workouts (id, user_id, plan_id, weekday, title, order_index)
-        SELECT w.id, @userId, @planId, w.weekday, w.title, w.order_index
-        FROM unnest(@ids, @weekdays, @titles, @orderIndexes) AS w(id, weekday, title, order_index)
+        INSERT INTO planned_workouts (id, user_id, plan_id, weekday, title, order_index, rest_between_exercises_seconds)
+        SELECT w.id, @userId, @planId, w.weekday, w.title, w.order_index, w.rest_between
+        FROM unnest(@ids, @weekdays, @titles, @orderIndexes, CAST(@restBetween AS integer[]))
+             AS w(id, weekday, title, order_index, rest_between)
         """;
 
     private const string InsertExercisesSql = """
@@ -138,6 +139,7 @@ public sealed class PlanWriter(NpgsqlDataSource dataSource) : IPlanWriter
                         weekdays = workouts.Select(w => w.Weekday).ToArray(),
                         titles = workouts.Select(w => w.Title).ToArray(),
                         orderIndexes = workouts.Select(w => w.OrderIndex).ToArray(),
+                        restBetween = workouts.Select(w => w.RestBetweenExercisesSeconds).ToArray(),
                     },
                     transaction,
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -239,6 +241,7 @@ public sealed class PlanWriter(NpgsqlDataSource dataSource) : IPlanWriter
         ["weekday"] = workout.Weekday,
         ["title"] = workout.Title,
         ["orderIndex"] = workout.OrderIndex,
+        ["restBetweenExercisesSeconds"] = workout.RestBetweenExercisesSeconds,
     }.ToJsonString();
 
     // planned_exercise_payload

@@ -596,7 +596,7 @@ public sealed class SyncPushTests(PostgresFixture postgres)
 
         var fixture = await FixtureAsync("validation", "schema_rejections.json");
         var cases = fixture["cases"]!.AsArray();
-        cases.Count.ShouldBe(30);
+        cases.Count.ShouldBe(31);
         cases.Select(c => c!["mutation"]!["mutationId"]!.GetValue<string>()).ShouldBeUnique();
         var mismatches = new List<string>();
         foreach (var item in cases)
@@ -634,6 +634,7 @@ public sealed class SyncPushTests(PostgresFixture postgres)
     [InlineData("body_measurement_sync_push.sample.json")]
     [InlineData("plan_activation_sync_push.sample.json")]
     [InlineData("plan_goals_sync_push.sample.json")]
+    [InlineData("rest_between_exercises_sync_push.sample.json")]
     public async Task Self_contained_samples_apply_in_order(string sample)
     {
         var setup = await SetupAsync("sync_sample");
@@ -647,6 +648,75 @@ public sealed class SyncPushTests(PostgresFixture postgres)
         {
             Status(receipt).ShouldBe("applied", receipt.GetRawText());
         }
+    }
+
+    [Fact]
+    public async Task A_deleted_set_result_can_be_recorded_again_with_a_new_id()
+    {
+        // ADR-025: the live-row unique index (execution_id, set_index) WHERE deleted_at IS NULL lets a client
+        // retract a set (tombstone) and record the same set again under a new id.
+        var setup = await SetupAsync("sync_set_retract");
+        await using var factory = Factory(setup);
+        using var client = Client(factory, setup, setup.UserA);
+        var device = Guid.NewGuid();
+        var session = Guid.NewGuid();
+        var execution = Guid.NewGuid();
+        var hold = new JsonObject { ["kind"] = "static_hold", ["holdSeconds"] = 12 };
+        JsonObject Set(string status) => new()
+        {
+            ["executionId"] = execution.ToString(), ["setIndex"] = 1, ["status"] = status,
+            ["prescribedSnapshot"] = new JsonObject
+            {
+                ["target"] = hold.DeepClone(), ["setCount"] = 3, ["restSeconds"] = 90, ["catalogVersion"] = 1, ["exerciseId"] = TuckPlanche.ToString(),
+            },
+            ["confirmedAt"] = "2026-11-07T07:10:00Z",
+        };
+        Status(await PushOneAsync(client, device, Upsert("workout_session", session, Session()))).ShouldBe("applied");
+        Status(await PushOneAsync(client, device, Upsert("exercise_execution", execution, Execution(session, TuckPlanche, 0, hold)))).ShouldBe("applied");
+
+        var first = Guid.NewGuid();
+        Status(await PushOneAsync(client, device, Upsert("set_result", first, Set("skipped")))).ShouldBe("applied");
+        var second = Guid.NewGuid();
+        var blocked = await PushOneAsync(client, device, Upsert("set_result", second, Set("completed")));
+        Status(blocked).ShouldNotBe("applied", "a second live row for the same set must not be accepted");
+
+        var deleted = await PushOneAsync(client, device, Delete("set_result", first, baseVersion: 1));
+        Status(deleted).ShouldBe("applied", deleted.GetRawText());
+        deleted.GetProperty("serverVersion").GetInt64().ShouldBe(2);
+
+        var again = await PushOneAsync(client, device, Upsert("set_result", Guid.NewGuid(), Set("completed")));
+        Status(again).ShouldBe("applied", again.GetRawText());
+
+        (await ScalarAsync<long>(setup.ConnectionString,
+            $"SELECT count(*) FROM set_results WHERE execution_id = '{execution}' AND set_index = 1 AND deleted_at IS NULL")).ShouldBe(1);
+        (await ScalarAsync<bool>(setup.ConnectionString, $"SELECT deleted_at IS NOT NULL FROM set_results WHERE id = '{first}'")).ShouldBeTrue();
+        (await ScalarAsync<long>(setup.ConnectionString,
+            $"SELECT count(*) FROM sync_change_log WHERE entity_id = '{first}' AND operation = 'delete'")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Rest_between_exercises_is_stored_and_logged_absent_or_null_as_null()
+    {
+        // CON-011: a payload without the field (pre-CON-011 client) and an explicit null both mean
+        // "client default" and are stored as NULL; a value is stored and echoed in the change log.
+        var setup = await SetupAsync("sync_rest_between");
+        await using var factory = Factory(setup);
+        using var client = Client(factory, setup, setup.UserA);
+
+        var receipts = await ReceiptsAsync(await PostAsync(client,
+            (await FixtureAsync("samples", "rest_between_exercises_sync_push.sample.json")).ToJsonString()));
+        receipts.Length.ShouldBe(4);
+        foreach (var receipt in receipts)
+        {
+            Status(receipt).ShouldBe("applied", receipt.GetRawText());
+        }
+
+        (await ScalarAsync<long>(setup.ConnectionString,
+            "SELECT count(*) FROM planned_workouts WHERE rest_between_exercises_seconds IS NULL")).ShouldBe(2);
+        (await ScalarAsync<int>(setup.ConnectionString,
+            "SELECT rest_between_exercises_seconds FROM planned_workouts WHERE id = 'f3100000-0000-4000-8000-000000000003'")).ShouldBe(90);
+        (await ScalarAsync<int>(setup.ConnectionString,
+            "SELECT (payload->>'restBetweenExercisesSeconds')::int FROM sync_change_log WHERE entity_id = 'f3100000-0000-4000-8000-000000000003'")).ShouldBe(90);
     }
 
     private static async Task ExecuteAsync(string connectionString, string sql, params object?[] args)

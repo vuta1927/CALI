@@ -1,0 +1,51 @@
+{
+  "_comment": "SAMPLE ONLY (CON-011) - not production data. One weekly plan with three planned_workouts: restBetweenExercisesSeconds absent (pre-CON-011 payload, stays valid), explicitly null (client default 60 s) and 90 s. Ids are illustrative; the plan must be synced before its workouts.",
+  "deviceId": "d0000000-0000-4000-8000-000000000011",
+  "mutations": [
+    {
+      "mutationId": "f1100000-0000-4000-8000-000000000001",
+      "entityType": "training_plan",
+      "entityId": "f2100000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-12T08:00:00Z",
+      "payload": {
+        "id": "f2100000-0000-4000-8000-000000000001",
+        "title": "Mẫu: nghỉ giữa các bài",
+        "revision": 1,
+        "status": "current",
+        "parentPlanId": null,
+        "lineageId": "f2100000-0000-4000-8000-000000000001",
+        "kind": "weekly",
+        "primaryDiscipline": "calisthenics"
+      }
+    },
+    {
+      "mutationId": "f1100000-0000-4000-8000-000000000002",
+      "entityType": "planned_workout",
+      "entityId": "f3100000-0000-4000-8000-000000000001",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-12T08:00:00Z",
+      "payload": {"id": "f3100000-0000-4000-8000-000000000001", "planId": "f2100000-0000-4000-8000-000000000001", "weekday": 1, "title": "Thứ 2", "orderIndex": 0}
+    },
+    {
+      "mutationId": "f1100000-0000-4000-8000-000000000003",
+      "entityType": "planned_workout",
+      "entityId": "f3100000-0000-4000-8000-000000000002",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-12T08:00:00Z",
+      "payload": {"id": "f3100000-0000-4000-8000-000000000002", "planId": "f2100000-0000-4000-8000-000000000001", "weekday": 3, "title": "Thứ 4", "orderIndex": 0, "restBetweenExercisesSeconds": null}
+    },
+    {
+      "mutationId": "f1100000-0000-4000-8000-000000000004",
+      "entityType": "planned_workout",
+      "entityId": "f3100000-0000-4000-8000-000000000003",
+      "action": "upsert",
+      "baseVersion": 0,
+      "clientChangedAt": "2026-11-12T08:00:00Z",
+      "payload": {"id": "f3100000-0000-4000-8000-000000000003", "planId": "f2100000-0000-4000-8000-000000000001", "weekday": 5, "title": "Thứ 6", "orderIndex": 0, "restBetweenExercisesSeconds": 90}
+    }
+  ]
+}

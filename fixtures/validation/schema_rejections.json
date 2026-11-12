@@ -755,6 +755,19 @@
           "criteria": null
         }
       }
+    },
+    {
+      "name": "rest_between_exercises_over_3600",
+      "reason": "CON-011: restBetweenExercisesSeconds is 0..3600",
+      "mutation": {
+        "mutationId": "c1000000-0000-4000-8000-000000000111",
+        "entityType": "planned_workout",
+        "entityId": "c4000000-0000-4000-8000-000000000111",
+        "action": "upsert",
+        "baseVersion": 0,
+        "clientChangedAt": "2026-11-12T10:30:00Z",
+        "payload": {"id": "c4000000-0000-4000-8000-000000000111", "planId": "c4000000-0000-4000-8000-000000000112", "weekday": 1, "orderIndex": 0, "restBetweenExercisesSeconds": 3601}
+      }
     }
   ]
 }

@@ -10,6 +10,7 @@
       "weekday": 1,
       "title": "Thứ 2 — Planche / Pull / Legs",
       "orderIndex": 0,
+      "restBetweenExercisesSeconds": 90,
       "exercises": [
         {
           "id": "33333333-3333-4333-8333-333333333331",
