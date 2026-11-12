@@ -185,7 +185,10 @@ final class AppStore {
                 restSeconds: item.restSeconds
             )
         }
-        let command = CreateSession(commandId: UUID(), sessionId: UUID(), plannedWorkoutId: workout.id, executions: executions)
+        // IOS-022 (PO D2): the plan has no transition-rest field yet (separate contract PR); nil ⇒ the domain default 60 s.
+        // Feed the plan's value here once `PlannedWorkout` carries it.
+        let command = CreateSession(commandId: UUID(), sessionId: UUID(), plannedWorkoutId: workout.id, executions: executions,
+                                    transitionRestSeconds: nil)
         guard let result = execute(.createSession(command), sessionTitle: workout.title) else { return }
         guard result.outcome.status == .applied, let state = result.state else {
             let reason = result.error.map(WorkoutPlayerModel.message(for:)) ?? (result.outcome.errorCode ?? "-")

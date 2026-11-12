@@ -131,7 +131,7 @@ enum DebugScenario: String {
                            setCount: 1, target: pair.item.target, restSeconds: 0), reps, holdMs)
         }
         var commands: [Command] = [.createSession(CreateSession(commandId: UUID(), sessionId: sessionId, plannedWorkoutId: reps.workout.id,
-                                                                executions: specs.map { $0.0 }))]
+                                                                executions: specs.map { $0.0 }, transitionRestSeconds: 0))]
         for (spec, reps, holdMs) in specs {
             commands += [.startSet(StartSet(commandId: UUID(), countdownSeconds: 0)), .stopSet(SimpleCommand(commandId: UUID())),
                          .confirmSet(ConfirmSet(commandId: UUID(), setResultId: UUID(), executionId: spec.id, setIndex: 1, status: .completed,

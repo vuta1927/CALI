@@ -23,12 +23,16 @@ public struct CreateSession: Codable, Equatable, Sendable {
     public var sessionId: UUID
     public var plannedWorkoutId: UUID?
     public var executions: [ExecutionSpec]
+    /// IOS-022: rest before the first set of each following exercise; `nil` ⇒ `DomainLimits.defaultTransitionRestSeconds`.
+    /// The app passes the plan's value once the plan carries one (separate contract PR); until then always nil.
+    public var transitionRestSeconds: Int?
 
-    public init(commandId: UUID, sessionId: UUID, plannedWorkoutId: UUID? = nil, executions: [ExecutionSpec]) {
+    public init(commandId: UUID, sessionId: UUID, plannedWorkoutId: UUID? = nil, executions: [ExecutionSpec], transitionRestSeconds: Int? = nil) {
         self.commandId = commandId
         self.sessionId = sessionId
         self.plannedWorkoutId = plannedWorkoutId
         self.executions = executions
+        self.transitionRestSeconds = transitionRestSeconds
     }
 }
 

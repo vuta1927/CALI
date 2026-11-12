@@ -6,6 +6,8 @@ public enum DomainLimits {
     public static let setCount: ClosedRange<Int> = 1...20
     /// `rest_seconds` integer 0..3600.
     public static let restSeconds: ClosedRange<Int> = 0...3600
+    /// IOS-022 (PO D2): transition rest between exercises when the plan has none. Same bounds as `restSeconds`.
+    public static let defaultTransitionRestSeconds = 60
     /// `rpe` integer 1..10.
     public static let rpe: ClosedRange<Int> = 1...10
     /// `holdSeconds` 1..3600 (schema `target.static_hold`).

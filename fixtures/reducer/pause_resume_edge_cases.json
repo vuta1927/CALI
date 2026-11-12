@@ -301,11 +301,29 @@
         "actualReps": 10
       },
       "expect": {
-        "phase": "ready",
+        "phase": "resting",
         "revision": 13,
         "currentExecutionIndex": 1,
         "currentSetIndex": 1,
-        "confirmedSetCount": 2
+        "confirmedSetCount": 2,
+        "phaseDeadlineAt": "2026-11-07T08:04:26Z"
+      }
+    },
+    {
+      "now": "2026-11-07T08:05:00Z",
+      "reconcile": {
+        "previousNow": null
+      },
+      "expect": {
+        "phase": "ready",
+        "revision": 14,
+        "currentExecutionIndex": 1,
+        "currentSetIndex": 1,
+        "phaseDeadlineAt": null,
+        "events": [
+          "phase_changed",
+          "deadline_changed"
+        ]
       }
     },
     {
@@ -317,7 +335,7 @@
       },
       "expect": {
         "phase": "exercising",
-        "revision": 14,
+        "revision": 15,
         "phaseDeadlineAt": "2026-11-07T08:05:20Z",
         "events": [
           "phase_changed",
@@ -333,7 +351,7 @@
       },
       "expect": {
         "phase": "paused",
-        "revision": 15,
+        "revision": 16,
         "phaseDeadlineAt": null,
         "events": [
           "phase_changed",
@@ -349,7 +367,7 @@
       },
       "expect": {
         "phase": "exercising",
-        "revision": 16,
+        "revision": 17,
         "phaseDeadlineAt": "2026-11-07T08:10:00.500Z",
         "events": [
           "phase_changed",
@@ -365,7 +383,7 @@
       },
       "expect": {
         "phase": "awaiting_result",
-        "revision": 17,
+        "revision": 18,
         "pendingMeasuredElapsedMs": 20000,
         "pendingSuggestedActualMs": 20000
       }
@@ -384,7 +402,7 @@
       "expect": {
         "phase": "reviewing_summary",
         "status": "active",
-        "revision": 18,
+        "revision": 19,
         "confirmedSetCount": 3,
         "phaseDeadlineAt": null
       }
@@ -398,7 +416,7 @@
       "expect": {
         "error": "invalid_transition",
         "phase": "reviewing_summary",
-        "revision": 18
+        "revision": 19
       }
     },
     {
@@ -410,7 +428,7 @@
       "expect": {
         "error": "invalid_transition",
         "phase": "reviewing_summary",
-        "revision": 18
+        "revision": 19
       }
     },
     {
@@ -422,7 +440,7 @@
       "expect": {
         "phase": "completed",
         "status": "completed",
-        "revision": 19,
+        "revision": 20,
         "events": [
           "session_finished",
           "phase_changed"
@@ -438,7 +456,7 @@
       "expect": {
         "error": "session_not_active",
         "phase": "completed",
-        "revision": 19
+        "revision": 20
       }
     },
     {
@@ -450,7 +468,7 @@
       "expect": {
         "error": "session_not_active",
         "phase": "completed",
-        "revision": 19
+        "revision": 20
       }
     }
   ]

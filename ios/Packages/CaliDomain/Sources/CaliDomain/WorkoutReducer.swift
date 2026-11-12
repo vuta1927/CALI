@@ -69,6 +69,9 @@ public enum WorkoutReducer {
                 ValidationIssue(field: "executions[\(i)].\($0.field)", reason: $0.reason, detail: $0.detail)
             })
         }
+        if let v = c.transitionRestSeconds, let issue = ValidationIssue.range("transitionRestSeconds", v, DomainLimits.restSeconds) {
+            issues.append(issue)
+        }
         guard issues.isEmpty else { return .failure(.validationFailed(issues)) }
 
         let state = SessionState(
@@ -82,7 +85,8 @@ public enum WorkoutReducer {
             currentSetIndex: 1,
             startedAt: now,
             updatedAt: now,
-            phaseStartedAt: now
+            phaseStartedAt: now,
+            transitionRestSeconds: c.transitionRestSeconds ?? DomainLimits.defaultTransitionRestSeconds
         )
         return .success(Transition(state: state, events: [.sessionCreated(sessionId: c.sessionId, startedAt: now)]))
     }
@@ -399,24 +403,42 @@ struct Builder {
         next.phaseDeadlineAt = nil
     }
 
-    /// After a set is confirmed or skipped: next set (rest or ready), next exercise (ready), or summary.
+    /// IOS-022: rest before the first set of another exercise (cursor already moved).
+    mutating func enterTransition(now: Date) {
+        if next.transitionRestSeconds > 0 {
+            enterResting(seconds: next.transitionRestSeconds, now: now)
+        } else {
+            enterReady(now: now)
+        }
+    }
+
+    mutating func enterResting(seconds: Int, now: Date) {
+        next.phase = .resting
+        next.phaseStartedAt = now
+        // seconds == 0 ⇒ deadline == now; the next reconcile marks it ready (CON-002 Q5).
+        next.phaseDeadlineAt = TimeMath.date(now, plusSeconds: seconds)
+    }
+
+    /// After a set is confirmed or skipped: next set (rest or ready), next exercise (transition rest), or summary.
+    ///
+    /// IOS-022 interpretation (docs/03 §4): `restBeforeNextSet` only governs the rest *within* an exercise ("a skipped
+    /// set earns no rest"). Changing exercise always gets the session's transition rest, however the last set was
+    /// resolved, because it is preparation time for the new exercise, not recovery from the last set.
+    /// `transitionRestSeconds == 0` goes straight to READY.
     mutating func advanceAfterResolution(restBeforeNextSet: Bool, now: Date) {
         clearSetScratch()
         guard let spec = next.currentExecution else { return }
         if next.currentSetIndex < spec.setCount {
             next.currentSetIndex += 1
             if restBeforeNextSet {
-                next.phase = .resting
-                next.phaseStartedAt = now
-                // restSeconds == 0 ⇒ deadline == now; the next reconcile marks it ready (CON-002 Q5).
-                next.phaseDeadlineAt = TimeMath.date(now, plusSeconds: spec.restSeconds)
+                enterResting(seconds: spec.restSeconds, now: now)
             } else {
                 enterReady(now: now)
             }
         } else if next.currentExecutionIndex + 1 < next.executions.count {
             next.currentExecutionIndex += 1
             next.currentSetIndex = 1
-            enterReady(now: now)
+            enterTransition(now: now)
         } else {
             // Final set: summary while status stays active; only FinishSession completes.
             next.phase = .reviewingSummary

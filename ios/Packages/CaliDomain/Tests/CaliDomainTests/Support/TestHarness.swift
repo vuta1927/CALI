@@ -185,6 +185,7 @@ final class Harness {
         while s.phase != .reviewingSummary {
             switch s.phase {
             case .ready: send(skip())
+            case .resting: send(readyNext()) // IOS-022 transition rest between exercises
             default: XCTFail("unexpected phase \(s.phase)", file: file, line: line); return
             }
         }

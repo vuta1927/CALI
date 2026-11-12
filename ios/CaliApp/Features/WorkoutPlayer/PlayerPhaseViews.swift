@@ -166,6 +166,14 @@ struct RestPhaseView: View {
     let model: WorkoutPlayerModel
 
     var body: some View {
+        if model.state.isTransitionRest {
+            TransitionRestView(model: model)
+        } else {
+            setRest
+        }
+    }
+
+    private var setRest: some View {
         PlayerScaffold {
             Text("Nghỉ")
                 .font(.title2.bold())
@@ -209,6 +217,58 @@ struct RestPhaseView: View {
                 .multilineTextAlignment(.center)
         } actions: {
             Button("Bắt đầu set tiếp", systemImage: "play.fill") { model.startNextSet() }
+                .buttonStyle(.caliPrimary)
+        }
+    }
+}
+
+// MARK: - Transition rest (IOS-022)
+
+/// Rest before a new exercise: the next exercise's poster leads (visual-first), the countdown is secondary.
+/// Ends in READY; the user starts the first set (never auto-started, even with "Tự động chuyển set").
+struct TransitionRestView: View {
+    let model: WorkoutPlayerModel
+
+    var body: some View {
+        PlayerScaffold {
+            Text("Chuẩn bị bài mới")
+                .font(.title2.bold())
+                .foregroundStyle(Color.caliText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            PosterView(exercise: model.currentExercise, height: 220)
+            if let execution = model.currentExecution {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.currentExercise?.name ?? "Bài tập")
+                        .font(.title3.bold())
+                        .foregroundStyle(Color.caliText)
+                    Text("\(execution.setCount) set · \(Fmt.target(execution.target))")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(Color.caliAccentInk)
+                    HStack(spacing: 6) {
+                        TagChip(text: execution.target.type.label)
+                        TagChip(text: "Nghỉ giữa set \(Fmt.seconds(execution.restSeconds))", systemImage: "clock")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+            HStack(spacing: Spacing.m) {
+                TimerText(text: Fmt.countdown(ms: model.remainingMs ?? 0), size: 56)
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    Button("+30 giây", systemImage: "plus") { model.extendRest(30) }
+                        .buttonStyle(.caliSecondary)
+                    Button("Bỏ nghỉ") { model.skipRest() }
+                        .buttonStyle(.caliSecondary)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Chuẩn bị còn \(Fmt.countdown(ms: model.remainingMs ?? 0))")
+            Text("Hết giờ chỉ nhắc, không tự bắt đầu bài mới. Bấm Bắt đầu khi bạn đã sẵn sàng.")
+                .font(.caption)
+                .foregroundStyle(Color.caliSecondary)
+                .multilineTextAlignment(.center)
+        } actions: {
+            Button("Bắt đầu bài mới", systemImage: "play.fill") { model.startNextSet() }
                 .buttonStyle(.caliPrimary)
         }
     }

@@ -117,14 +117,17 @@ final class TransitionTests: XCTestCase {
         XCTAssertEqual(t.events.codes, ["set_confirmed", "phase_changed", "deadline_changed"])
     }
 
-    func testConfirmLastSetOfExerciseMovesToNextExerciseReady() {
+    /// IOS-022: the last set of an exercise leads into the transition rest (default 60 s), then READY.
+    func testConfirmLastSetOfExerciseMovesToNextExerciseTransitionRest() {
         let h = Harness()
         h.send(h.create([Specs.hold(sets: 1), Specs.reps()]))
         h.send(h.startSet(countdown: 0))
         h.clock.advance(by: 5)
         h.send(h.stopSet())
         h.send(h.confirm())
-        XCTAssertEqual(h.s.phase, .ready)
+        XCTAssertEqual(h.s.phase, .resting)
+        XCTAssertEqual(h.s.phaseDeadlineAt, h.now.addingTimeInterval(60))
+        XCTAssertTrue(h.s.isTransitionRest)
         XCTAssertEqual(h.s.currentExecutionIndex, 1)
         XCTAssertEqual(h.s.currentSetIndex, 1)
     }

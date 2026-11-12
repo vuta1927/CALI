@@ -84,12 +84,13 @@ public enum VoiceCuePlan {
         case .resting:
             guard let deadline = s.phaseDeadlineAt else { return [] }
             var cues: [PlannedVoiceCue] = []
-            if execution.restSeconds >= minimumSecondsForMidCue {
+            // IOS-022: the rest's own length (a transition rest is the session's, not the exercise's `restSeconds`).
+            let restLength = s.phaseStartedAt.map { deadline.timeIntervalSince($0) } ?? Double(execution.restSeconds)
+            if restLength >= Double(minimumSecondsForMidCue) {
                 cues.append(PlannedVoiceCue(key: .restEnding10s, at: deadline.addingTimeInterval(-10)))
             }
-            // The rest leads to the set that `currentSetIndex` already names; set 1 means a new exercise.
-            let next: VoiceCueKey = s.currentSetIndex == 1 && s.currentExecutionIndex > 0 ? .restDoneNextExercise : .restDone
-            let restLength = s.phaseStartedAt.map { deadline.timeIntervalSince($0) } ?? 0
+            // The rest leads to the set that `currentSetIndex` already names; a transition rest leads to a new exercise.
+            let next: VoiceCueKey = s.isTransitionRest ? .restDoneNextExercise : .restDone
             if autoAdvance, s.restAutoAdvances, restLength >= autoStartLeadSeconds + 1 {
                 // IOS-021: in the foreground the set starts by itself at the deadline, so "Ba, hai, một, bắt đầu" ends on
                 // it (CON-010 `countdown.start`, no new key). In the background the reminder keeps "Hết giờ nghỉ": a

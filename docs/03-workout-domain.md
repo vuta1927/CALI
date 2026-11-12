@@ -104,15 +104,18 @@ stateDiagram-v2
     exercising --> paused: pause
     paused --> exercising: resume
     awaiting_result --> resting: confirmSet (if more sets)
-    awaiting_result --> ready: confirmSet (next exercise)
+    awaiting_result --> resting: confirmSet (next exercise, transition rest IOS-022)
     awaiting_result --> reviewing_summary: confirmSet (final set)
     reviewing_summary --> completed: finishSession
     reviewing_summary --> abandoned: abandonSession
     resting --> ready: restExpired / userReady / restLapsed
     resting --> exercising: restExpired while foreground + autoAdvance (IOS-021)
-    ready --> ready: skipSet (next set or exercise, no rest)
-    exercising --> ready: skipSet (next set or exercise, no rest)
-    awaiting_result --> ready: skipSet (next set or exercise, no rest)
+    ready --> ready: skipSet (next set, no rest)
+    exercising --> ready: skipSet (next set, no rest)
+    awaiting_result --> ready: skipSet (next set, no rest)
+    ready --> resting: skipSet (last set of exercise, transition rest)
+    exercising --> resting: skipSet (last set of exercise, transition rest)
+    awaiting_result --> resting: skipSet (last set of exercise, transition rest)
     ready --> reviewing_summary: skipSet (final set)
     exercising --> reviewing_summary: skipSet (final set)
     awaiting_result --> reviewing_summary: skipSet (final set)
@@ -125,7 +128,9 @@ stateDiagram-v2
     completed --> [*]
     abandoned --> [*]
 ```
-The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest.
+The diagram matches the transition table below (ADR-029). AbandonSession is accepted from every non-terminal phase. A skipped set earns no rest within its exercise.
+
+**Transition rest (IOS-022, PO D2).** Moving to the first set of the next exercise enters RESTING with deadline `now + transitionRestSeconds` (no new phase: the SQL `phase` CHECK is unchanged). The value is fixed at `CreateSession` (`transitionRestSeconds`, 0..3600); without one it is 60 s. Plans do not carry the field yet (separate contract PR); the app always sends none for now. `0` goes straight to READY. *Interpretation:* "a skipped set earns no rest" applies within an exercise; changing exercise always gets the transition rest, however the last set was resolved (confirmed or skipped), because it is preparation for the new exercise, not recovery. A transition rest is recognised by the last resolved set belonging to another execution (`SessionState.isTransitionRest`); it ends in READY even with auto-advance on (a new exercise is never auto-started). It is local session state only and not on the wire; states saved by older builds decode with 60 s. The final set still goes straight to REVIEWING_SUMMARY. Vectors `skip_set.json` and `pause_resume_edge_cases.json` were updated for this on purpose (an extra transition-rest step, revisions shifted).
 
 **Important distinction:** `countdownElapsed` / `restExpired` may be computed when foreground resumes; background suspension does **not** guarantee callback. Domain state on disk remains stable until reconciliation is called. Without auto-advance `restExpired → ready` only updates readiness, never starts exercising.
 
@@ -140,10 +145,10 @@ The diagram matches the transition table below (ADR-029). AbandonSession is acce
 | `Pause(cmdId)` | EXERCISING | pausedAt, accumulatedExerciseMs; phase PAUSED | update Activity, cancel/rebuild notifications |
 | `Resume(cmdId)` | PAUSED | recompute deadline; EXERCISING | update Activity/notification |
 | `StopSet(cmdId)` | EXERCISING or elapsed deadline reconciled | AWAITING_RESULT draft | prompt actual values |
-| `ConfirmSet(cmdId, payload)` | AWAITING_RESULT; unique set not confirmed | insert `set_result` + advance phase REST/READY/REVIEWING_SUMMARY + outbox | Activity and next notification |
+| `ConfirmSet(cmdId, payload)` | AWAITING_RESULT; unique set not confirmed | insert `set_result` + advance phase REST (set rest, or transition rest before the next exercise) / REVIEWING_SUMMARY + outbox | Activity and next notification |
 | `ExtendRest(cmdId, +30s)` | RESTING | recompute deadline, revision | cancel previous reminder, schedule new one |
 | `ReadyNext(cmdId)` | RESTING, manual request or deadline reached | READY | Activity refresh |
-| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED + skipReason, revision, phase next READY (no rest) or REVIEWING_SUMMARY | Activity |
+| `SkipSet(cmdId, reason)` | READY/EXERCISING/AWAITING_RESULT | set_result SKIPPED + skipReason, revision, phase next READY (no rest), transition REST (last set of an exercise, IOS-022) or REVIEWING_SUMMARY | Activity |
 | `FinishSession(cmdId)` | REVIEWING_SUMMARY, no active set pending confirmation | COMPLETED + finishedAt + outbox | end Activity; AI after sync |
 | `AbandonSession(cmdId)` | active session (any non-terminal phase) | ABANDONED, abandonReason, finishedAt | end Activity |
 

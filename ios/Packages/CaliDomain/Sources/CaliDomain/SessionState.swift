@@ -95,6 +95,10 @@ public struct SessionState: Codable, Equatable, Sendable {
     public var pendingResult: ResultDraft?
     /// Sets that already have a canonical result.
     public var resolvedSets: [ResolvedSet]
+    /// IOS-022 (PO D2): rest before the first set of the next exercise. Fixed at `CreateSession` (from the plan when
+    /// the plan carries one — separate contract PR — else `DomainLimits.defaultTransitionRestSeconds`). Local state
+    /// only; states persisted before IOS-022 decode with the default.
+    public var transitionRestSeconds: Int
 
     public init(
         sessionId: UUID,
@@ -117,8 +121,10 @@ public struct SessionState: Codable, Equatable, Sendable {
         pausedAt: Date? = nil,
         pausedRemainingMs: Int64? = nil,
         pendingResult: ResultDraft? = nil,
-        resolvedSets: [ResolvedSet] = []
+        resolvedSets: [ResolvedSet] = [],
+        transitionRestSeconds: Int = DomainLimits.defaultTransitionRestSeconds
     ) {
+        self.transitionRestSeconds = transitionRestSeconds
         self.sessionId = sessionId
         self.plannedWorkoutId = plannedWorkoutId
         self.status = status
@@ -158,8 +164,16 @@ public struct SessionState: Codable, Equatable, Sendable {
         resolvedSets.first { $0.key == key }
     }
 
-    /// Whether a rest ending now may auto-start the next set (IOS-021). Only meaningful while `resting`.
-    public var restAutoAdvances: Bool { phase == .resting }
+    /// IOS-022: the current rest leads into a different exercise than the last resolved set (the transition rest).
+    public var isTransitionRest: Bool {
+        guard phase == .resting, let current = currentExecution else { return false }
+        guard let last = resolvedSets.last else { return currentSetIndex == 1 && currentExecutionIndex > 0 }
+        return last.key.executionId != current.id
+    }
+
+    /// Whether a rest ending now may auto-start the next set (IOS-021). A transition rest never does (IOS-022): a new
+    /// exercise needs the user to look at it and set up, so it ends in READY.
+    public var restAutoAdvances: Bool { phase == .resting && !isTransitionRest }
 
     public var totalPlannedSets: Int { executions.reduce(0) { $0 + $1.setCount } }
     public var confirmedSetCount: Int { resolvedSets.filter { $0.status != .skipped }.count }
