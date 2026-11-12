@@ -170,10 +170,10 @@ public static class PlanValidator
         return ok ? (title!, effectiveKind, discipline) : null;
     }
 
-    /// <summary><c>planned_workout</c> scalar fields; an omitted title is stored as "" (ADR-027).</summary>
     /// <summary>Upper bound of <c>planned_workouts.rest_between_exercises_seconds</c> (db/012, CON-011).</summary>
     public const int MaxRestBetweenExercisesSeconds = 3600;
 
+    /// <summary><c>planned_workout</c> scalar fields; an omitted title is stored as "" (ADR-027).</summary>
     public static (int Weekday, string Title, int OrderIndex)? ValidateWorkoutFields(
         int? weekday, string? title, int? orderIndex, string prefix, ValidationErrors errors)
     {

@@ -1,4 +1,4 @@
--- CON-011 Per-workout transition rest (docs/07, docs/08; ADR-079).
+-- CON-011 Per-workout transition rest (docs/07, docs/08; ADR-080).
 -- New numbered migration (ADR-049): db/001..011 are never edited.
 -- Backward compatible: adds one nullable column; existing rows stay NULL.
 --   * planned_workouts.rest_between_exercises_seconds: rest after the last set of one exercise and

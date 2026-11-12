@@ -50,7 +50,7 @@ public sealed record TrainingPlan(
     DateTimeOffset? ArchivedAt);
 
 /// <summary>OpenAPI <c>PlannedWorkout</c>; <c>title</c> is "" when the client omitted it (ADR-027).</summary>
-/// <remarks><c>RestBetweenExercisesSeconds</c>: null = client default 60 s (CON-011, ADR-079).</remarks>
+/// <remarks><c>RestBetweenExercisesSeconds</c>: null = client default 60 s (CON-011, ADR-080).</remarks>
 public sealed record PlannedWorkout(
     Guid Id, int Weekday, string Title, int OrderIndex, IReadOnlyList<PlannedExercise> Exercises,
     int? RestBetweenExercisesSeconds = null);
