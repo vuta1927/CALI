@@ -146,6 +146,37 @@ public sealed class PlanTests
         plan.Workouts.Single().Exercises.Single().Target.GetRawText().ShouldBe("""{"kind":"reps","repMin":5,"repMax":8}""");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(90)]
+    [InlineData(3600)]
+    public void Rest_between_exercises_is_optional_and_kept(int? seconds)
+    {
+        var errors = new ValidationErrors();
+        var input = ValidPlan();
+        input = input with { Workouts = [input.Workouts![0]! with { RestBetweenExercisesSeconds = seconds }] };
+
+        var plan = PlanValidator.ValidateCreate(input, CatalogTypes, errors);
+
+        errors.HasErrors.ShouldBeFalse(string.Join(", ", errors.Fields));
+        plan!.Workouts.Single().RestBetweenExercisesSeconds.ShouldBe(seconds);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3601)]
+    public void Rest_between_exercises_outside_0_to_3600_is_rejected(int seconds)
+    {
+        var errors = new ValidationErrors();
+        var input = ValidPlan();
+        input = input with { Workouts = [input.Workouts![0]! with { RestBetweenExercisesSeconds = seconds }] };
+
+        PlanValidator.ValidateCreate(input, CatalogTypes, errors).ShouldBeNull();
+
+        errors.Fields.ShouldBe(["workouts[0].restBetweenExercisesSeconds"]);
+    }
+
     [Fact]
     public void Duplicate_ids_within_the_request_are_rejected()
     {

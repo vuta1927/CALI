@@ -45,6 +45,7 @@ CON-009,M2,Integrator/BE/iOS,BE-004,personal content sync
 CON-010,M2,Integrator/BE/iOS,"CON-008, BE-006","voice pack contract: GET /v1/voice-pack, db/011, cue script, ADR-077/078"
 BE-007,M2,BE,"CON-010, BE-006","vbee TTS publisher job (CAF IMA4, sha256, object store, one-transaction publish) + GET /v1/voice-pack with ETag/304/rate limit"
 IOS-019,M2,iOS,"CON-010, BE-007","voice pack sync to Library/Sounds + VoiceCueService (foreground AVAudioPlayer, background notification sound) + settings toggle"
+CON-011,M2,BE/iOS,CON-001,"per-workout transition rest: planned_workouts.rest_between_exercises_seconds (db/012, NULL = client default 60 s), planned_workout payload + OpenAPI PlannedWorkout optional field, sync push/pull + POST /v1/plans, ADR-079"
 QA-004,M2,QA,IOS-019,"T-19..T-23 device matrix: locked, silent switch, Focus, music ducking, offline, deadline changes"
 IOS-007,M2,iOS,"IOS-001,BE-004",outbox push/pull/visible status/conflict inbox
 IOS-008,M2,iOS/BE,IOS-007,"Sign in with Apple, guest attach workflow"

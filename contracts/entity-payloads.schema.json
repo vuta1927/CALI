@@ -151,7 +151,8 @@
       "properties": {
         "id": {"$ref": "#/$defs/uuid"}, "planId": {"$ref": "#/$defs/uuid"},
         "weekday": {"type": "integer", "minimum": 1, "maximum": 7}, "title": {"type": "string", "maxLength": 120},
-        "orderIndex": {"type": "integer", "minimum": 0}
+        "orderIndex": {"type": "integer", "minimum": 0},
+        "restBetweenExercisesSeconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 3600, "description": "CON-011: rest before the next exercise of this workout; absent or null = client default 60 s."}
       }, "additionalProperties": false
     },
     "planned_exercise_payload": {

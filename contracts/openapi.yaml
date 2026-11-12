@@ -880,6 +880,7 @@ components:
         weekday: {type: integer, minimum: 1, maximum: 7, description: '1=Monday'}
         title: {type: string, maxLength: 120, description: 'Optional; stored as empty string when omitted (ADR-027).'}
         orderIndex: {type: integer, minimum: 0}
+        restBetweenExercisesSeconds: {type: [integer, 'null'], minimum: 0, maximum: 3600, description: 'CON-011: rest after the last set of one exercise before the next exercise of this workout. Optional; absent or null = client default 60 s (not stored). Between-set rest stays PlannedExercise.restSeconds.'}
         exercises:
           type: array
           items: {$ref: '#/components/schemas/PlannedExercise'}

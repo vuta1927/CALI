@@ -596,7 +596,7 @@ public sealed class SyncPushTests(PostgresFixture postgres)
 
         var fixture = await FixtureAsync("validation", "schema_rejections.json");
         var cases = fixture["cases"]!.AsArray();
-        cases.Count.ShouldBe(30);
+        cases.Count.ShouldBe(31);
         cases.Select(c => c!["mutation"]!["mutationId"]!.GetValue<string>()).ShouldBeUnique();
         var mismatches = new List<string>();
         foreach (var item in cases)
@@ -634,6 +634,7 @@ public sealed class SyncPushTests(PostgresFixture postgres)
     [InlineData("body_measurement_sync_push.sample.json")]
     [InlineData("plan_activation_sync_push.sample.json")]
     [InlineData("plan_goals_sync_push.sample.json")]
+    [InlineData("rest_between_exercises_sync_push.sample.json")]
     public async Task Self_contained_samples_apply_in_order(string sample)
     {
         var setup = await SetupAsync("sync_sample");
@@ -647,6 +648,31 @@ public sealed class SyncPushTests(PostgresFixture postgres)
         {
             Status(receipt).ShouldBe("applied", receipt.GetRawText());
         }
+    }
+
+    [Fact]
+    public async Task Rest_between_exercises_is_stored_and_logged_absent_or_null_as_null()
+    {
+        // CON-011: a payload without the field (pre-CON-011 client) and an explicit null both mean
+        // "client default" and are stored as NULL; a value is stored and echoed in the change log.
+        var setup = await SetupAsync("sync_rest_between");
+        await using var factory = Factory(setup);
+        using var client = Client(factory, setup, setup.UserA);
+
+        var receipts = await ReceiptsAsync(await PostAsync(client,
+            (await FixtureAsync("samples", "rest_between_exercises_sync_push.sample.json")).ToJsonString()));
+        receipts.Length.ShouldBe(4);
+        foreach (var receipt in receipts)
+        {
+            Status(receipt).ShouldBe("applied", receipt.GetRawText());
+        }
+
+        (await ScalarAsync<long>(setup.ConnectionString,
+            "SELECT count(*) FROM planned_workouts WHERE rest_between_exercises_seconds IS NULL")).ShouldBe(2);
+        (await ScalarAsync<int>(setup.ConnectionString,
+            "SELECT rest_between_exercises_seconds FROM planned_workouts WHERE id = 'f3100000-0000-4000-8000-000000000003'")).ShouldBe(90);
+        (await ScalarAsync<int>(setup.ConnectionString,
+            "SELECT (payload->>'restBetweenExercisesSeconds')::int FROM sync_change_log WHERE entity_id = 'f3100000-0000-4000-8000-000000000003'")).ShouldBe(90);
     }
 
     private static async Task ExecuteAsync(string connectionString, string sql, params object?[] args)

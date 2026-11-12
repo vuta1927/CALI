@@ -177,6 +177,9 @@ public static class SyncEntitySpecs
         r.Integer("weekday", "weekday", required: true, 1, 7);
         r.Text("title", "title", required: false, 0, PlanValidator.MaxTitleLength, defaultValue: string.Empty);
         r.Integer("orderIndex", "order_index", required: true, 0, int.MaxValue);
+        // CON-011: optional; absent or null = client default 60 s.
+        r.Integer("restBetweenExercisesSeconds", "rest_between_exercises_seconds", required: false, 0,
+            PlanValidator.MaxRestBetweenExercisesSeconds, nullable: true);
     }
 
     private static void PlannedExercise(SpecContext c)

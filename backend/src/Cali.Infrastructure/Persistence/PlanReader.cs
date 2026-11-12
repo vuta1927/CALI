@@ -25,7 +25,8 @@ public sealed class PlanReader(NpgsqlDataSource dataSource) : IPlanReader
         """;
 
     private const string WorkoutsSql = """
-        SELECT id AS Id, plan_id AS PlanId, weekday AS Weekday, title AS Title, order_index AS OrderIndex
+        SELECT id AS Id, plan_id AS PlanId, weekday AS Weekday, title AS Title, order_index AS OrderIndex,
+               rest_between_exercises_seconds AS RestBetweenExercisesSeconds
         FROM planned_workouts
         WHERE user_id = @userId AND plan_id = ANY(@planIds) AND deleted_at IS NULL
         ORDER BY weekday, order_index, id
@@ -81,7 +82,7 @@ public sealed class PlanReader(NpgsqlDataSource dataSource) : IPlanReader
                 p.EventName, p.PrimaryDiscipline,
                 workoutsByPlan[p.Id].Select(w => new PlannedWorkout(
                     w.Id, w.Weekday, w.Title, w.OrderIndex,
-                    exercisesByWorkout[w.Id].Select(ToExercise).ToArray())).ToArray(),
+                    exercisesByWorkout[w.Id].Select(ToExercise).ToArray(), w.RestBetweenExercisesSeconds)).ToArray(),
                 p.Revision, p.Version, p.Status, p.ParentPlanId, p.LineageId,
                 Utc(p.EndedAt), p.EndReason, p.EndNote, Utc(p.ArchivedAt)),
             DateTime.SpecifyKind(p.CreatedAt, DateTimeKind.Utc))).ToArray();
@@ -138,6 +139,7 @@ public sealed class PlanReader(NpgsqlDataSource dataSource) : IPlanReader
         public int Weekday { get; init; }
         public string Title { get; init; } = "";
         public int OrderIndex { get; init; }
+        public int? RestBetweenExercisesSeconds { get; init; }
     }
 
     private sealed class ExerciseRow

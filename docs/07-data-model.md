@@ -17,7 +17,7 @@
 | plan_audit_events | server | id, user_id, entity_type (`plan_goal\|plan_phase`), entity_id, entity_version, operation, old_row?, new_row, mutation_id?, changed_at | CON-005: chỉ thêm, ghi bởi trigger (đề xuất ADR-059) |
 | body_measurements | user | id, user_id, kind (`weight`), value, measured_at, version, deleted_at? | CON-007: **nhạy cảm**; kg, không có cột đơn vị (ADR-046, ADR-063); không bao giờ là đầu vào AI, không hiện trên Lock Screen (ADR-064) |
 | server_settings | server | key, int_value | cấu hình không phụ thuộc user: `active_plan_limit` = 3, `plan_count_limit` = 50 (db/004); `pinned_goal_limit` = 3 (db/005) |
-| planned_workouts | user | id, plan_id, weekday, order_index, title (optional, ≤120, `''` default) | order explicit (ADR-027) |
+| planned_workouts | user | id, plan_id, weekday, order_index, title (optional, ≤120, `''` default), rest_between_exercises_seconds? (0..3600) | order explicit (ADR-027); rest_between_exercises_seconds NULL = client default 60 s (CON-011, db/012, ADR-079) |
 | planned_exercises | user | id, planned_workout_id, exercise_id, order_index, set_count, target JSON, rest_seconds | validated type |
 | workout_sessions | user | id, planned_workout_id?, local_date, timezone, status, phase, paused_at?, accumulated_exercise_ms?, abandon_reason?, version | single active per user (`ux_session_one_active_per_user`); status↔phase CHECK (ADR-023) |
 | exercise_executions | user | id, session_id, exercise_id, order_index, prescribed_snapshot | snapshot prescribed (ADR-018) |
